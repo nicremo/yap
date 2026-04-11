@@ -1,43 +1,101 @@
 # OpenWhisp
 
-OpenWhisp is a Mac-first local dictation prototype inspired by the press-and-hold flow used by Wispr Flow: hold `Fn`, speak, release, and the app transcribes, rewrites, and pastes back into the focused app.
+Mac-first local dictation app. Hold **Fn**, speak, release — your words are transcribed, enhanced, and pasted into the active app. Everything runs on your machine. No cloud, no account, no latency.
 
-## Stack
+## How it works
 
-- Electron + React + TypeScript for the desktop shell and setup UI
-- Local Whisper transcription through `@huggingface/transformers`
-- Local rewrite through Ollama, with `qwen2.5:0.5b` as the recommended lightweight text model
-- A small Swift helper for macOS-only `Fn` listening, focus checks, and paste events
+1. **Hold Fn** — OpenWhisp starts listening
+2. **Speak** — your voice is captured locally
+3. **Release Fn** — Whisper transcribes your speech, a local LLM polishes the text, and the result is pasted into whatever app you were using
 
-## Why these default models
+The entire pipeline runs locally via [Whisper](https://github.com/openai/whisper) (speech-to-text) and [Ollama](https://ollama.com) (text enhancement).
 
-- `onnx-community/whisper-base.en` is the current default because it is still small enough for laptop use, but materially more reliable for dictation than the tiny English checkpoint.
-- `qwen2.5:0.5b` is the recommended rewrite model because it is close to the requested 0.4B class, fast in Ollama, and much stronger than the very smallest models at following tightly-scoped rewrite prompts.
+## Features
 
-## Current behavior
+- **Fully local** — no data leaves your Mac
+- **Styles** — switch between Conversation and Vibe Coding modes depending on context
+- **Enhancement levels** — from raw transcription (No Filter) to professional polish (High)
+- **Auto-paste** — refined text is pasted directly into the active app
+- **Auto-launch Ollama** — if Ollama is installed, OpenWhisp starts it automatically
+- **Setup wizard** — guided first-launch experience for permissions, models, and configuration
+- **Minimal overlay** — a small audio-reactive grid appears at the bottom of your screen during dictation
 
-1. On first launch, the setup window asks for microphone and macOS system-control permissions.
-2. The app can prepare the local Whisper model and pull the recommended Ollama model.
-3. The overlay appears near the bottom of the screen while dictation is active.
-4. `Fn` down starts recording.
-5. `Fn` up stops recording, transcribes locally, rewrites with the selected level, and pastes into the active app if the frontmost control looks editable.
+## Styles
 
-## Commands
+| Style | Use case |
+|-------|----------|
+| **Conversation** | Messages, emails, notes, everyday writing |
+| **Vibe Coding** | Developer communication — translates casual speech into proper engineering language |
+
+Each style has four enhancement levels: **No Filter**, **Soft**, **Medium**, and **High**.
+
+## Requirements
+
+- macOS (Apple Silicon recommended)
+- [Ollama](https://ollama.com/download/mac) — OpenWhisp auto-launches it if installed
+- ~10 GB disk space for models (downloaded on first launch)
+
+## Getting started
 
 ```bash
+git clone https://github.com/user/openwhisp.git
+cd openwhisp
 npm install
 npm run build:native
 npm run dev
 ```
 
-For a packaged app:
+On first launch, the setup wizard will walk you through:
+1. Connecting to Ollama
+2. Downloading the speech model (Whisper Base English)
+3. Downloading the text model (Gemma 4 E4B)
+4. Granting microphone and system permissions
+
+## Default models
+
+| Purpose | Model | Size |
+|---------|-------|------|
+| Speech-to-text | `onnx-community/whisper-base.en` | ~150 MB |
+| Text enhancement | `gemma4:e4b` | ~9.6 GB |
+
+You can switch to any Ollama-compatible model from the Models page.
+
+## Tech stack
+
+- **Electron** + **React** + **TypeScript** — desktop shell and UI
+- **@huggingface/transformers** — local Whisper inference
+- **Ollama** — local LLM inference via API
+- **Swift** — native macOS helper for Fn key listening, focus detection, and paste simulation
+- **electron-vite** — build tooling
+
+## Building for distribution
 
 ```bash
 npm run package
 ```
 
-## Notes
+Builds the Electron app, compiles the Swift helper, and packages everything into a `.dmg` and `.zip` in the `release/` directory.
 
-- The Swift helper is compiled locally in development and bundled from `build/native` during packaging.
-- macOS may require both Accessibility and Input Monitoring approval before global `Fn` capture works.
-- The current implementation keeps recordings in memory and only persists settings plus downloaded model files in the chosen storage folder.
+## Project structure
+
+```
+src/
+  main/           # Electron main process
+    dictation.ts    # Transcription + rewrite pipeline
+    ollama.ts       # Ollama API client + auto-launch
+    prompts.ts      # Style + level prompt matrix
+    settings.ts     # Settings persistence
+    windows.ts      # Window creation and positioning
+  renderer/       # React UI
+    App.tsx         # Sidebar layout, pages, overlay
+    styles.css      # Complete styling
+    audio-recorder.ts # Web Audio recorder with level metering
+  preload/        # Electron preload bridge
+  shared/         # Shared types and constants
+swift/
+  OpenWhispHelper.swift  # Native macOS helper
+```
+
+## License
+
+MIT
