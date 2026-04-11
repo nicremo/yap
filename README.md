@@ -2,6 +2,8 @@
 
 Mac-first local dictation app. Hold **Fn**, speak, release — your words are transcribed, enhanced, and pasted into the active app. Everything runs on your machine. No cloud, no account, no latency.
 
+Built in a weekend because I kept getting ads for Whisper Flow and thought — why not build it myself?
+
 ## How it works
 
 1. **Hold Fn** — OpenWhisp starts listening
@@ -15,6 +17,7 @@ The entire pipeline runs locally via [Whisper](https://github.com/openai/whisper
 - **Fully local** — no data leaves your Mac
 - **Styles** — switch between Conversation and Vibe Coding modes depending on context
 - **Enhancement levels** — from raw transcription (No Filter) to professional polish (High)
+- **Intent resolution** — if you change your mind mid-sentence ("make it white... actually, black"), OpenWhisp resolves to your final intent
 - **Auto-paste** — refined text is pasted directly into the active app
 - **Auto-launch Ollama** — if Ollama is installed, OpenWhisp starts it automatically
 - **Setup wizard** — guided first-launch experience for permissions, models, and configuration
@@ -38,18 +41,28 @@ Each style has four enhancement levels: **No Filter**, **Soft**, **Medium**, and
 ## Getting started
 
 ```bash
+# Clone the repo
 git clone https://github.com/user/openwhisp.git
 cd openwhisp
+
+# Install dependencies
 npm install
+
+# Compile the native Swift helper
 npm run build:native
+
+# Start the app
 npm run dev
 ```
 
 On first launch, the setup wizard will walk you through:
-1. Connecting to Ollama
-2. Downloading the speech model (Whisper Base English)
-3. Downloading the text model (Gemma 4 E4B)
-4. Granting microphone and system permissions
+
+1. **Ollama** — if not installed, the wizard links you to the download. If installed, OpenWhisp launches it automatically.
+2. **Speech model** — downloads Whisper Base English (~150 MB) for local speech recognition.
+3. **Text model** — downloads Gemma 4 E4B (~9.6 GB) for local text enhancement. This takes a few minutes on the first run.
+4. **Permissions** — microphone access for recording, plus Accessibility and Input Monitoring for Fn key listening and auto-paste.
+
+After setup, just press **Fn** and start talking.
 
 ## Default models
 
@@ -67,6 +80,7 @@ You can switch to any Ollama-compatible model from the Models page.
 - **Ollama** — local LLM inference via API
 - **Swift** — native macOS helper for Fn key listening, focus detection, and paste simulation
 - **electron-vite** — build tooling
+- **Hugeicons** — UI icons
 
 ## Building for distribution
 
@@ -83,11 +97,11 @@ src/
   main/           # Electron main process
     dictation.ts    # Transcription + rewrite pipeline
     ollama.ts       # Ollama API client + auto-launch
-    prompts.ts      # Style + level prompt matrix
+    prompts.ts      # Global rules + style + level prompt matrix
     settings.ts     # Settings persistence
     windows.ts      # Window creation and positioning
   renderer/       # React UI
-    App.tsx         # Sidebar layout, pages, overlay
+    App.tsx         # Sidebar layout, pages, setup wizard, overlay
     styles.css      # Complete styling
     audio-recorder.ts # Web Audio recorder with level metering
   preload/        # Electron preload bridge
@@ -99,3 +113,7 @@ swift/
 ## License
 
 MIT
+
+---
+
+Made by [Raelume](https://raelume.ai)
