@@ -9,7 +9,7 @@ interface OllamaTagsResponse {
 }
 
 const OLLAMA_DISCOVERY_TIMEOUT_MS = 5_000;
-const OLLAMA_PULL_TIMEOUT_MS = 20_000;
+const OLLAMA_PULL_TIMEOUT_MS = 600_000;
 const OLLAMA_CHAT_TIMEOUT_MS = 90_000;
 
 function buildUrl(baseUrl: string, pathName: string): string {
