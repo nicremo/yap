@@ -31,5 +31,6 @@ export function createDefaultSettings(): AppSettings {
     enhancementLevel: 'medium',
     autoPaste: true,
     launchAtLogin: false,
+    setupComplete: false,
   };
 }

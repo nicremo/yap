@@ -18,6 +18,7 @@ export interface AppSettings {
   enhancementLevel: EnhancementLevel;
   autoPaste: boolean;
   launchAtLogin: boolean;
+  setupComplete: boolean;
 }
 
 export interface PermissionsState {
@@ -83,4 +84,5 @@ export interface UpdateSettingsInput {
   storageDirectory?: string;
   autoPaste?: boolean;
   launchAtLogin?: boolean;
+  setupComplete?: boolean;
 }

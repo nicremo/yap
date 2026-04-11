@@ -7,28 +7,47 @@ import { RECOMMENDED_TEXT_MODEL, RECOMMENDED_WHISPER_LABEL } from '../shared/rec
 const OVERLAY_VIEW = window.location.hash === '#overlay';
 
 const LEVEL_OPTIONS: Array<{ value: EnhancementLevel; label: string; caption: string }> = [
-  { value: 'none', label: 'No filter', caption: 'Fastest pass. Keep the wording almost untouched.' },
-  { value: 'soft', label: 'Soft', caption: 'Fix grammar and cleanup with a light touch.' },
-  { value: 'medium', label: 'Medium', caption: 'Default. Improve clarity while keeping intent intact.' },
-  { value: 'high', label: 'High', caption: 'Most polished. Expand shorthand into professional prose.' },
+  { value: 'none', label: 'None', caption: 'Minimal touch — fix typos only.' },
+  { value: 'soft', label: 'Soft', caption: 'Light grammar and clarity polish.' },
+  { value: 'medium', label: 'Medium', caption: 'Rewrite for natural, clear prose.' },
+  { value: 'high', label: 'High', caption: 'Professional polish and expansion.' },
 ];
 
-function formatBytes(size: number): string {
-  if (size <= 0) {
-    return '0 B';
-  }
+const SETUP_STEPS = ['welcome', 'ollama', 'models', 'permissions', 'ready'] as const;
+type SetupStep = (typeof SETUP_STEPS)[number];
 
+function formatBytes(size: number): string {
+  if (size <= 0) return '0 B';
   const units = ['B', 'KB', 'MB', 'GB'];
   let current = size;
   let unitIndex = 0;
-
   while (current >= 1024 && unitIndex < units.length - 1) {
     current /= 1024;
     unitIndex += 1;
   }
-
   return `${current.toFixed(current >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
 }
+
+function CheckIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="3"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  );
+}
+
+/* ────────────────────────────────────────────────
+   App – root component
+   ──────────────────────────────────────────────── */
 
 export function App() {
   const [bootstrap, setBootstrap] = useState<BootstrapState | null>(null);
@@ -42,7 +61,6 @@ export function App() {
   const recordingRef = useRef(false);
   const processingRef = useRef(false);
   const bootstrapRef = useRef<BootstrapState | null>(null);
-  const onboardingAttemptedRef = useRef(false);
   const targetFocusRef = useRef<FocusInfo | null>(null);
 
   useEffect(() => {
@@ -53,32 +71,22 @@ export function App() {
     let mounted = true;
 
     const loadBootstrap = async () => {
-      const nextBootstrap = await window.openWhisp.bootstrap();
-      if (!mounted) {
-        return;
-      }
-
-      setBootstrap(nextBootstrap);
-      setStatus(nextBootstrap.status);
+      const next = await window.openWhisp.bootstrap();
+      if (!mounted) return;
+      setBootstrap(next);
+      setStatus(next.status);
     };
 
     void loadBootstrap();
 
-    const stopStatus = window.openWhisp.onStatus((nextStatus) => {
-      if (mounted) {
-        setStatus(nextStatus);
-      }
+    const stopStatus = window.openWhisp.onStatus((s) => {
+      if (mounted) setStatus(s);
     });
 
     const stopHotkey = OVERLAY_VIEW
       ? window.openWhisp.onHotkey((event) => {
-          if (event.type === 'down') {
-            void handleHotkeyDown();
-          }
-
-          if (event.type === 'up') {
-            void handleHotkeyUp();
-          }
+          if (event.type === 'down') void handleHotkeyDown();
+          if (event.type === 'up') void handleHotkeyUp();
         })
       : () => undefined;
 
@@ -90,70 +98,34 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (OVERLAY_VIEW) {
-      recorderRef.current = new AudioRecorder();
-    }
+    if (OVERLAY_VIEW) recorderRef.current = new AudioRecorder();
   }, []);
 
-  useEffect(() => {
-    if (OVERLAY_VIEW || !bootstrap || onboardingAttemptedRef.current) {
-      return;
-    }
-
-    onboardingAttemptedRef.current = true;
-
-    const runOnboarding = async () => {
-      let nextState = bootstrap;
-
-      if (nextState.permissions.microphone !== 'granted') {
-        nextState = await window.openWhisp.requestMicrophoneAccess();
-        bootstrapRef.current = nextState;
-        setBootstrap(nextState);
-        setStatus(nextState.status);
-      }
-
-      if (
-        !nextState.permissions.accessibility ||
-        !nextState.permissions.inputMonitoring ||
-        !nextState.permissions.postEvents
-      ) {
-        nextState = await window.openWhisp.requestSystemAccess();
-        bootstrapRef.current = nextState;
-        setBootstrap(nextState);
-        setStatus(nextState.status);
-      }
-    };
-
-    void runOnboarding();
-  }, [bootstrap]);
-
   const refreshBootstrap = async () => {
-    const nextBootstrap = await window.openWhisp.bootstrap();
-    bootstrapRef.current = nextBootstrap;
-    setBootstrap(nextBootstrap);
-    setStatus(nextBootstrap.status);
-    return nextBootstrap;
+    const next = await window.openWhisp.bootstrap();
+    bootstrapRef.current = next;
+    setBootstrap(next);
+    setStatus(next.status);
+    return next;
   };
 
-  const pushStatus = (nextStatus: AppStatus) => {
-    setStatus(nextStatus);
-    window.openWhisp.pushStatus(nextStatus);
+  const pushStatus = (s: AppStatus) => {
+    setStatus(s);
+    window.openWhisp.pushStatus(s);
   };
 
   const runAction = async (label: string, action: () => Promise<BootstrapState>) => {
     try {
       setBusyAction(label);
-      const nextBootstrap = await action();
-      bootstrapRef.current = nextBootstrap;
-      setBootstrap(nextBootstrap);
-      setStatus(nextBootstrap.status);
+      const next = await action();
+      bootstrapRef.current = next;
+      setBootstrap(next);
+      setStatus(next.status);
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'OpenWhisp could not complete this action.';
       pushStatus({
         phase: 'error',
         title: 'Action failed',
-        detail: message,
+        detail: error instanceof Error ? error.message : 'Could not complete this action.',
       });
     } finally {
       setBusyAction(null);
@@ -166,9 +138,7 @@ export function App() {
       (model) => model.name === current.settings.textModel,
     );
 
-    if (recordingRef.current || processingRef.current) {
-      return;
-    }
+    if (recordingRef.current || processingRef.current) return;
 
     if (current.permissions.microphone !== 'granted') {
       pushStatus({
@@ -180,7 +150,11 @@ export function App() {
       return;
     }
 
-    if (!current.permissions.inputMonitoring || !current.permissions.postEvents || !current.permissions.accessibility) {
+    if (
+      !current.permissions.inputMonitoring ||
+      !current.permissions.postEvents ||
+      !current.permissions.accessibility
+    ) {
       pushStatus({
         phase: 'error',
         title: 'System access needed',
@@ -215,11 +189,7 @@ export function App() {
       await window.openWhisp.hideMainWindow();
       recordingRef.current = true;
       await recorderRef.current?.start();
-      pushStatus({
-        phase: 'listening',
-        title: 'Listening',
-        detail: 'Speak while holding Fn.',
-      });
+      pushStatus({ phase: 'listening', title: 'Listening', detail: 'Speak while holding Fn.' });
     } catch (error) {
       recordingRef.current = false;
       pushStatus({
@@ -231,25 +201,22 @@ export function App() {
   };
 
   const handleHotkeyUp = async () => {
-    if (!recordingRef.current || processingRef.current) {
-      return;
-    }
+    if (!recordingRef.current || processingRef.current) return;
 
     recordingRef.current = false;
     processingRef.current = true;
 
     try {
       const wavBase64 = await recorderRef.current?.stop();
-      if (!wavBase64) {
-        throw new Error('No recording was captured.');
-      }
+      if (!wavBase64) throw new Error('No recording was captured.');
 
       const result = await window.openWhisp.processAudio({
         wavBase64,
         targetFocus: targetFocusRef.current ?? undefined,
       });
+
       pushStatus({
-        phase: result.pasted ? 'done' : 'done',
+        phase: 'done',
         title: result.pasted ? 'Pasted' : 'Copied',
         detail: result.pasted
           ? 'The refined text was pasted into the active app.'
@@ -261,7 +228,7 @@ export function App() {
       pushStatus({
         phase: 'error',
         title: 'Dictation failed',
-        detail: error instanceof Error ? error.message : 'OpenWhisp could not finish this dictation.',
+        detail: error instanceof Error ? error.message : 'Could not finish this dictation.',
       });
     } finally {
       targetFocusRef.current = null;
@@ -269,101 +236,539 @@ export function App() {
     }
   };
 
-  if (OVERLAY_VIEW) {
-    return <OverlayChip status={status} />;
-  }
+  if (OVERLAY_VIEW) return <OverlayChip status={status} />;
 
   if (!bootstrap) {
-    return <main className="app-shell loading-shell">Loading OpenWhisp…</main>;
+    return (
+      <main className="app-shell loading-shell">
+        <div className="loading-spinner" />
+        <span className="loading-text">Loading OpenWhisp</span>
+      </main>
+    );
+  }
+
+  if (!bootstrap.settings.setupComplete) {
+    return (
+      <SetupWizard
+        bootstrap={bootstrap}
+        busyAction={busyAction}
+        onAction={runAction}
+        onRefresh={refreshBootstrap}
+        onComplete={() =>
+          void runAction('setup', () => window.openWhisp.updateSettings({ setupComplete: true }))
+        }
+      />
+    );
   }
 
   return (
-    <main className="app-shell">
-      <section className="hero">
-        <div>
-          <p className="eyebrow">OpenWhisp</p>
-          <h1>Hold Fn to talk. Release Fn to paste.</h1>
+    <MainView
+      bootstrap={bootstrap}
+      status={status}
+      busyAction={busyAction}
+      onAction={runAction}
+      onRefresh={refreshBootstrap}
+    />
+  );
+}
+
+/* ────────────────────────────────────────────────
+   Setup Wizard
+   ──────────────────────────────────────────────── */
+
+function SetupWizard({
+  bootstrap,
+  busyAction,
+  onAction,
+  onRefresh,
+  onComplete,
+}: {
+  bootstrap: BootstrapState;
+  busyAction: string | null;
+  onAction: (label: string, action: () => Promise<BootstrapState>) => Promise<void>;
+  onRefresh: () => Promise<BootstrapState>;
+  onComplete: () => void;
+}) {
+  const [step, setStep] = useState<SetupStep>('welcome');
+  const stepIndex = SETUP_STEPS.indexOf(step);
+
+  const goNext = () => {
+    const next = stepIndex + 1;
+    if (next < SETUP_STEPS.length) setStep(SETUP_STEPS[next]);
+  };
+
+  const goBack = () => {
+    const prev = stepIndex - 1;
+    if (prev >= 0) setStep(SETUP_STEPS[prev]);
+  };
+
+  return (
+    <main className="setup-shell">
+      <div className="drag-region" />
+
+      <div className="setup-progress">
+        {SETUP_STEPS.map((s, i) => (
+          <div
+            key={s}
+            className={`setup-dot${i <= stepIndex ? ' setup-dot-active' : ''}${i === stepIndex ? ' setup-dot-current' : ''}`}
+          />
+        ))}
+      </div>
+
+      <div className="setup-body" key={step}>
+        {step === 'welcome' && <WelcomeStep onNext={goNext} />}
+        {step === 'ollama' && (
+          <OllamaStep
+            bootstrap={bootstrap}
+            onRefresh={onRefresh}
+            onNext={goNext}
+            onBack={goBack}
+          />
+        )}
+        {step === 'models' && (
+          <ModelsStep
+            bootstrap={bootstrap}
+            busyAction={busyAction}
+            onAction={onAction}
+            onNext={goNext}
+            onBack={goBack}
+          />
+        )}
+        {step === 'permissions' && (
+          <PermissionsStep
+            bootstrap={bootstrap}
+            busyAction={busyAction}
+            onAction={onAction}
+            onNext={goNext}
+            onBack={goBack}
+          />
+        )}
+        {step === 'ready' && <ReadyStep onBack={goBack} onComplete={onComplete} />}
+      </div>
+    </main>
+  );
+}
+
+/* ── Welcome ──────────────────────────────────── */
+
+function WelcomeStep({ onNext }: { onNext: () => void }) {
+  return (
+    <div className="setup-step setup-step-center">
+      <div className="fn-key">
+        <span>fn</span>
+      </div>
+      <h1 className="setup-title">Welcome to OpenWhisp</h1>
+      <p className="setup-desc">
+        Local dictation powered by Whisper and Ollama. Your voice stays on your machine — nothing
+        leaves your Mac.
+      </p>
+      <div className="setup-nav">
+        <div />
+        <button className="btn btn-primary" onClick={onNext}>
+          Get Started
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ── Ollama ───────────────────────────────────── */
+
+function OllamaStep({
+  bootstrap,
+  onRefresh,
+  onNext,
+  onBack,
+}: {
+  bootstrap: BootstrapState;
+  onRefresh: () => Promise<BootstrapState>;
+  onNext: () => void;
+  onBack: () => void;
+}) {
+  const [checking, setChecking] = useState(false);
+
+  const handleRetry = async () => {
+    setChecking(true);
+    await onRefresh();
+    setChecking(false);
+  };
+
+  return (
+    <div className="setup-step">
+      <h1 className="setup-title">Connect to Ollama</h1>
+      <p className="setup-desc">
+        Ollama runs AI models locally on your Mac. OpenWhisp uses it to enhance your dictated text.
+      </p>
+
+      <div className="s-card">
+        <div className="s-card-row">
+          <div className="s-card-info">
+            <strong>Ollama Server</strong>
+            <span>{bootstrap.settings.ollamaBaseUrl}</span>
+          </div>
+          {bootstrap.ollamaReachable ? (
+            <span className="badge badge-ready">
+              <CheckIcon size={12} /> Connected
+            </span>
+          ) : (
+            <span className="badge badge-pending">Not running</span>
+          )}
         </div>
-        <p className="hero-copy">
-          Local Whisper transcription, local Ollama rewriting, and a small Mac overlay tuned for
-          fast dictation.
+
+        {!bootstrap.ollamaReachable && (
+          <div className="s-card-bottom">
+            <p className="s-card-hint">
+              Install and start Ollama to continue. It runs locally and is completely free.
+            </p>
+            <div className="btn-group">
+              <button
+                className="btn btn-secondary"
+                onClick={() =>
+                  void window.openWhisp.openExternal('https://ollama.com/download/mac')
+                }
+              >
+                Install Ollama
+              </button>
+              <button
+                className="btn btn-secondary"
+                onClick={() => void handleRetry()}
+                disabled={checking}
+              >
+                {checking ? 'Checking...' : 'Retry Connection'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {bootstrap.ollamaReachable && bootstrap.ollamaModels.length > 0 && (
+          <div className="s-card-meta">
+            {bootstrap.ollamaModels.length} model
+            {bootstrap.ollamaModels.length !== 1 ? 's' : ''} available
+          </div>
+        )}
+      </div>
+
+      <div className="setup-nav">
+        <button className="btn btn-ghost" onClick={onBack}>
+          Back
+        </button>
+        <button className="btn btn-primary" onClick={onNext} disabled={!bootstrap.ollamaReachable}>
+          Continue
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ── Models ───────────────────────────────────── */
+
+function ModelsStep({
+  bootstrap,
+  busyAction,
+  onAction,
+  onNext,
+  onBack,
+}: {
+  bootstrap: BootstrapState;
+  busyAction: string | null;
+  onAction: (label: string, action: () => Promise<BootstrapState>) => Promise<void>;
+  onNext: () => void;
+  onBack: () => void;
+}) {
+  const speechReady = bootstrap.speechModelReady;
+  const textReady = bootstrap.recommendedModelInstalled;
+
+  return (
+    <div className="setup-step">
+      <h1 className="setup-title">Download Models</h1>
+      <p className="setup-desc">
+        Two small AI models power OpenWhisp — one for speech recognition and one for text
+        enhancement.
+      </p>
+
+      <div className="s-card">
+        <div className="s-card-label">Speech to Text</div>
+        <div className="s-card-row">
+          <div className="s-card-info">
+            <strong>{RECOMMENDED_WHISPER_LABEL}</strong>
+            <span>Local speech recognition</span>
+          </div>
+          {speechReady ? (
+            <span className="badge badge-ready">
+              <CheckIcon size={12} /> Ready
+            </span>
+          ) : (
+            <button
+              className="btn btn-sm btn-primary"
+              disabled={busyAction === 'speech'}
+              onClick={() => void onAction('speech', () => window.openWhisp.prepareSpeechModel())}
+            >
+              {busyAction === 'speech' ? 'Downloading...' : 'Download'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="s-card">
+        <div className="s-card-label">Text Enhancement</div>
+        <div className="s-card-row">
+          <div className="s-card-info">
+            <strong>{RECOMMENDED_TEXT_MODEL}</strong>
+            <span>Polishes your transcribed text</span>
+          </div>
+          {textReady ? (
+            <span className="badge badge-ready">
+              <CheckIcon size={12} /> Ready
+            </span>
+          ) : (
+            <button
+              className="btn btn-sm btn-primary"
+              disabled={busyAction === 'model' || !bootstrap.ollamaReachable}
+              onClick={() =>
+                void onAction('model', () => window.openWhisp.pullRecommendedModel())
+              }
+            >
+              {busyAction === 'model' ? 'Downloading...' : 'Download'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="setup-nav">
+        <button className="btn btn-ghost" onClick={onBack}>
+          Back
+        </button>
+        <button
+          className="btn btn-primary"
+          onClick={onNext}
+          disabled={!speechReady || !textReady}
+        >
+          Continue
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ── Permissions ──────────────────────────────── */
+
+function PermissionsStep({
+  bootstrap,
+  busyAction,
+  onAction,
+  onNext,
+  onBack,
+}: {
+  bootstrap: BootstrapState;
+  busyAction: string | null;
+  onAction: (label: string, action: () => Promise<BootstrapState>) => Promise<void>;
+  onNext: () => void;
+  onBack: () => void;
+}) {
+  const micReady = bootstrap.permissions.microphone === 'granted';
+  const sysReady =
+    bootstrap.permissions.accessibility &&
+    bootstrap.permissions.inputMonitoring &&
+    bootstrap.permissions.postEvents;
+
+  return (
+    <div className="setup-step">
+      <h1 className="setup-title">Allow Access</h1>
+      <p className="setup-desc">
+        OpenWhisp needs a few permissions to listen, transcribe, and paste into your apps.
+      </p>
+
+      <div className="s-card">
+        <div className="s-card-row">
+          <div className="s-card-info">
+            <strong>Microphone</strong>
+            <span>Captures your voice for transcription</span>
+          </div>
+          {micReady ? (
+            <span className="badge badge-ready">
+              <CheckIcon size={12} /> Granted
+            </span>
+          ) : (
+            <button
+              className="btn btn-sm btn-primary"
+              disabled={busyAction === 'mic'}
+              onClick={() =>
+                void onAction('mic', () => window.openWhisp.requestMicrophoneAccess())
+              }
+            >
+              {busyAction === 'mic' ? 'Requesting...' : 'Allow'}
+            </button>
+          )}
+        </div>
+
+        <div className="s-card-divider" />
+
+        <div className="s-card-row">
+          <div className="s-card-info">
+            <strong>System Access</strong>
+            <span>Fn key listening and auto-paste</span>
+          </div>
+          {sysReady ? (
+            <span className="badge badge-ready">
+              <CheckIcon size={12} /> Granted
+            </span>
+          ) : (
+            <button
+              className="btn btn-sm btn-primary"
+              disabled={busyAction === 'system'}
+              onClick={() =>
+                void onAction('system', () => window.openWhisp.requestSystemAccess())
+              }
+            >
+              {busyAction === 'system' ? 'Opening...' : 'Allow'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {!sysReady && (
+        <p className="setup-hint">
+          macOS will ask you to enable Accessibility and Input Monitoring in System Settings. You may
+          need to restart the app after granting access.
         </p>
+      )}
+
+      <div className="setup-nav">
+        <button className="btn btn-ghost" onClick={onBack}>
+          Back
+        </button>
+        <button className="btn btn-primary" onClick={onNext} disabled={!micReady || !sysReady}>
+          Continue
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ── Ready ────────────────────────────────────── */
+
+function ReadyStep({ onBack, onComplete }: { onBack: () => void; onComplete: () => void }) {
+  return (
+    <div className="setup-step setup-step-center">
+      <div className="ready-icon">
+        <CheckIcon size={32} />
+      </div>
+      <h1 className="setup-title">You're All Set</h1>
+      <p className="setup-desc">
+        Hold the Fn key to start dictating. Release it and OpenWhisp will transcribe, enhance, and
+        paste your text automatically.
+      </p>
+      <div className="setup-nav">
+        <button className="btn btn-ghost" onClick={onBack}>
+          Back
+        </button>
+        <button className="btn btn-primary" onClick={onComplete}>
+          Start Dictating
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────
+   Main View – post-setup settings
+   ──────────────────────────────────────────────── */
+
+function MainView({
+  bootstrap,
+  status,
+  onAction,
+}: {
+  bootstrap: BootstrapState;
+  status: AppStatus;
+  busyAction: string | null;
+  onAction: (label: string, action: () => Promise<BootstrapState>) => Promise<void>;
+  onRefresh: () => Promise<BootstrapState>;
+}) {
+  const [ollamaUrl, setOllamaUrl] = useState(bootstrap.settings.ollamaBaseUrl);
+
+  useEffect(() => {
+    setOllamaUrl(bootstrap.settings.ollamaBaseUrl);
+  }, [bootstrap.settings.ollamaBaseUrl]);
+
+  const selectedLevel = LEVEL_OPTIONS.find(
+    (l) => l.value === bootstrap.settings.enhancementLevel,
+  );
+
+  return (
+    <main className="app-shell">
+      <div className="drag-region" />
+
+      <header className="app-header">
+        <div>
+          <h1 className="app-title">OpenWhisp</h1>
+          <p className="app-tagline">Hold Fn to talk. Release to paste.</p>
+        </div>
+      </header>
+
+      {/* Status */}
+      <section className="card status-card">
+        <div className="status-row">
+          <div className={`status-dot status-${status.phase}`} />
+          <div className="status-info">
+            <strong>{status.title}</strong>
+            <span>{status.detail}</span>
+          </div>
+        </div>
+        {status.preview && <pre className="status-preview">{status.preview}</pre>}
       </section>
 
-      <section className="section">
-        <div className="section-heading">
-          <h2>Setup</h2>
-          <button className="ghost-button quick-action-button" onClick={() => void refreshBootstrap()}>
+      {/* Enhancement Level */}
+      <section className="card">
+        <div className="card-head">
+          <h2>Enhancement</h2>
+        </div>
+        <div className="level-selector">
+          {LEVEL_OPTIONS.map((level) => (
+            <button
+              key={level.value}
+              className={`level-pill${bootstrap.settings.enhancementLevel === level.value ? ' level-pill-active' : ''}`}
+              onClick={() =>
+                void onAction('settings', () =>
+                  window.openWhisp.updateSettings({ enhancementLevel: level.value }),
+                )
+              }
+            >
+              {level.label}
+            </button>
+          ))}
+        </div>
+        {selectedLevel && <p className="level-caption">{selectedLevel.caption}</p>}
+      </section>
+
+      {/* Models */}
+      <section className="card">
+        <div className="card-head">
+          <h2>Models</h2>
+          <button
+            className="btn btn-link"
+            onClick={() => void onAction('refresh-ollama', () => window.openWhisp.refreshOllama())}
+          >
             Refresh
           </button>
         </div>
 
-        <SetupRow
-          title="Microphone"
-          description="Required to capture dictation. If macOS does not show a prompt, OpenWhisp opens the Microphone settings page."
-          ready={bootstrap.permissions.microphone === 'granted'}
-          actionLabel={busyAction === 'mic' ? 'Requesting…' : 'Enable'}
-          onAction={() =>
-            void runAction('mic', () => window.openWhisp.requestMicrophoneAccess())
-          }
-        />
-        <SetupRow
-          title="System control"
-          description="Needed for Fn listening and paste into the active app. In development, macOS may show Electron and openwhisp-helper in Privacy & Security."
-          ready={
-            bootstrap.permissions.accessibility &&
-            bootstrap.permissions.inputMonitoring &&
-            bootstrap.permissions.postEvents
-          }
-          actionLabel={busyAction === 'system' ? 'Opening…' : 'Enable'}
-          onAction={() => void runAction('system', () => window.openWhisp.requestSystemAccess())}
-        />
-        <SetupRow
-          title={RECOMMENDED_WHISPER_LABEL}
-          description="Recommended local speech model. Download once and reuse."
-          ready={bootstrap.speechModelReady}
-          actionLabel={busyAction === 'speech' ? 'Preparing…' : 'Download speech model'}
-          onAction={() => void runAction('speech', () => window.openWhisp.prepareSpeechModel())}
-        />
-        <SetupRow
-          title={RECOMMENDED_TEXT_MODEL}
-          description={
-            bootstrap.ollamaReachable
-              ? 'Recommended fastest rewrite model for this workflow. You can still switch to a larger local model if you prefer stronger polishing over latency.'
-              : 'Start Ollama first. OpenWhisp expects it at the configured local URL before it can pull or use rewrite models.'
-          }
-          ready={bootstrap.recommendedModelInstalled}
-          actionLabel={
-            bootstrap.ollamaReachable
-              ? busyAction === 'model'
-                ? 'Downloading…'
-                : 'Download text model'
-              : 'Ollama offline'
-          }
-          disabled={!bootstrap.ollamaReachable}
-          onAction={() => void runAction('model', () => window.openWhisp.pullRecommendedModel())}
-        />
-      </section>
-
-      <section className="section">
-        <div className="section-heading">
-          <h2>Models</h2>
-          <button
-            className="ghost-button quick-action-button"
-            onClick={() => void runAction('refresh-ollama', () => window.openWhisp.refreshOllama())}
-          >
-            Refresh Ollama
-          </button>
+        <div className="setting-row">
+          <label className="setting-label">Speech model</label>
+          <span className="setting-value">{bootstrap.settings.whisperLabel}</span>
         </div>
 
-        <div className="field">
-          <label htmlFor="model-select">Rewrite model</label>
+        <div className="setting-row">
+          <label className="setting-label" htmlFor="model-select">
+            Rewrite model
+          </label>
           <select
             id="model-select"
+            className="setting-select"
             value={bootstrap.settings.textModel}
-            onChange={(event) =>
-              void runAction('settings', () =>
-                window.openWhisp.updateSettings({ textModel: event.target.value }),
+            onChange={(e) =>
+              void onAction('settings', () =>
+                window.openWhisp.updateSettings({ textModel: e.target.value }),
               )
             }
           >
@@ -372,162 +777,136 @@ export function App() {
             ) : (
               bootstrap.ollamaModels.map((model) => (
                 <option key={model.name} value={model.name}>
-                  {model.name} · {formatBytes(model.size)}
+                  {model.name} ({formatBytes(model.size)})
                 </option>
               ))
             )}
           </select>
         </div>
 
-        <div className="field">
-          <label htmlFor="base-url">Ollama base URL</label>
-          <input
-            id="base-url"
-            value={bootstrap.settings.ollamaBaseUrl}
-            onChange={(event) =>
-              setBootstrap({
-                ...bootstrap,
-                settings: {
-                  ...bootstrap.settings,
-                  ollamaBaseUrl: event.target.value,
-                },
-              })
-            }
-            onBlur={() =>
-              void runAction('settings', () =>
-                window.openWhisp.updateSettings({ ollamaBaseUrl: bootstrap.settings.ollamaBaseUrl }),
-              )
-            }
-          />
-          {!bootstrap.ollamaReachable && (
-            <p className="hint">
-              Ollama is not responding. Install it from{' '}
-              <button
-                className="inline-button"
-                onClick={() => void window.openWhisp.openExternal('https://ollama.com/download/mac')}
-              >
-                ollama.com
-              </button>
-              .
-            </p>
-          )}
-        </div>
-      </section>
-
-      <section className="section">
-        <div className="section-heading">
-          <h2>Rewrite level</h2>
-        </div>
-
-        <div className="level-grid">
-          {LEVEL_OPTIONS.map((level) => (
-            <button
-              key={level.value}
-              className={`level-button ${
-                bootstrap.settings.enhancementLevel === level.value ? 'level-button-active' : ''
-              }`}
-              onClick={() =>
-                void runAction('settings', () =>
-                  window.openWhisp.updateSettings({ enhancementLevel: level.value }),
+        <div className="setting-row">
+          <label className="setting-label" htmlFor="ollama-url">
+            Ollama URL
+          </label>
+          <div className="url-field">
+            <input
+              id="ollama-url"
+              className="setting-input"
+              value={ollamaUrl}
+              onChange={(e) => setOllamaUrl(e.target.value)}
+              onBlur={() =>
+                void onAction('settings', () =>
+                  window.openWhisp.updateSettings({ ollamaBaseUrl: ollamaUrl }),
                 )
               }
+            />
+            <span
+              className={`url-badge${bootstrap.ollamaReachable ? ' url-badge-ok' : ' url-badge-off'}`}
             >
-              <span>{level.label}</span>
-              <small>{level.caption}</small>
-            </button>
-          ))}
+              {bootstrap.ollamaReachable ? 'Connected' : 'Offline'}
+            </span>
+          </div>
         </div>
       </section>
 
-      <section className="section">
-        <div className="section-heading">
-          <h2>Storage</h2>
+      {/* Preferences */}
+      <section className="card">
+        <div className="card-head">
+          <h2>Preferences</h2>
         </div>
 
-        <p className="storage-path">{bootstrap.settings.storageDirectory}</p>
-        <div className="button-row">
-          <button className="ghost-button" onClick={() => void runAction('storage', () => window.openWhisp.chooseStorage())}>
-            Choose folder
-          </button>
-          <button className="ghost-button" onClick={() => void window.openWhisp.revealStorage()}>
-            Open folder
-          </button>
-        </div>
+        <ToggleRow
+          title="Auto-paste"
+          description="Paste into the active app after rewriting"
+          checked={bootstrap.settings.autoPaste}
+          onChange={(v) =>
+            void onAction('settings', () => window.openWhisp.updateSettings({ autoPaste: v }))
+          }
+        />
+        <ToggleRow
+          title="Launch at login"
+          description="Start OpenWhisp when you log in"
+          checked={bootstrap.settings.launchAtLogin}
+          onChange={(v) =>
+            void onAction('settings', () =>
+              window.openWhisp.updateSettings({ launchAtLogin: v }),
+            )
+          }
+        />
 
-        <label className="toggle">
-          <input
-            type="checkbox"
-            checked={bootstrap.settings.autoPaste}
-            onChange={(event) =>
-              void runAction('settings', () =>
-                window.openWhisp.updateSettings({ autoPaste: event.target.checked }),
-              )
-            }
-          />
-          <span>Auto-paste into the active app after rewriting</span>
-        </label>
-        <label className="toggle">
-          <input
-            type="checkbox"
-            checked={bootstrap.settings.launchAtLogin}
-            onChange={(event) =>
-              void runAction('settings', () =>
-                window.openWhisp.updateSettings({ launchAtLogin: event.target.checked }),
-              )
-            }
-          />
-          <span>Launch at login</span>
-        </label>
+        <div className="storage-section">
+          <div className="storage-top">
+            <span className="setting-label">Storage</span>
+            <div className="btn-group-compact">
+              <button
+                className="btn btn-link"
+                onClick={() =>
+                  void onAction('storage', () => window.openWhisp.chooseStorage())
+                }
+              >
+                Change
+              </button>
+              <button
+                className="btn btn-link"
+                onClick={() => void window.openWhisp.revealStorage()}
+              >
+                Open
+              </button>
+            </div>
+          </div>
+          <span className="storage-path">{bootstrap.settings.storageDirectory}</span>
+        </div>
       </section>
 
-      <section className="section live-section">
-        <div className="section-heading">
-          <h2>Live</h2>
-        </div>
-        <StatusSummary status={status} />
-      </section>
+      {/* Footer */}
+      <div className="app-footer">
+        <button
+          className="btn btn-link btn-muted"
+          onClick={() =>
+            void onAction('setup', () =>
+              window.openWhisp.updateSettings({ setupComplete: false }),
+            )
+          }
+        >
+          Reset Setup
+        </button>
+      </div>
     </main>
   );
 }
 
-function SetupRow(props: {
+/* ────────────────────────────────────────────────
+   Toggle Row
+   ──────────────────────────────────────────────── */
+
+function ToggleRow({
+  title,
+  description,
+  checked,
+  onChange,
+}: {
   title: string;
   description: string;
-  ready: boolean;
-  actionLabel: string;
-  disabled?: boolean;
-  onAction: () => void;
+  checked: boolean;
+  onChange: (value: boolean) => void;
 }) {
   return (
-    <div className="setup-row">
-      <div>
-        <div className="setup-title">
-          <strong>{props.title}</strong>
-          <span className={`badge ${props.ready ? 'badge-ready' : 'badge-pending'}`}>
-            {props.ready ? 'Ready' : 'Needed'}
-          </span>
-        </div>
-        <p>{props.description}</p>
+    <div className="toggle-row">
+      <div className="toggle-info">
+        <strong>{title}</strong>
+        <span>{description}</span>
       </div>
-      <button className="primary-button" onClick={props.onAction} disabled={props.disabled}>
-        {props.actionLabel}
-      </button>
+      <label className="switch">
+        <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+        <span className="switch-slider" />
+      </label>
     </div>
   );
 }
 
-function StatusSummary({ status }: { status: AppStatus }) {
-  return (
-    <div className="status-summary">
-      <div className="status-topline">
-        <strong>{status.title}</strong>
-        <span>{status.phase}</span>
-      </div>
-      <p>{status.detail}</p>
-      {status.preview && <pre>{status.preview}</pre>}
-    </div>
-  );
-}
+/* ────────────────────────────────────────────────
+   Overlay Chip
+   ──────────────────────────────────────────────── */
 
 function OverlayChip({ status }: { status: AppStatus }) {
   return (
