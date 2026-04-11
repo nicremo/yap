@@ -210,6 +210,7 @@ async function bootstrap(): Promise<void> {
   });
 
   await createWindows();
+  await ensureOverlayWindow();
 
   helperReady = await ensureNativeHelper();
 

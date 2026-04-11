@@ -31,8 +31,8 @@ async function loadRendererWindow(window: BrowserWindow, hash = ''): Promise<voi
 
 export async function createMainWindow(): Promise<BrowserWindow> {
   const window = new BrowserWindow({
-    width: 720,
-    height: 520,
+    width: 780,
+    height: 580,
     minWidth: 480,
     minHeight: 360,
     show: false,
