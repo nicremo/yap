@@ -201,7 +201,6 @@ export function App() {
 
     try {
       targetFocusRef.current = await window.openWhisp.captureFocusTarget();
-      await window.openWhisp.hideMainWindow();
       recordingRef.current = true;
       await recorderRef.current?.start();
       pushStatus({ phase: 'listening', title: 'Listening', detail: 'Speak while holding Fn.' });
@@ -248,7 +247,6 @@ export function App() {
     } finally {
       targetFocusRef.current = null;
       processingRef.current = false;
-      void window.openWhisp.showMainWindow();
     }
   };
 
