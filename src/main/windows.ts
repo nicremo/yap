@@ -4,12 +4,8 @@ import { BrowserWindow, screen } from 'electron';
 
 const preloadPath = fileURLToPath(new URL('../preload/index.cjs', import.meta.url));
 const rendererFilePath = fileURLToPath(new URL('../renderer/index.html', import.meta.url));
-const overlayWidth = 420;
-const overlayHeight = 102;
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max);
-}
+const overlayWidth = 320;
+const overlayHeight = 68;
 
 function getRendererEntry(hash = ''): string {
   const rendererUrl = process.env.ELECTRON_RENDERER_URL;
@@ -35,10 +31,10 @@ async function loadRendererWindow(window: BrowserWindow, hash = ''): Promise<voi
 
 export async function createMainWindow(): Promise<BrowserWindow> {
   const window = new BrowserWindow({
-    width: 440,
-    height: 760,
-    minWidth: 400,
-    minHeight: 700,
+    width: 720,
+    height: 500,
+    minWidth: 600,
+    minHeight: 420,
     show: false,
     backgroundColor: '#f5f5ef',
     titleBarStyle: 'hiddenInset',
@@ -61,26 +57,13 @@ export async function createMainWindow(): Promise<BrowserWindow> {
 export function positionOverlayWindow(window: BrowserWindow): void {
   const cursor = screen.getCursorScreenPoint();
   const display = screen.getDisplayNearestPoint(cursor);
-  const margin = 18;
   const workArea = display.workArea;
-  const minX = workArea.x + margin;
-  const maxX = workArea.x + workArea.width - overlayWidth - margin;
-  const minY = workArea.y + margin;
-  const maxY = workArea.y + workArea.height - overlayHeight - margin;
-  const preferredBelowY = cursor.y + 26;
-  const preferredAboveY = cursor.y - overlayHeight - 26;
-  const x = clamp(cursor.x - Math.round(overlayWidth / 2), minX, maxX);
-  const y =
-    preferredBelowY <= maxY
-      ? preferredBelowY
-      : clamp(preferredAboveY, minY, maxY);
+  const margin = 24;
 
-  window.setBounds({
-    x,
-    y,
-    width: overlayWidth,
-    height: overlayHeight,
-  });
+  const x = workArea.x + Math.round((workArea.width - overlayWidth) / 2);
+  const y = workArea.y + workArea.height - overlayHeight - margin;
+
+  window.setBounds({ x, y, width: overlayWidth, height: overlayHeight });
 }
 
 export async function createOverlayWindow(): Promise<BrowserWindow> {

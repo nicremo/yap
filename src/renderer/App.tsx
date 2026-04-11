@@ -16,6 +16,12 @@ const LEVEL_OPTIONS: Array<{ value: EnhancementLevel; label: string; caption: st
 const SETUP_STEPS = ['welcome', 'ollama', 'models', 'permissions', 'ready'] as const;
 type SetupStep = (typeof SETUP_STEPS)[number];
 
+/* ── Grid constants ─────────────────────────── */
+
+const GRID_COLS = 7;
+const GRID_ROWS = 3;
+const GRID_TOTAL = GRID_COLS * GRID_ROWS;
+
 function formatBytes(size: number): string {
   if (size <= 0) return '0 B';
   const units = ['B', 'KB', 'MB', 'GB'];
@@ -57,6 +63,7 @@ export function App() {
     detail: 'Hold Fn to dictate. Release Fn to paste.',
   });
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [audioLevel, setAudioLevel] = useState(0);
   const recorderRef = useRef<AudioRecorder | null>(null);
   const recordingRef = useRef(false);
   const processingRef = useRef(false);
@@ -98,8 +105,16 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (OVERLAY_VIEW) recorderRef.current = new AudioRecorder();
+    if (OVERLAY_VIEW) {
+      const recorder = new AudioRecorder();
+      recorder.onLevel = (level) => setAudioLevel(level);
+      recorderRef.current = recorder;
+    }
   }, []);
+
+  useEffect(() => {
+    if (status.phase !== 'listening') setAudioLevel(0);
+  }, [status.phase]);
 
   const refreshBootstrap = async () => {
     const next = await window.openWhisp.bootstrap();
@@ -236,7 +251,7 @@ export function App() {
     }
   };
 
-  if (OVERLAY_VIEW) return <OverlayChip status={status} />;
+  if (OVERLAY_VIEW) return <OverlayBar status={status} audioLevel={audioLevel} />;
 
   if (!bootstrap) {
     return (
@@ -265,9 +280,7 @@ export function App() {
     <MainView
       bootstrap={bootstrap}
       status={status}
-      busyAction={busyAction}
       onAction={runAction}
-      onRefresh={refreshBootstrap}
     />
   );
 }
@@ -318,12 +331,7 @@ function SetupWizard({
       <div className="setup-body" key={step}>
         {step === 'welcome' && <WelcomeStep onNext={goNext} />}
         {step === 'ollama' && (
-          <OllamaStep
-            bootstrap={bootstrap}
-            onRefresh={onRefresh}
-            onNext={goNext}
-            onBack={goBack}
-          />
+          <OllamaStep bootstrap={bootstrap} onRefresh={onRefresh} onNext={goNext} onBack={goBack} />
         )}
         {step === 'models' && (
           <ModelsStep
@@ -357,7 +365,7 @@ function WelcomeStep({ onNext }: { onNext: () => void }) {
       <div className="fn-key">
         <span>fn</span>
       </div>
-      <h1 className="setup-title">Welcome to OpenWhisp</h1>
+      <h1 className="setup-title serif">Welcome to OpenWhisp</h1>
       <p className="setup-desc">
         Local dictation powered by Whisper and Ollama. Your voice stays on your machine — nothing
         leaves your Mac.
@@ -395,7 +403,7 @@ function OllamaStep({
 
   return (
     <div className="setup-step">
-      <h1 className="setup-title">Connect to Ollama</h1>
+      <h1 className="setup-title serif">Connect to Ollama</h1>
       <p className="setup-desc">
         Ollama runs AI models locally on your Mac. OpenWhisp uses it to enhance your dictated text.
       </p>
@@ -480,7 +488,7 @@ function ModelsStep({
 
   return (
     <div className="setup-step">
-      <h1 className="setup-title">Download Models</h1>
+      <h1 className="setup-title serif">Download Models</h1>
       <p className="setup-desc">
         Two small AI models power OpenWhisp — one for speech recognition and one for text
         enhancement.
@@ -538,11 +546,7 @@ function ModelsStep({
         <button className="btn btn-ghost" onClick={onBack}>
           Back
         </button>
-        <button
-          className="btn btn-primary"
-          onClick={onNext}
-          disabled={!speechReady || !textReady}
-        >
+        <button className="btn btn-primary" onClick={onNext} disabled={!speechReady || !textReady}>
           Continue
         </button>
       </div>
@@ -573,7 +577,7 @@ function PermissionsStep({
 
   return (
     <div className="setup-step">
-      <h1 className="setup-title">Allow Access</h1>
+      <h1 className="setup-title serif">Allow Access</h1>
       <p className="setup-desc">
         OpenWhisp needs a few permissions to listen, transcribe, and paste into your apps.
       </p>
@@ -653,7 +657,7 @@ function ReadyStep({ onBack, onComplete }: { onBack: () => void; onComplete: () 
       <div className="ready-icon">
         <CheckIcon size={32} />
       </div>
-      <h1 className="setup-title">You're All Set</h1>
+      <h1 className="setup-title serif">You're All Set</h1>
       <p className="setup-desc">
         Hold the Fn key to start dictating. Release it and OpenWhisp will transcribe, enhance, and
         paste your text automatically.
@@ -671,7 +675,7 @@ function ReadyStep({ onBack, onComplete }: { onBack: () => void; onComplete: () 
 }
 
 /* ────────────────────────────────────────────────
-   Main View – post-setup settings
+   Main View – post-setup settings (landscape)
    ──────────────────────────────────────────────── */
 
 function MainView({
@@ -681,9 +685,7 @@ function MainView({
 }: {
   bootstrap: BootstrapState;
   status: AppStatus;
-  busyAction: string | null;
   onAction: (label: string, action: () => Promise<BootstrapState>) => Promise<void>;
-  onRefresh: () => Promise<BootstrapState>;
 }) {
   const [ollamaUrl, setOllamaUrl] = useState(bootstrap.settings.ollamaBaseUrl);
 
@@ -701,164 +703,173 @@ function MainView({
 
       <header className="app-header">
         <div>
-          <h1 className="app-title">OpenWhisp</h1>
-          <p className="app-tagline">Hold Fn to talk. Release to paste.</p>
+          <h1 className="app-title serif">OpenWhisp</h1>
+          <p className="app-tagline serif">Hold Fn to talk. Release to paste.</p>
         </div>
       </header>
 
-      {/* Status */}
-      <section className="card status-card">
-        <div className="status-row">
-          <div className={`status-dot status-${status.phase}`} />
-          <div className="status-info">
-            <strong>{status.title}</strong>
-            <span>{status.detail}</span>
+      <div className="main-grid">
+        {/* Status – full width */}
+        <section className="card status-card col-full">
+          <div className="status-row">
+            <div className={`status-dot status-${status.phase}`} />
+            <div className="status-info">
+              <strong>{status.title}</strong>
+              <span>{status.detail}</span>
+            </div>
           </div>
-        </div>
-        {status.preview && <pre className="status-preview">{status.preview}</pre>}
-      </section>
+          {status.preview && <pre className="status-preview">{status.preview}</pre>}
+        </section>
 
-      {/* Enhancement Level */}
-      <section className="card">
-        <div className="card-head">
-          <h2>Enhancement</h2>
-        </div>
-        <div className="level-selector">
-          {LEVEL_OPTIONS.map((level) => (
+        {/* Enhancement – left */}
+        <section className="card">
+          <div className="card-head">
+            <h2>Enhancement</h2>
+          </div>
+          <div className="level-selector">
+            {LEVEL_OPTIONS.map((level) => (
+              <button
+                key={level.value}
+                className={`level-pill${bootstrap.settings.enhancementLevel === level.value ? ' level-pill-active' : ''}`}
+                onClick={() =>
+                  void onAction('settings', () =>
+                    window.openWhisp.updateSettings({ enhancementLevel: level.value }),
+                  )
+                }
+              >
+                {level.label}
+              </button>
+            ))}
+          </div>
+          {selectedLevel && <p className="level-caption">{selectedLevel.caption}</p>}
+        </section>
+
+        {/* Models – right */}
+        <section className="card">
+          <div className="card-head">
+            <h2>Models</h2>
             <button
-              key={level.value}
-              className={`level-pill${bootstrap.settings.enhancementLevel === level.value ? ' level-pill-active' : ''}`}
+              className="btn btn-link"
               onClick={() =>
+                void onAction('refresh-ollama', () => window.openWhisp.refreshOllama())
+              }
+            >
+              Refresh
+            </button>
+          </div>
+
+          <div className="setting-row">
+            <label className="setting-label">Speech model</label>
+            <span className="setting-value">{bootstrap.settings.whisperLabel}</span>
+          </div>
+
+          <div className="setting-row">
+            <label className="setting-label" htmlFor="model-select">
+              Rewrite model
+            </label>
+            <select
+              id="model-select"
+              className="setting-select"
+              value={bootstrap.settings.textModel}
+              onChange={(e) =>
                 void onAction('settings', () =>
-                  window.openWhisp.updateSettings({ enhancementLevel: level.value }),
+                  window.openWhisp.updateSettings({ textModel: e.target.value }),
                 )
               }
             >
-              {level.label}
-            </button>
-          ))}
-        </div>
-        {selectedLevel && <p className="level-caption">{selectedLevel.caption}</p>}
-      </section>
-
-      {/* Models */}
-      <section className="card">
-        <div className="card-head">
-          <h2>Models</h2>
-          <button
-            className="btn btn-link"
-            onClick={() => void onAction('refresh-ollama', () => window.openWhisp.refreshOllama())}
-          >
-            Refresh
-          </button>
-        </div>
-
-        <div className="setting-row">
-          <label className="setting-label">Speech model</label>
-          <span className="setting-value">{bootstrap.settings.whisperLabel}</span>
-        </div>
-
-        <div className="setting-row">
-          <label className="setting-label" htmlFor="model-select">
-            Rewrite model
-          </label>
-          <select
-            id="model-select"
-            className="setting-select"
-            value={bootstrap.settings.textModel}
-            onChange={(e) =>
-              void onAction('settings', () =>
-                window.openWhisp.updateSettings({ textModel: e.target.value }),
-              )
-            }
-          >
-            {bootstrap.ollamaModels.length === 0 ? (
-              <option value={bootstrap.settings.textModel}>{bootstrap.settings.textModel}</option>
-            ) : (
-              bootstrap.ollamaModels.map((model) => (
-                <option key={model.name} value={model.name}>
-                  {model.name} ({formatBytes(model.size)})
+              {bootstrap.ollamaModels.length === 0 ? (
+                <option value={bootstrap.settings.textModel}>
+                  {bootstrap.settings.textModel}
                 </option>
-              ))
-            )}
-          </select>
-        </div>
+              ) : (
+                bootstrap.ollamaModels.map((model) => (
+                  <option key={model.name} value={model.name}>
+                    {model.name} ({formatBytes(model.size)})
+                  </option>
+                ))
+              )}
+            </select>
+          </div>
 
-        <div className="setting-row">
-          <label className="setting-label" htmlFor="ollama-url">
-            Ollama URL
-          </label>
-          <div className="url-field">
-            <input
-              id="ollama-url"
-              className="setting-input"
-              value={ollamaUrl}
-              onChange={(e) => setOllamaUrl(e.target.value)}
-              onBlur={() =>
+          <div className="setting-row">
+            <label className="setting-label" htmlFor="ollama-url">
+              Ollama URL
+            </label>
+            <div className="url-field">
+              <input
+                id="ollama-url"
+                className="setting-input"
+                value={ollamaUrl}
+                onChange={(e) => setOllamaUrl(e.target.value)}
+                onBlur={() =>
+                  void onAction('settings', () =>
+                    window.openWhisp.updateSettings({ ollamaBaseUrl: ollamaUrl }),
+                  )
+                }
+              />
+              <span
+                className={`url-badge${bootstrap.ollamaReachable ? ' url-badge-ok' : ' url-badge-off'}`}
+              >
+                {bootstrap.ollamaReachable ? 'Connected' : 'Offline'}
+              </span>
+            </div>
+          </div>
+        </section>
+
+        {/* Preferences – full width */}
+        <section className="card col-full">
+          <div className="card-head">
+            <h2>Preferences</h2>
+          </div>
+
+          <div className="prefs-grid">
+            <ToggleRow
+              title="Auto-paste"
+              description="Paste into the active app after rewriting"
+              checked={bootstrap.settings.autoPaste}
+              onChange={(v) =>
                 void onAction('settings', () =>
-                  window.openWhisp.updateSettings({ ollamaBaseUrl: ollamaUrl }),
+                  window.openWhisp.updateSettings({ autoPaste: v }),
                 )
               }
             />
-            <span
-              className={`url-badge${bootstrap.ollamaReachable ? ' url-badge-ok' : ' url-badge-off'}`}
-            >
-              {bootstrap.ollamaReachable ? 'Connected' : 'Offline'}
-            </span>
+            <ToggleRow
+              title="Launch at login"
+              description="Start OpenWhisp when you log in"
+              checked={bootstrap.settings.launchAtLogin}
+              onChange={(v) =>
+                void onAction('settings', () =>
+                  window.openWhisp.updateSettings({ launchAtLogin: v }),
+                )
+              }
+            />
           </div>
-        </div>
-      </section>
 
-      {/* Preferences */}
-      <section className="card">
-        <div className="card-head">
-          <h2>Preferences</h2>
-        </div>
-
-        <ToggleRow
-          title="Auto-paste"
-          description="Paste into the active app after rewriting"
-          checked={bootstrap.settings.autoPaste}
-          onChange={(v) =>
-            void onAction('settings', () => window.openWhisp.updateSettings({ autoPaste: v }))
-          }
-        />
-        <ToggleRow
-          title="Launch at login"
-          description="Start OpenWhisp when you log in"
-          checked={bootstrap.settings.launchAtLogin}
-          onChange={(v) =>
-            void onAction('settings', () =>
-              window.openWhisp.updateSettings({ launchAtLogin: v }),
-            )
-          }
-        />
-
-        <div className="storage-section">
-          <div className="storage-top">
-            <span className="setting-label">Storage</span>
-            <div className="btn-group-compact">
-              <button
-                className="btn btn-link"
-                onClick={() =>
-                  void onAction('storage', () => window.openWhisp.chooseStorage())
-                }
-              >
-                Change
-              </button>
-              <button
-                className="btn btn-link"
-                onClick={() => void window.openWhisp.revealStorage()}
-              >
-                Open
-              </button>
+          <div className="storage-section">
+            <div className="storage-top">
+              <span className="setting-label">Storage</span>
+              <div className="btn-group-compact">
+                <button
+                  className="btn btn-link"
+                  onClick={() =>
+                    void onAction('storage', () => window.openWhisp.chooseStorage())
+                  }
+                >
+                  Change
+                </button>
+                <button
+                  className="btn btn-link"
+                  onClick={() => void window.openWhisp.revealStorage()}
+                >
+                  Open
+                </button>
+              </div>
             </div>
+            <span className="storage-path">{bootstrap.settings.storageDirectory}</span>
           </div>
-          <span className="storage-path">{bootstrap.settings.storageDirectory}</span>
-        </div>
-      </section>
+        </section>
+      </div>
 
-      {/* Footer */}
       <div className="app-footer">
         <button
           className="btn btn-link btn-muted"
@@ -905,23 +916,73 @@ function ToggleRow({
 }
 
 /* ────────────────────────────────────────────────
-   Overlay Chip
+   Overlay Bar – audio-reactive grid
    ──────────────────────────────────────────────── */
 
-function OverlayChip({ status }: { status: AppStatus }) {
+function OverlayBar({ status, audioLevel }: { status: AppStatus; audioLevel: number }) {
+  const isListening = status.phase === 'listening';
+  const isProcessing =
+    status.phase === 'transcribing' ||
+    status.phase === 'rewriting' ||
+    status.phase === 'pasting';
+  const isDone = status.phase === 'done';
+
   return (
-    <div className={`overlay-shell overlay-${status.phase}`}>
-      <div className="overlay-chip">
-        <div className="overlay-dots" aria-hidden="true">
-          <span />
-          <span />
-          <span />
-        </div>
-        <div className="overlay-copy">
-          <strong>{status.title}</strong>
-          <span>{status.detail}</span>
-        </div>
+    <div className="overlay-shell">
+      <div className={`overlay-bar${isProcessing ? ' overlay-processing' : ''}${isDone ? ' overlay-done' : ''}`}>
+        <AudioGrid level={audioLevel} listening={isListening} processing={isProcessing} />
+        <span className="overlay-label">{status.title}</span>
       </div>
+    </div>
+  );
+}
+
+function AudioGrid({
+  level,
+  listening,
+  processing,
+}: {
+  level: number;
+  listening: boolean;
+  processing: boolean;
+}) {
+  const [cells, setCells] = useState<boolean[]>(() => new Array(GRID_TOTAL).fill(false));
+  const seedRef = useRef(0);
+
+  useEffect(() => {
+    if (!listening) {
+      if (!processing) setCells(new Array(GRID_TOTAL).fill(false));
+      return;
+    }
+
+    seedRef.current += 1;
+    const onCount = Math.round(level * GRID_TOTAL);
+    const next = new Array(GRID_TOTAL).fill(false);
+
+    const indices = Array.from({ length: GRID_TOTAL }, (_, i) => i);
+    let seed = seedRef.current;
+    for (let i = indices.length - 1; i > 0; i--) {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      const j = seed % (i + 1);
+      [indices[i], indices[j]] = [indices[j], indices[i]];
+    }
+
+    for (let i = 0; i < onCount; i++) {
+      next[indices[i]] = true;
+    }
+
+    setCells(next);
+  }, [level, listening, processing]);
+
+  return (
+    <div className={`audio-grid${processing ? ' audio-grid-wave' : ''}`}>
+      {cells.map((on, i) => (
+        <span
+          key={i}
+          className={`grid-cell${on ? ' grid-cell-on' : ''}`}
+          style={processing ? { animationDelay: `${(i % GRID_COLS) * 0.12}s` } : undefined}
+        />
+      ))}
     </div>
   );
 }

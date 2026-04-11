@@ -16,15 +16,16 @@
   --text-3: #8c8c84;
   --radius: 12px;
   --radius-sm: 8px;
-  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.04), 0 0 0 1px var(--border);
   --green: #10b981;
   --green-bg: #ecfdf5;
-  --green-border: #a7f3d0;
   --amber: #f59e0b;
-  --amber-bg: #fffbeb;
   --red: #ef4444;
   --blue: #3b82f6;
   --purple: #8b5cf6;
+}
+
+.serif {
+  font-family: "Instrument Serif", Georgia, "Times New Roman", serif;
 }
 
 *,
@@ -65,7 +66,7 @@ button {
 }
 
 /* ────────────────────────────────────────────────
-   Drag Region (title-bar area)
+   Drag Region
    ──────────────────────────────────────────────── */
 
 .drag-region {
@@ -205,7 +206,6 @@ button {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 16px;
-  margin-bottom: 10px;
 }
 
 .card-head {
@@ -254,7 +254,7 @@ button {
 }
 
 .switch-slider::before {
-  content: '';
+  content: "";
   position: absolute;
   height: 18px;
   width: 18px;
@@ -302,14 +302,14 @@ button {
 }
 
 /* ────────────────────────────────────────────────
-   Setup Wizard – Shell
+   Setup Wizard
    ──────────────────────────────────────────────── */
 
 .setup-shell {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  padding: 72px 28px 28px;
+  padding: 64px 48px 32px;
   background: var(--bg);
 }
 
@@ -317,7 +317,7 @@ button {
   display: flex;
   justify-content: center;
   gap: 8px;
-  margin-bottom: 36px;
+  margin-bottom: 32px;
 }
 
 .setup-dot {
@@ -340,10 +340,11 @@ button {
 .setup-body {
   flex: 1;
   display: flex;
+  max-width: 440px;
+  margin: 0 auto;
+  width: 100%;
   animation: fadeIn 0.25s ease;
 }
-
-/* ── Steps ──────────────────────────────────── */
 
 .setup-step {
   flex: 1;
@@ -354,26 +355,26 @@ button {
 .setup-step-center {
   align-items: center;
   text-align: center;
-  padding-top: 48px;
+  padding-top: 24px;
 }
 
 .setup-title {
   margin: 0;
-  font-size: 24px;
-  font-weight: 700;
+  font-size: 28px;
+  font-weight: 400;
   line-height: 1.15;
 }
 
 .setup-desc {
   margin: 10px 0 0;
   color: var(--text-2);
-  max-width: 30ch;
+  max-width: 34ch;
   line-height: 1.55;
 }
 
 .setup-step:not(.setup-step-center) .setup-desc {
   max-width: none;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .setup-hint {
@@ -388,7 +389,7 @@ button {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-top: 28px;
+  padding-top: 24px;
 }
 
 /* ── Fn Key Visual ──────────────────────────── */
@@ -402,7 +403,7 @@ button {
   border-radius: 10px;
   background: var(--surface);
   box-shadow: 0 3px 0 var(--border);
-  margin-bottom: 28px;
+  margin-bottom: 24px;
   font-size: 15px;
   font-weight: 600;
   color: var(--text-2);
@@ -419,7 +420,7 @@ button {
   color: var(--green);
   display: grid;
   place-items: center;
-  margin-bottom: 28px;
+  margin-bottom: 24px;
   animation: scaleIn 0.4s ease;
 }
 
@@ -492,38 +493,51 @@ button {
 }
 
 /* ────────────────────────────────────────────────
-   Main View – App Shell
+   Main View – Landscape
    ──────────────────────────────────────────────── */
 
 .app-shell {
   min-height: 100vh;
-  padding: 64px 20px 32px;
+  padding: 56px 28px 24px;
   background: var(--bg);
 }
 
-/* ── Header ─────────────────────────────────── */
-
 .app-header {
-  margin-bottom: 16px;
+  margin-bottom: 14px;
   padding: 0 2px;
 }
 
 .app-title {
   margin: 0;
-  font-size: 22px;
-  font-weight: 700;
+  font-size: 26px;
+  font-weight: 400;
+  line-height: 1.1;
 }
 
 .app-tagline {
-  margin: 3px 0 0;
-  font-size: 14px;
+  margin: 2px 0 0;
+  font-size: 15px;
+  font-weight: 400;
+  font-style: italic;
   color: var(--text-2);
+}
+
+/* ── Two-column grid ────────────────────────── */
+
+.main-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.col-full {
+  grid-column: 1 / -1;
 }
 
 /* ── Status Card ────────────────────────────── */
 
 .status-card {
-  margin-bottom: 14px;
+  /* full-width via col-full */
 }
 
 .status-row {
@@ -669,7 +683,7 @@ button {
 .setting-select,
 .setting-input {
   width: 100%;
-  min-height: 38px;
+  min-height: 36px;
   padding: 0 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -712,16 +726,18 @@ button {
 
 /* ── Toggle Rows ────────────────────────────── */
 
+.prefs-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 24px;
+}
+
 .toggle-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   padding: 10px 0;
-}
-
-.toggle-row + .toggle-row {
-  border-top: 1px solid var(--border-light);
 }
 
 .toggle-info {
@@ -768,11 +784,11 @@ button {
 .app-footer {
   display: flex;
   justify-content: center;
-  padding: 16px 0 8px;
+  padding: 14px 0 4px;
 }
 
 /* ────────────────────────────────────────────────
-   Overlay
+   Overlay – minimal bottom bar
    ──────────────────────────────────────────────── */
 
 .overlay-shell {
@@ -783,56 +799,65 @@ button {
   background: transparent;
 }
 
-.overlay-chip {
+.overlay-bar {
   display: flex;
   align-items: center;
   gap: 14px;
-  width: min(420px, calc(100vw - 24px));
-  min-height: 76px;
-  padding: 14px 18px;
-  border-radius: 999px;
+  padding: 12px 20px;
+  border-radius: 14px;
   background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(26, 26, 26, 0.1);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12);
-  backdrop-filter: blur(22px);
+  border: 1px solid rgba(26, 26, 26, 0.08);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
 }
 
-.overlay-dots {
-  display: flex;
-  gap: 4px;
-}
-
-.overlay-dots span {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: var(--text);
-  animation: pulse 1.2s ease-in-out infinite;
-}
-
-.overlay-dots span:nth-child(2) {
-  animation-delay: 0.15s;
-}
-
-.overlay-dots span:nth-child(3) {
-  animation-delay: 0.3s;
-}
-
-.overlay-copy {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-}
-
-.overlay-copy strong,
-.overlay-copy span {
+.overlay-label {
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--text);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-.overlay-copy span {
-  color: var(--text-2);
+.overlay-done .overlay-label {
+  color: var(--green);
+}
+
+/* ── Audio Grid ─────────────────────────────── */
+
+.audio-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 7px);
+  grid-template-rows: repeat(3, 7px);
+  gap: 3px;
+}
+
+.grid-cell {
+  width: 7px;
+  height: 7px;
+  border-radius: 1.5px;
+  background: rgba(26, 26, 26, 0.08);
+  transition: background 0.08s ease;
+}
+
+.grid-cell-on {
+  background: rgba(26, 26, 26, 0.72);
+}
+
+/* wave animation during processing */
+.audio-grid-wave .grid-cell {
+  animation: cell-wave 1.6s ease-in-out infinite;
+}
+
+@keyframes cell-wave {
+  0%,
+  100% {
+    background: rgba(26, 26, 26, 0.06);
+  }
+  50% {
+    background: rgba(26, 26, 26, 0.5);
+  }
 }
 
 /* ────────────────────────────────────────────────
@@ -877,18 +902,6 @@ button {
   }
 }
 
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 0.35;
-    transform: translateY(0);
-  }
-  50% {
-    opacity: 1;
-    transform: translateY(-3px);
-  }
-}
-
 @keyframes pulse-dot {
   0%,
   100% {
@@ -902,19 +915,23 @@ button {
 }
 
 /* ────────────────────────────────────────────────
-   Responsive
+   Responsive – narrow fallback
    ──────────────────────────────────────────────── */
 
-@media (max-width: 520px) {
-  .app-shell {
-    padding: 56px 16px 28px;
+@media (max-width: 620px) {
+  .main-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .col-full {
+    grid-column: auto;
+  }
+
+  .prefs-grid {
+    grid-template-columns: 1fr;
   }
 
   .setup-shell {
-    padding: 64px 20px 20px;
-  }
-
-  .setup-title {
-    font-size: 22px;
+    padding: 64px 24px 24px;
   }
 }

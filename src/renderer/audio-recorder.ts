@@ -74,6 +74,8 @@ function encodeWave(audio: Float32Array, sampleRate: number): string {
 }
 
 export class AudioRecorder {
+  onLevel: ((level: number) => void) | null = null;
+
   private stream: MediaStream | null = null;
   private audioContext: AudioContext | null = null;
   private source: MediaStreamAudioSourceNode | null = null;
@@ -116,6 +118,14 @@ export class AudioRecorder {
     this.processor.onaudioprocess = (event) => {
       const data = event.inputBuffer.getChannelData(0);
       this.chunks.push(new Float32Array(data));
+
+      if (this.onLevel) {
+        let sum = 0;
+        for (let i = 0; i < data.length; i++) {
+          sum += data[i] * data[i];
+        }
+        this.onLevel(Math.min(1, Math.sqrt(sum / data.length) * 5));
+      }
     };
 
     this.source.connect(this.processor);
