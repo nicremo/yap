@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Home01Icon, PaintBrush01Icon, CubeIcon, Settings01Icon } from '@hugeicons/core-free-icons';
 
 import { AudioRecorder } from './audio-recorder';
 import type { AppStatus, BootstrapState, EnhancementLevel, FocusInfo, StyleMode } from '../shared/types';
@@ -374,10 +376,18 @@ function MainView({ bootstrap, status, busyAction, onAction }: {
           <h1 className="serif">OpenWhisp</h1>
         </div>
         <nav className="sidebar-nav">
-          <button className={`nav-item${page === 'home' ? ' nav-item-active' : ''}`} onClick={() => setPage('home')}>Home</button>
-          <button className={`nav-item${page === 'style' ? ' nav-item-active' : ''}`} onClick={() => setPage('style')}>Style</button>
-          <button className={`nav-item${page === 'models' ? ' nav-item-active' : ''}`} onClick={() => setPage('models')}>Models</button>
-          <button className={`nav-item${page === 'preferences' ? ' nav-item-active' : ''}`} onClick={() => setPage('preferences')}>Preferences</button>
+          <button className={`nav-item${page === 'home' ? ' nav-item-active' : ''}`} onClick={() => setPage('home')}>
+            <HugeiconsIcon icon={Home01Icon} size={18} strokeWidth={2} /> Home
+          </button>
+          <button className={`nav-item${page === 'style' ? ' nav-item-active' : ''}`} onClick={() => setPage('style')}>
+            <HugeiconsIcon icon={PaintBrush01Icon} size={18} strokeWidth={2} /> Style
+          </button>
+          <button className={`nav-item${page === 'models' ? ' nav-item-active' : ''}`} onClick={() => setPage('models')}>
+            <HugeiconsIcon icon={CubeIcon} size={18} strokeWidth={2} /> Models
+          </button>
+          <button className={`nav-item${page === 'preferences' ? ' nav-item-active' : ''}`} onClick={() => setPage('preferences')}>
+            <HugeiconsIcon icon={Settings01Icon} size={18} strokeWidth={2} /> Preferences
+          </button>
         </nav>
         <div className="sidebar-footer">
           <button className="btn btn-link btn-muted" onClick={() => void onAction('setup', () => window.openWhisp.updateSettings({ setupComplete: false }))}>Reset Setup</button>
