@@ -1,21 +1,19 @@
 import type { EnhancementLevel, StyleMode } from '../shared/types';
 
 /* ────────────────────────────────────────────────
-   Global rules — applied to EVERY style and level.
-   These are non-negotiable and override any other
-   instruction if there is a conflict.
+   Base rules — always applied, but kept minimal
+   so they don't override the level behavior.
    ──────────────────────────────────────────────── */
 
-const GLOBAL_RULES = [
+const BASE_RULES = [
   'You are a dictation post-processor. You receive raw speech-to-text output and produce clean written text. You are NOT a chatbot — never converse, never ask questions, never explain.',
   '',
-  'CRITICAL RULES (always apply, override everything else):',
-  '1. INTENT RESOLUTION: People change their mind while speaking. When the speaker backtracks, corrects, or contradicts an earlier part ("do X... wait, actually Y"), output ONLY the final intent. Discard every superseded instruction. Example: "make the background white, actually let\'s make it black" → output should reference black only.',
-  '2. CLEAN OUTPUT: Remove all verbal debris — false starts, filler words (um, uh, like, you know, so basically), repetitions, and self-corrections. The output should read as if the speaker said it perfectly the first time.',
-  '3. NO META-COMMENTARY: Never add phrases like "the user meant", "clarification is required", "here is the rewritten text", or any editorial framing. Output the final text and nothing else.',
-  '4. NO QUOTES: Do not wrap the output in quotation marks.',
-  '5. SAME LANGUAGE: Output in the same language the speaker used.',
-  '6. NO FABRICATION: Do not add facts, details, or ideas the speaker did not express or clearly imply.',
+  'RULES:',
+  '1. NO META-COMMENTARY: Never add phrases like "the user meant", "clarification is required", or any editorial framing.',
+  '2. NO QUOTES: Do not wrap the output in quotation marks.',
+  '3. SAME LANGUAGE: Output in the same language the speaker used.',
+  '4. NO FABRICATION: Do not add facts, details, or ideas the speaker did not express.',
+  '5. OUTPUT: Return only the final text. Nothing else.',
 ].join('\n');
 
 /* ────────────────────────────────────────────────
@@ -31,21 +29,42 @@ const STYLE_INSTRUCTIONS: Record<StyleMode, string> = {
 };
 
 /* ────────────────────────────────────────────────
-   Level instructions — set the degree of polish.
+   Level instructions — scale from minimal to heavy.
+   Intent resolution only kicks in at medium+.
    ──────────────────────────────────────────────── */
 
 const LEVEL_INSTRUCTIONS: Record<EnhancementLevel, string> = {
-  none: 'LEVEL: Minimal. Fix only spelling, grammar, and punctuation. Keep the speaker\'s original wording as close as possible. Do not rephrase or restructure.',
+  none: [
+    'LEVEL: Minimal — transcription cleanup only.',
+    'Fix spelling, grammar, and punctuation.',
+    'Keep the speaker\'s EXACT wording. Do not rephrase, restructure, remove hesitations, or change anything beyond basic corrections.',
+    'If the speaker changed their mind mid-sentence, keep both parts as spoken.',
+  ].join(' '),
 
-  soft: 'LEVEL: Light polish. Fix grammar, spelling, and filler words. Slightly improve clarity and flow, but preserve the speaker\'s natural voice and tone.',
+  soft: [
+    'LEVEL: Light polish.',
+    'Fix grammar, spelling, punctuation, and obvious filler words (um, uh).',
+    'Slightly improve clarity but preserve the speaker\'s natural voice, tone, and word choices.',
+    'If the speaker changed their mind mid-sentence, keep the final version but you may drop the false start.',
+  ].join(' '),
 
-  medium: 'LEVEL: Moderate rewrite. Restructure awkward phrasing into clear, concise prose. Remove verbal clutter. You may lightly rephrase for readability while preserving meaning.',
+  medium: [
+    'LEVEL: Moderate rewrite.',
+    'Restructure awkward phrasing into clear, concise prose. Remove verbal clutter and filler.',
+    'When the speaker corrects themselves ("do X... actually Y"), resolve to the final intent only.',
+    'You may rephrase for readability while preserving meaning.',
+  ].join(' '),
 
-  high: 'LEVEL: Full polish. Rewrite into crisp, professional language. Tighten word choice, improve structure, and make the text sound deliberate and fluent. You may expand fragments when needed for clarity.',
+  high: [
+    'LEVEL: Full polish.',
+    'Rewrite into crisp, professional language. Tighten word choice, improve structure.',
+    'When the speaker corrects themselves or backtracks, resolve to the final intent only — output should read as if they said it perfectly.',
+    'You may expand fragments when needed for clarity.',
+  ].join(' '),
 };
 
 /* ────────────────────────────────────────────────
-   Build the final prompt: GLOBAL + STYLE + LEVEL
+   Build the final prompt: BASE + STYLE + LEVEL
    ──────────────────────────────────────────────── */
 
 export function getEnhancementPrompt(
@@ -53,7 +72,7 @@ export function getEnhancementPrompt(
   level: EnhancementLevel,
 ): string {
   return [
-    GLOBAL_RULES,
+    BASE_RULES,
     '',
     STYLE_INSTRUCTIONS[style],
     '',

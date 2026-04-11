@@ -1,4 +1,6 @@
-# OpenWhisp
+# Openwhisp
+
+![Openwhisp](assets/cover.png)
 
 Mac-first local dictation app. Hold **Fn**, speak, release — your words are transcribed, enhanced, and pasted into the active app. Everything runs on your machine. No cloud, no account, no latency.
 
