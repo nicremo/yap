@@ -2,9 +2,9 @@
 
 ![Openwhisp](assets/cover.png)
 
-Mac-first local dictation app. Hold **Fn**, speak, release — your words are transcribed, enhanced, and pasted into the active app. Everything runs on your machine. No cloud, no account, no latency.
+Voice to text, entirely on your machine. Hold **Fn**, speak, release — your words are transcribed, polished, and pasted right where you need them. No cloud, no account, no latency.
 
-Built in a weekend because I kept getting ads for Whisper Flow and thought — why not build it myself?
+Built in a weekend because I kept getting ads for Wispr Flow and thought — why not build it myself?
 
 ## How it works
 
@@ -60,17 +60,17 @@ npm run dev
 On first launch, the setup wizard will walk you through:
 
 1. **Ollama** — if not installed, the wizard links you to the download. If installed, OpenWhisp launches it automatically.
-2. **Speech model** — downloads Whisper Base English (~150 MB) for local speech recognition.
+2. **Speech model** — downloads Whisper Base Multilingual (~150 MB) for local speech recognition.
 3. **Text model** — downloads Gemma 4 E4B (~9.6 GB) for local text enhancement. This takes a few minutes on the first run.
 4. **Permissions** — microphone access for recording, plus Accessibility and Input Monitoring for Fn key listening and auto-paste.
 
-After setup, just press **Fn** and start talking.
+After setup, click into the text field where you want the text to go (an email, chat, code editor, etc.), then hold **Fn** and speak. When you release, the transcribed and enhanced text is automatically pasted into that field. If you move away or no text field is selected, the text is still copied to your clipboard — just use **Cmd+V** to paste it wherever you need.
 
 ## Default models
 
 | Purpose | Model | Size |
 |---------|-------|------|
-| Speech-to-text | `onnx-community/whisper-base.en` | ~150 MB |
+| Speech-to-text | `onnx-community/whisper-base` | ~150 MB |
 | Text enhancement | `gemma4:e4b` | ~9.6 GB |
 
 You can switch to any Ollama-compatible model from the Models page.
