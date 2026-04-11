@@ -1,4 +1,5 @@
 export type EnhancementLevel = 'none' | 'soft' | 'medium' | 'high';
+export type StyleMode = 'conversation' | 'vibe-coding';
 
 export type OverlayPhase =
   | 'idle'
@@ -15,6 +16,7 @@ export interface AppSettings {
   whisperLabel: string;
   ollamaBaseUrl: string;
   textModel: string;
+  styleMode: StyleMode;
   enhancementLevel: EnhancementLevel;
   autoPaste: boolean;
   launchAtLogin: boolean;
@@ -78,6 +80,7 @@ export interface HotkeyEvent {
 }
 
 export interface UpdateSettingsInput {
+  styleMode?: StyleMode;
   enhancementLevel?: EnhancementLevel;
   textModel?: string;
   ollamaBaseUrl?: string;

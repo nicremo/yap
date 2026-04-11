@@ -28,6 +28,7 @@ export function createDefaultSettings(): AppSettings {
     whisperLabel: RECOMMENDED_WHISPER_LABEL,
     ollamaBaseUrl: 'http://127.0.0.1:11434',
     textModel: RECOMMENDED_TEXT_MODEL,
+    styleMode: 'conversation',
     enhancementLevel: 'medium',
     autoPaste: true,
     launchAtLogin: false,

@@ -61,7 +61,7 @@ export async function processDictationAudio({
     finalText = await rewriteWithOllama(
       settings.ollamaBaseUrl,
       settings.textModel,
-      getEnhancementPrompt(settings.enhancementLevel),
+      getEnhancementPrompt(settings.styleMode, settings.enhancementLevel),
       rawText,
     );
   } catch (error) {

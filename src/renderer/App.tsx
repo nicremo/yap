@@ -1,47 +1,57 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { AudioRecorder } from './audio-recorder';
-import type { AppStatus, BootstrapState, EnhancementLevel, FocusInfo } from '../shared/types';
+import type { AppStatus, BootstrapState, EnhancementLevel, FocusInfo, StyleMode } from '../shared/types';
 import { RECOMMENDED_TEXT_MODEL, RECOMMENDED_WHISPER_LABEL } from '../shared/recommendations';
 
 const OVERLAY_VIEW = window.location.hash === '#overlay';
 
-type Page = 'home' | 'enhancement' | 'models' | 'preferences';
+type Page = 'home' | 'style' | 'models' | 'preferences';
 
-const LEVEL_OPTIONS: Array<{
+interface LevelOption {
   value: EnhancementLevel;
   label: string;
   caption: string;
   detail: string;
   intensity: number;
-}> = [
+}
+
+interface StyleOption {
+  value: StyleMode;
+  label: string;
+  description: string;
+  levels: Record<EnhancementLevel, { example: string }>;
+}
+
+const LEVEL_OPTIONS: LevelOption[] = [
+  { value: 'none', label: 'No filter', caption: 'Minimal touch — fix typos only.', detail: 'Corrects spelling and punctuation. Your exact words, cleaned up.', intensity: 1 },
+  { value: 'soft', label: 'Soft', caption: 'Light grammar and clarity polish.', detail: 'Fixes filler words and grammar while keeping your natural voice.', intensity: 2 },
+  { value: 'medium', label: 'Medium', caption: 'Rewrite for natural, clear prose.', detail: 'Restructures awkward phrasing into clean, readable text.', intensity: 3 },
+  { value: 'high', label: 'High', caption: 'Professional polish and expansion.', detail: 'Turns rough dictation into polished, professional writing.', intensity: 4 },
+];
+
+const STYLE_OPTIONS: StyleOption[] = [
   {
-    value: 'none',
-    label: 'No filter',
-    caption: 'Minimal touch — fix typos only.',
-    detail: 'Corrects spelling and punctuation. Your exact words, cleaned up.',
-    intensity: 1,
+    value: 'conversation',
+    label: 'Conversation',
+    description: 'Natural conversation style. Perfect for messages, notes, and everyday writing.',
+    levels: {
+      none: { example: 'I went to the store and bought some stuff for the project.' },
+      soft: { example: 'I went to the store and picked up some things for the project.' },
+      medium: { example: 'I stopped by the store and picked up supplies for the project.' },
+      high: { example: 'I visited the store to procure the necessary supplies for our project.' },
+    },
   },
   {
-    value: 'soft',
-    label: 'Soft',
-    caption: 'Light grammar and clarity polish.',
-    detail: 'Fixes filler words and grammar while keeping your natural voice.',
-    intensity: 2,
-  },
-  {
-    value: 'medium',
-    label: 'Medium',
-    caption: 'Rewrite for natural, clear prose.',
-    detail: 'Restructures awkward phrasing into clean, readable text.',
-    intensity: 3,
-  },
-  {
-    value: 'high',
-    label: 'High',
-    caption: 'Professional polish and expansion.',
-    detail: 'Turns rough dictation into polished, professional writing.',
-    intensity: 4,
+    value: 'vibe-coding',
+    label: 'Vibe Coding',
+    description: 'Developer mode. Translates your speech into proper software engineering language.',
+    levels: {
+      none: { example: 'We need to refactor the auth thing because it\'s hitting the database too much.' },
+      soft: { example: 'We need to refactor the auth module because it\'s making too many database calls.' },
+      medium: { example: 'We need to refactor the authentication service to reduce excessive database queries.' },
+      high: { example: 'The authentication service requires refactoring to optimize query patterns and eliminate redundant database round-trips.' },
+    },
   },
 ];
 
@@ -365,7 +375,7 @@ function MainView({ bootstrap, status, busyAction, onAction }: {
         </div>
         <nav className="sidebar-nav">
           <button className={`nav-item${page === 'home' ? ' nav-item-active' : ''}`} onClick={() => setPage('home')}>Home</button>
-          <button className={`nav-item${page === 'enhancement' ? ' nav-item-active' : ''}`} onClick={() => setPage('enhancement')}>Enhancement</button>
+          <button className={`nav-item${page === 'style' ? ' nav-item-active' : ''}`} onClick={() => setPage('style')}>Style</button>
           <button className={`nav-item${page === 'models' ? ' nav-item-active' : ''}`} onClick={() => setPage('models')}>Models</button>
           <button className={`nav-item${page === 'preferences' ? ' nav-item-active' : ''}`} onClick={() => setPage('preferences')}>Preferences</button>
         </nav>
@@ -376,7 +386,7 @@ function MainView({ bootstrap, status, busyAction, onAction }: {
 
       <main className="content">
         {page === 'home' && <HomePage status={status} bootstrap={bootstrap} setPage={setPage} />}
-        {page === 'enhancement' && <EnhancementPage bootstrap={bootstrap} onAction={onAction} />}
+        {page === 'style' && <StylePage bootstrap={bootstrap} onAction={onAction} />}
         {page === 'models' && <ModelsPage bootstrap={bootstrap} busyAction={busyAction} onAction={onAction} />}
         {page === 'preferences' && <PreferencesPage bootstrap={bootstrap} onAction={onAction} />}
       </main>
@@ -388,6 +398,7 @@ function MainView({ bootstrap, status, busyAction, onAction }: {
 
 function HomePage({ status, bootstrap, setPage }: { status: AppStatus; bootstrap: BootstrapState; setPage: (p: Page) => void }) {
   const level = LEVEL_OPTIONS.find((l) => l.value === bootstrap.settings.enhancementLevel);
+  const style = STYLE_OPTIONS.find((s) => s.value === bootstrap.settings.styleMode);
   return (
     <div className="page">
       <div className="page-header">
@@ -418,9 +429,9 @@ function HomePage({ status, bootstrap, setPage }: { status: AppStatus; bootstrap
         </div>
 
         <div className="home-stats">
-          <button className="stat-card" onClick={() => setPage('enhancement')}>
-            <span className="stat-value">{level?.label ?? 'Medium'}</span>
-            <span className="stat-label">Enhancement</span>
+          <button className="stat-card" onClick={() => setPage('style')}>
+            <span className="stat-value">{style?.label ?? 'Conversation'}</span>
+            <span className="stat-label">{level?.label ?? 'Medium'}</span>
           </button>
           <button className="stat-card" onClick={() => setPage('models')}>
             <span className="stat-value stat-value-sm">{bootstrap.settings.textModel.split(':')[0]}</span>
@@ -436,19 +447,38 @@ function HomePage({ status, bootstrap, setPage }: { status: AppStatus; bootstrap
   );
 }
 
-/* ── Enhancement ──────────────────────────────── */
+/* ── Style ─────────────────────────────────────── */
 
-function EnhancementPage({ bootstrap, onAction }: { bootstrap: BootstrapState; onAction: (l: string, a: () => Promise<BootstrapState>) => Promise<void> }) {
+function StylePage({ bootstrap, onAction }: { bootstrap: BootstrapState; onAction: (l: string, a: () => Promise<BootstrapState>) => Promise<void> }) {
+  const activeStyle = STYLE_OPTIONS.find((s) => s.value === bootstrap.settings.styleMode) ?? STYLE_OPTIONS[0];
+
   return (
     <div className="page">
       <div className="page-header">
-        <h2 className="page-title serif">Enhancement</h2>
-        <p className="page-desc">Choose how much OpenWhisp polishes your dictated text.</p>
+        <h2 className="page-title serif">Style</h2>
+        <p className="page-desc">Choose your dictation style and enhancement level.</p>
+      </div>
+
+      <div className="style-tabs">
+        {STYLE_OPTIONS.map((s) => (
+          <button
+            key={s.value}
+            className={`style-tab${bootstrap.settings.styleMode === s.value ? ' style-tab-active' : ''}`}
+            onClick={() => void onAction('settings', () => window.openWhisp.updateSettings({ styleMode: s.value }))}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+
+      <div className={`style-banner${activeStyle.value === 'vibe-coding' ? ' style-banner-dev' : ''}`}>
+        <p>{activeStyle.description}</p>
       </div>
 
       <div className="enhance-grid">
         {LEVEL_OPTIONS.map((level) => {
           const active = bootstrap.settings.enhancementLevel === level.value;
+          const example = activeStyle.levels[level.value].example;
           return (
             <button
               key={level.value}
@@ -460,7 +490,7 @@ function EnhancementPage({ bootstrap, onAction }: { bootstrap: BootstrapState; o
                 {active && <span className="badge badge-ready">Active</span>}
               </div>
               <p className="enhance-caption">{level.caption}</p>
-              <p className="enhance-detail">{level.detail}</p>
+              <p className="enhance-example">"{example}"</p>
               <div className="intensity-bar">
                 {[1, 2, 3, 4].map((i) => (
                   <span key={i} className={`intensity-dot${i <= level.intensity ? ' intensity-dot-on' : ''}`} />

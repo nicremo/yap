@@ -417,7 +417,63 @@ button { cursor: pointer; }
 }
 
 /* ────────────────────────────────────────────────
-   Enhancement Page
+   Style Tabs
+   ──────────────────────────────────────────────── */
+
+.style-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 20px;
+}
+
+.style-tab {
+  padding: 10px 22px;
+  border: none;
+  background: none;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text-3);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: all 0.15s;
+  -webkit-app-region: no-drag;
+}
+
+.style-tab:hover {
+  color: var(--text);
+}
+
+.style-tab-active {
+  color: var(--text);
+  font-weight: 600;
+  border-bottom-color: var(--text);
+}
+
+.style-banner {
+  background: linear-gradient(135deg, #f0ede6 0%, #e8e4da 100%);
+  border-radius: 12px;
+  padding: 16px 22px;
+  margin-bottom: 20px;
+}
+
+.style-banner p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-2);
+  line-height: 1.5;
+}
+
+.style-banner-dev {
+  background: linear-gradient(135deg, #1e1b2e 0%, #2a2540 100%);
+}
+
+.style-banner-dev p {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* ────────────────────────────────────────────────
+   Enhancement Cards (used by Style page)
    ──────────────────────────────────────────────── */
 
 .enhance-grid {
@@ -473,6 +529,15 @@ button { cursor: pointer; }
   font-size: 13px;
   color: var(--text-3);
   line-height: 1.45;
+}
+
+.enhance-example {
+  margin: 4px 0 0;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--text-3);
+  line-height: 1.45;
+  opacity: 0.8;
 }
 
 .intensity-bar {
