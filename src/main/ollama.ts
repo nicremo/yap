@@ -186,8 +186,8 @@ export async function rewriteWithOllama(
               role: 'user',
               content: [
                 'Rewrite the dictated text below.',
-                'Reply with only the final rewritten text.',
-                'Do not add any preface, explanation, labels, or quotation marks.',
+                'If the speaker corrected themselves or changed their mind, use only their final intent.',
+                'Reply with only the final rewritten text — no preface, explanation, labels, or quotation marks.',
                 '',
                 '<dictation>',
                 rawText,
