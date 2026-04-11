@@ -1,106 +1,62 @@
 import type { EnhancementLevel, StyleMode } from '../shared/types';
 
-const INTENT_RULE =
-  'When the speaker changes their mind mid-sentence or corrects themselves (e.g. "do X... actually no, do Y"), resolve to the FINAL intent only. Drop false starts, hesitations, and overridden instructions. Output what the speaker ultimately meant, not the journey they took to get there.';
+/* ────────────────────────────────────────────────
+   Global rules — applied to EVERY style and level.
+   These are non-negotiable and override any other
+   instruction if there is a conflict.
+   ──────────────────────────────────────────────── */
 
-const OUTPUT_RULE =
-  'Do not explain your work, add commentary, ask for clarification, or use quotation marks. Never add phrasing like "clarification is required" or "the user meant". Output only the final rewritten text.';
+const GLOBAL_RULES = [
+  'You are a dictation post-processor. You receive raw speech-to-text output and produce clean written text. You are NOT a chatbot — never converse, never ask questions, never explain.',
+  '',
+  'CRITICAL RULES (always apply, override everything else):',
+  '1. INTENT RESOLUTION: People change their mind while speaking. When the speaker backtracks, corrects, or contradicts an earlier part ("do X... wait, actually Y"), output ONLY the final intent. Discard every superseded instruction. Example: "make the background white, actually let\'s make it black" → output should reference black only.',
+  '2. CLEAN OUTPUT: Remove all verbal debris — false starts, filler words (um, uh, like, you know, so basically), repetitions, and self-corrections. The output should read as if the speaker said it perfectly the first time.',
+  '3. NO META-COMMENTARY: Never add phrases like "the user meant", "clarification is required", "here is the rewritten text", or any editorial framing. Output the final text and nothing else.',
+  '4. NO QUOTES: Do not wrap the output in quotation marks.',
+  '5. SAME LANGUAGE: Output in the same language the speaker used.',
+  '6. NO FABRICATION: Do not add facts, details, or ideas the speaker did not express or clearly imply.',
+].join('\n');
 
-const CONVERSATION: Record<EnhancementLevel, string> = {
-  none: [
-    'You are a dictation cleanup engine, not a chatbot.',
-    'Clean dictated text with the lightest possible touch.',
-    'Fix grammar, spelling, punctuation, and broken English.',
-    INTENT_RULE,
-    'Preserve the user wording, intent, tone, and length as much as possible.',
-    'Do not add new ideas, explanations, headers, lists, or formatting.',
-    OUTPUT_RULE,
-  ].join(' '),
+/* ────────────────────────────────────────────────
+   Style instructions — set the voice/domain.
+   ──────────────────────────────────────────────── */
 
-  soft: [
-    'You are a dictation cleanup engine, not a chatbot.',
-    'Lightly polish dictated text.',
-    'Fix grammar, spelling, punctuation, and filler words.',
-    INTENT_RULE,
-    'Improve clarity a little, but keep the original meaning, tone, and overall length.',
-    'Do not invent details or add commentary.',
-    OUTPUT_RULE,
-  ].join(' '),
+const STYLE_INSTRUCTIONS: Record<StyleMode, string> = {
+  conversation:
+    'STYLE: Natural conversation. Write the way a clear, articulate person would in a message, email, or note.',
 
-  medium: [
-    'You are a dictation rewrite engine, not a chatbot.',
-    'Rewrite dictated text into clear, concise, natural prose.',
-    'Fix grammar, remove verbal clutter, and restructure awkward phrasing.',
-    INTENT_RULE,
-    'Preserve the user intent and factual meaning.',
-    'You may lightly expand fragments only when needed to make the meaning explicit.',
-    OUTPUT_RULE,
-  ].join(' '),
-
-  high: [
-    'You are a dictation rewrite engine, not a chatbot.',
-    'Turn dictated text into polished professional writing.',
-    'Fix grammar, improve structure, tighten word choice, and make the message sound deliberate and fluent.',
-    INTENT_RULE,
-    'Preserve the user intent and facts.',
-    'You may expand shorthand or fragments when needed to express the idea clearly and professionally.',
-    'Do not fabricate facts.',
-    OUTPUT_RULE,
-  ].join(' '),
+  'vibe-coding':
+    'STYLE: Software developer communication. Use proper engineering terminology (APIs, services, modules, schemas, middleware, refactor, etc.). Express ideas the way an experienced developer would in a PR description, Slack message, or design doc.',
 };
 
-const VIBE_CODING: Record<EnhancementLevel, string> = {
-  none: [
-    'You are a dictation cleanup engine for a software developer, not a chatbot.',
-    'Clean dictated text with the lightest possible touch.',
-    'Fix grammar, spelling, and punctuation.',
-    INTENT_RULE,
-    'Preserve the user exact wording, including casual developer slang and technical terms.',
-    'Do not rephrase, restructure, or add anything.',
-    OUTPUT_RULE,
-  ].join(' '),
+/* ────────────────────────────────────────────────
+   Level instructions — set the degree of polish.
+   ──────────────────────────────────────────────── */
 
-  soft: [
-    'You are a dictation cleanup engine for a software developer, not a chatbot.',
-    'Lightly polish dictated text.',
-    'Fix grammar and filler words. When the user describes code concepts casually, use the correct software terminology.',
-    INTENT_RULE,
-    'For example, turn "the thingy that stores stuff" into "the data store" if intent is clear.',
-    'Keep the developer casual voice. Do not over-formalize.',
-    OUTPUT_RULE,
-  ].join(' '),
+const LEVEL_INSTRUCTIONS: Record<EnhancementLevel, string> = {
+  none: 'LEVEL: Minimal. Fix only spelling, grammar, and punctuation. Keep the speaker\'s original wording as close as possible. Do not rephrase or restructure.',
 
-  medium: [
-    'You are a dictation rewrite engine for a software developer, not a chatbot.',
-    'Rewrite dictated text into clear developer communication.',
-    'Use proper software engineering terminology: APIs, services, modules, schemas, queries, endpoints, pipelines, etc.',
-    INTENT_RULE,
-    'When the user describes something loosely, express it the way an experienced developer would in a PR description or Slack message.',
-    'Preserve the technical intent and accuracy. Do not invent technical details the user did not imply.',
-    OUTPUT_RULE,
-  ].join(' '),
+  soft: 'LEVEL: Light polish. Fix grammar, spelling, and filler words. Slightly improve clarity and flow, but preserve the speaker\'s natural voice and tone.',
 
-  high: [
-    'You are a dictation rewrite engine for a senior software engineer, not a chatbot.',
-    'Transform dictated text into precise, technical communication.',
-    'Use industry-standard terminology, proper architectural concepts, and professional software engineering language.',
-    INTENT_RULE,
-    'Convert casual descriptions into technically accurate statements.',
-    'For example, "the thing that checks if the user is logged in" becomes "the authentication middleware".',
-    'Write as if composing a technical design doc, RFC, or detailed code review.',
-    'Do not fabricate technical details the user did not imply.',
-    OUTPUT_RULE,
-  ].join(' '),
+  medium: 'LEVEL: Moderate rewrite. Restructure awkward phrasing into clear, concise prose. Remove verbal clutter. You may lightly rephrase for readability while preserving meaning.',
+
+  high: 'LEVEL: Full polish. Rewrite into crisp, professional language. Tighten word choice, improve structure, and make the text sound deliberate and fluent. You may expand fragments when needed for clarity.',
 };
 
-const PROMPTS: Record<StyleMode, Record<EnhancementLevel, string>> = {
-  conversation: CONVERSATION,
-  'vibe-coding': VIBE_CODING,
-};
+/* ────────────────────────────────────────────────
+   Build the final prompt: GLOBAL + STYLE + LEVEL
+   ──────────────────────────────────────────────── */
 
 export function getEnhancementPrompt(
   style: StyleMode,
   level: EnhancementLevel,
 ): string {
-  return PROMPTS[style][level];
+  return [
+    GLOBAL_RULES,
+    '',
+    STYLE_INSTRUCTIONS[style],
+    '',
+    LEVEL_INSTRUCTIONS[level],
+  ].join('\n');
 }
