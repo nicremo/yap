@@ -19,6 +19,7 @@ export interface AppSettings {
   styleMode: StyleMode;
   enhancementLevel: EnhancementLevel;
   autoPaste: boolean;
+  showOverlay: boolean;
   launchAtLogin: boolean;
   setupComplete: boolean;
 }
@@ -86,6 +87,7 @@ export interface UpdateSettingsInput {
   ollamaBaseUrl?: string;
   storageDirectory?: string;
   autoPaste?: boolean;
+  showOverlay?: boolean;
   launchAtLogin?: boolean;
   setupComplete?: boolean;
 }

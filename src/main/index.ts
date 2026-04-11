@@ -26,7 +26,6 @@ let settings: AppSettings;
 let status: AppStatus = getInitialStatus();
 let helperReady = false;
 let isQuitting = false;
-let hideOverlayTimeout: NodeJS.Timeout | null = null;
 
 function shutdown(): void {
   if (isQuitting) {
@@ -65,33 +64,21 @@ async function showOverlay(): Promise<void> {
   window.showInactive();
 }
 
-function hideOverlaySoon(): void {
-  if (hideOverlayTimeout) {
-    clearTimeout(hideOverlayTimeout);
+function hideOverlay(): void {
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.hide();
   }
-
-  hideOverlayTimeout = setTimeout(() => {
-    if (overlayWindow && !overlayWindow.isDestroyed()) {
-      overlayWindow.hide();
-    }
-  }, 1_100);
 }
 
 function setStatus(nextStatus: AppStatus): void {
   status = nextStatus;
   broadcast('app:status', nextStatus);
 
-  if (nextStatus.phase === 'idle') {
-    hideOverlaySoon();
-    return;
+  if (settings.showOverlay || nextStatus.phase !== 'idle') {
+    void showOverlay();
+  } else {
+    hideOverlay();
   }
-
-  if (hideOverlayTimeout) {
-    clearTimeout(hideOverlayTimeout);
-    hideOverlayTimeout = null;
-  }
-
-  void showOverlay();
 }
 
 function showMainWindow(): void {
@@ -216,6 +203,7 @@ async function bootstrap(): Promise<void> {
 
   await createWindows();
   await ensureOverlayWindow();
+  if (settings.showOverlay) void showOverlay();
   createTray();
 
   helperReady = await ensureNativeHelper();

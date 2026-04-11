@@ -31,6 +31,7 @@ export function createDefaultSettings(): AppSettings {
     styleMode: 'conversation',
     enhancementLevel: 'medium',
     autoPaste: true,
+    showOverlay: false,
     launchAtLogin: false,
     setupComplete: false,
   };

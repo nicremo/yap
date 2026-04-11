@@ -163,7 +163,7 @@ export function App() {
   };
 
   const handleHotkeyDown = async () => {
-    const current = bootstrapRef.current ?? (await refreshBootstrap());
+    const current = await refreshBootstrap();
     const modelInstalled = current.ollamaModels.some((m) => m.name === current.settings.textModel);
     if (recordingRef.current || processingRef.current) return;
 
@@ -393,6 +393,11 @@ function MainView({ bootstrap, status, busyAction, onAction }: {
         </nav>
         <div className="sidebar-footer">
           <button className="btn btn-link btn-muted" onClick={() => void onAction('setup', () => window.openWhisp.updateSettings({ setupComplete: false }))}>Reset Setup</button>
+          <div className="sidebar-credits">
+            <button className="credit-link" onClick={() => void window.openWhisp.openExternal('https://x.com/GiusMarci')}>@GiusMarci</button>
+            <span className="credit-dot" />
+            <button className="credit-link" onClick={() => void window.openWhisp.openExternal('https://raelume.ai')}>raelume.ai</button>
+          </div>
         </div>
       </aside>
 
@@ -581,6 +586,10 @@ function ModelsPage({ bootstrap, busyAction, onAction }: { bootstrap: BootstrapS
 /* ── Preferences ──────────────────────────────── */
 
 function PreferencesPage({ bootstrap, onAction }: { bootstrap: BootstrapState; onAction: (l: string, a: () => Promise<BootstrapState>) => Promise<void> }) {
+  const p = bootstrap.permissions;
+  const micOk = p.microphone === 'granted';
+  const sysOk = p.accessibility && p.inputMonitoring && p.postEvents;
+
   return (
     <div className="page">
       <div className="page-header">
@@ -591,7 +600,36 @@ function PreferencesPage({ bootstrap, onAction }: { bootstrap: BootstrapState; o
       <div className="card">
         <div className="card-head"><h3>Behavior</h3></div>
         <ToggleRow title="Auto-paste" description="Paste into the active app after rewriting" checked={bootstrap.settings.autoPaste} onChange={(v) => void onAction('settings', () => window.openWhisp.updateSettings({ autoPaste: v }))} />
+        <ToggleRow title="Show overlay" description="Show the dictation badge on screen" checked={bootstrap.settings.showOverlay} onChange={(v) => void onAction('settings', () => window.openWhisp.updateSettings({ showOverlay: v }))} />
         <ToggleRow title="Launch at login" description="Start Openwhisp when you log in" checked={bootstrap.settings.launchAtLogin} onChange={(v) => void onAction('settings', () => window.openWhisp.updateSettings({ launchAtLogin: v }))} />
+      </div>
+
+      <div className="card">
+        <div className="card-head">
+          <h3>Permissions</h3>
+          <button className="btn btn-link" onClick={() => void onAction('refresh', () => window.openWhisp.bootstrap())}>Refresh</button>
+        </div>
+        <div className="perm-grid">
+          <div className="perm-row">
+            <span className="perm-name">Microphone</span>
+            <span className={`perm-status${micOk ? ' perm-ok' : ' perm-missing'}`}>{micOk ? 'Granted' : 'Not granted'}</span>
+            {!micOk && <button className="btn btn-sm btn-primary" onClick={() => void onAction('mic', () => window.openWhisp.requestMicrophoneAccess())}>Allow</button>}
+          </div>
+          <div className="perm-row">
+            <span className="perm-name">Accessibility</span>
+            <span className={`perm-status${p.accessibility ? ' perm-ok' : ' perm-missing'}`}>{p.accessibility ? 'Granted' : 'Not granted'}</span>
+          </div>
+          <div className="perm-row">
+            <span className="perm-name">Input Monitoring</span>
+            <span className={`perm-status${p.inputMonitoring ? ' perm-ok' : ' perm-missing'}`}>{p.inputMonitoring ? 'Granted' : 'Not granted'}</span>
+          </div>
+          <div className="perm-row">
+            <span className="perm-name">Paste Events</span>
+            <span className={`perm-status${p.postEvents ? ' perm-ok' : ' perm-missing'}`}>{p.postEvents ? 'Granted' : 'Not granted'}</span>
+          </div>
+          {!sysOk && <button className="btn btn-sm btn-secondary" style={{ marginTop: 8 }} onClick={() => void onAction('system', () => window.openWhisp.requestSystemAccess())}>Grant Permissions</button>}
+          <button className="btn btn-link btn-muted" style={{ marginTop: 8 }} onClick={() => void window.openWhisp.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy')}>Manage in System Settings</button>
+        </div>
       </div>
 
       <div className="card">
@@ -624,14 +662,17 @@ function ToggleRow({ title, description, checked, onChange }: { title: string; d
    ──────────────────────────────────────────────── */
 
 function OverlayBar({ status, audioLevel }: { status: AppStatus; audioLevel: number }) {
+  const isIdle = status.phase === 'idle';
   const isListening = status.phase === 'listening';
   const isProcessing = status.phase === 'transcribing' || status.phase === 'rewriting' || status.phase === 'pasting';
   const isDone = status.phase === 'done';
+  const isActive = !isIdle;
+
   return (
     <div className="overlay-shell">
-      <div className={`overlay-bar${isProcessing ? ' overlay-processing' : ''}${isDone ? ' overlay-done' : ''}`}>
+      <div className={`overlay-bar${isActive ? ' overlay-bar-active' : ''}${isProcessing ? ' overlay-processing' : ''}${isDone ? ' overlay-done' : ''}`}>
         <AudioGrid level={audioLevel} listening={isListening} processing={isProcessing} />
-        <span className="overlay-label">{status.title}</span>
+        <span className="overlay-label">{isIdle ? 'Press Fn to dictate' : status.title}</span>
       </div>
     </div>
   );

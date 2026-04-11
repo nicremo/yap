@@ -21,6 +21,7 @@ async function openSettingsPane(targetUrl: string): Promise<void> {
 export async function getPermissionState(): Promise<PermissionsState> {
   const nativePermissions = await getNativePermissionState();
   const microphone = systemPreferences.getMediaAccessStatus('microphone');
+  console.log('[openwhisp] mic status:', microphone, '| native:', JSON.stringify(nativePermissions));
 
   return {
     microphone:
@@ -36,6 +37,15 @@ export async function getPermissionState(): Promise<PermissionsState> {
   };
 }
 
+async function waitForMicrophoneAccess(attempts = 5): Promise<PermissionsState> {
+  for (let i = 0; i < attempts; i++) {
+    const state = await getPermissionState();
+    if (state.microphone === 'granted') return state;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  return getPermissionState();
+}
+
 export async function requestMicrophoneAccess(): Promise<PermissionsState> {
   let granted = false;
 
@@ -45,12 +55,26 @@ export async function requestMicrophoneAccess(): Promise<PermissionsState> {
     // Electron throws when the permission cannot be requested from the current context.
   }
 
+  if (granted) {
+    return waitForMicrophoneAccess();
+  }
+
   const nextState = await getPermissionState();
-  if (!granted && nextState.microphone !== 'granted') {
+  if (nextState.microphone !== 'granted') {
     await openSettingsPane(MICROPHONE_SETTINGS_URL);
+    return waitForMicrophoneAccess();
   }
 
   return nextState;
+}
+
+async function waitForSystemAccess(attempts = 10): Promise<PermissionsState> {
+  for (let i = 0; i < attempts; i++) {
+    const state = await getPermissionState();
+    if (state.accessibility && state.inputMonitoring && state.postEvents) return state;
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  return getPermissionState();
 }
 
 export async function requestSystemAccess(): Promise<PermissionsState> {
@@ -63,5 +87,5 @@ export async function requestSystemAccess(): Promise<PermissionsState> {
     await openSettingsPane(INPUT_MONITORING_SETTINGS_URL);
   }
 
-  return nextState;
+  return waitForSystemAccess();
 }
