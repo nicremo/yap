@@ -3,6 +3,7 @@ import { HugeiconsIcon } from '@hugeicons/react';
 import { Home01Icon, PaintBrush01Icon, CubeIcon, Settings01Icon } from '@hugeicons/core-free-icons';
 
 import { AudioRecorder } from './audio-recorder';
+import logoUrl from './logo.png';
 import type { AppStatus, BootstrapState, EnhancementLevel, FocusInfo, StyleMode } from '../shared/types';
 import { RECOMMENDED_TEXT_MODEL, RECOMMENDED_WHISPER_LABEL } from '../shared/recommendations';
 
@@ -223,7 +224,7 @@ export function App() {
 
   if (OVERLAY_VIEW) return <OverlayBar status={status} audioLevel={audioLevel} />;
   if (!bootstrap) {
-    return <main className="app-shell loading-shell"><div className="loading-spinner" /><span className="loading-text">Loading OpenWhisp</span></main>;
+    return <main className="app-shell loading-shell"><div className="loading-spinner" /><span className="loading-text">Loading Openwhisp</span></main>;
   }
   if (!bootstrap.settings.setupComplete) {
     return <SetupWizard bootstrap={bootstrap} busyAction={busyAction} onAction={runAction} onRefresh={refreshBootstrap} onComplete={() => void runAction('setup', () => window.openWhisp.updateSettings({ setupComplete: true }))} />;
@@ -260,7 +261,7 @@ function SetupWizard({ bootstrap, busyAction, onAction, onRefresh, onComplete }:
         {step === 'welcome' && (
           <div className="setup-step setup-step-center">
             <div className="fn-key"><span>fn</span></div>
-            <h1 className="setup-title serif">Welcome to OpenWhisp</h1>
+            <h1 className="setup-title serif">Welcome to Openwhisp</h1>
             <p className="setup-desc">Local dictation powered by Whisper and Ollama. Your voice stays on your machine.</p>
             <div className="setup-nav"><div /><button className="btn btn-primary" onClick={next}>Get Started</button></div>
           </div>
@@ -272,7 +273,7 @@ function SetupWizard({ bootstrap, busyAction, onAction, onRefresh, onComplete }:
           <div className="setup-step setup-step-center">
             <div className="ready-icon"><CheckIcon size={32} /></div>
             <h1 className="setup-title serif">You're All Set</h1>
-            <p className="setup-desc">Hold Fn to dictate. Release it and OpenWhisp handles the rest.</p>
+            <p className="setup-desc">Hold Fn to dictate. Release it and Openwhisp handles the rest.</p>
             <div className="setup-nav"><button className="btn btn-ghost" onClick={back}>Back</button><button className="btn btn-primary" onClick={onComplete}>Start Dictating</button></div>
           </div>
         )}
@@ -287,7 +288,7 @@ function OllamaStep({ bootstrap, onRefresh, onNext, onBack }: { bootstrap: Boots
   return (
     <div className="setup-step">
       <h1 className="setup-title serif">Connect to Ollama</h1>
-      <p className="setup-desc">Ollama runs AI models locally. OpenWhisp uses it to enhance your dictated text.</p>
+      <p className="setup-desc">Ollama runs AI models locally. Openwhisp uses it to enhance your dictated text.</p>
       <div className="s-card">
         <div className="s-card-row">
           <div className="s-card-info"><strong>Ollama Server</strong><span>{bootstrap.settings.ollamaBaseUrl}</span></div>
@@ -313,7 +314,7 @@ function ModelsStep({ bootstrap, busyAction, onAction, onNext, onBack }: { boots
   return (
     <div className="setup-step">
       <h1 className="setup-title serif">Download Models</h1>
-      <p className="setup-desc">Two AI models power OpenWhisp — one for speech and one for text enhancement.</p>
+      <p className="setup-desc">Two AI models power Openwhisp — one for speech and one for text enhancement.</p>
       <div className="s-card">
         <div className="s-card-label">Speech to Text</div>
         <div className="s-card-row">
@@ -339,7 +340,7 @@ function PermissionsStep({ bootstrap, busyAction, onAction, onNext, onBack }: { 
   return (
     <div className="setup-step">
       <h1 className="setup-title serif">Allow Access</h1>
-      <p className="setup-desc">OpenWhisp needs permissions to listen, transcribe, and paste.</p>
+      <p className="setup-desc">Openwhisp needs permissions to listen, transcribe, and paste.</p>
       <div className="s-card">
         <div className="s-card-row">
           <div className="s-card-info"><strong>Microphone</strong><span>Captures your voice</span></div>
@@ -373,7 +374,8 @@ function MainView({ bootstrap, status, busyAction, onAction }: {
 
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <h1 className="serif">OpenWhisp</h1>
+          <img src={logoUrl} alt="" className="sidebar-logo" />
+          <h1 className="serif">Openwhisp</h1>
         </div>
         <nav className="sidebar-nav">
           <button className={`nav-item${page === 'home' ? ' nav-item-active' : ''}`} onClick={() => setPage('home')}>
@@ -583,13 +585,13 @@ function PreferencesPage({ bootstrap, onAction }: { bootstrap: BootstrapState; o
     <div className="page">
       <div className="page-header">
         <h2 className="page-title serif">Preferences</h2>
-        <p className="page-desc">Customize how OpenWhisp works.</p>
+        <p className="page-desc">Customize how Openwhisp works.</p>
       </div>
 
       <div className="card">
         <div className="card-head"><h3>Behavior</h3></div>
         <ToggleRow title="Auto-paste" description="Paste into the active app after rewriting" checked={bootstrap.settings.autoPaste} onChange={(v) => void onAction('settings', () => window.openWhisp.updateSettings({ autoPaste: v }))} />
-        <ToggleRow title="Launch at login" description="Start OpenWhisp when you log in" checked={bootstrap.settings.launchAtLogin} onChange={(v) => void onAction('settings', () => window.openWhisp.updateSettings({ launchAtLogin: v }))} />
+        <ToggleRow title="Launch at login" description="Start Openwhisp when you log in" checked={bootstrap.settings.launchAtLogin} onChange={(v) => void onAction('settings', () => window.openWhisp.updateSettings({ launchAtLogin: v }))} />
       </div>
 
       <div className="card">
