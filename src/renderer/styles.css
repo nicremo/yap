@@ -284,7 +284,7 @@ button {
   align-items: center;
   justify-content: center;
   gap: 16px;
-  min-height: 100vh;
+  min-height: 100dvh;
 }
 
 .loading-spinner {
@@ -308,9 +308,10 @@ button {
 .setup-shell {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  min-height: 100dvh;
   padding: 64px 48px 32px;
   background: var(--bg);
+  overflow-y: auto;
 }
 
 .setup-progress {
@@ -497,9 +498,10 @@ button {
    ──────────────────────────────────────────────── */
 
 .app-shell {
-  min-height: 100vh;
+  min-height: 100dvh;
   padding: 56px 28px 24px;
   background: var(--bg);
+  overflow-y: auto;
 }
 
 .app-header {
@@ -918,7 +920,7 @@ button {
    Responsive – narrow fallback
    ──────────────────────────────────────────────── */
 
-@media (max-width: 620px) {
+@media (max-width: 640px) {
   .main-grid {
     grid-template-columns: 1fr;
   }
@@ -931,7 +933,37 @@ button {
     grid-template-columns: 1fr;
   }
 
+  .app-shell {
+    padding: 56px 20px 20px;
+  }
+
   .setup-shell {
     padding: 64px 24px 24px;
+  }
+
+  .setup-body {
+    max-width: none;
+  }
+
+  .app-title {
+    font-size: 22px;
+  }
+}
+
+@media (max-width: 480px) {
+  .app-shell {
+    padding: 52px 14px 16px;
+  }
+
+  .setup-shell {
+    padding: 56px 16px 16px;
+  }
+
+  .level-selector {
+    flex-wrap: wrap;
+  }
+
+  .level-pill {
+    flex: 1 1 40%;
   }
 }
