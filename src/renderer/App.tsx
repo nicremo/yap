@@ -248,6 +248,7 @@ export function App() {
     } finally {
       targetFocusRef.current = null;
       processingRef.current = false;
+      void window.openWhisp.showMainWindow();
     }
   };
 
