@@ -1,4 +1,6 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, Menu, Tray, nativeImage } from 'electron';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { getInitialStatus } from './dictation';
 import { registerIpcHandlers } from './ipc';
@@ -15,8 +17,11 @@ import { ensureStorage } from './storage';
 import { createMainWindow, createOverlayWindow, positionOverlayWindow } from './windows';
 import type { AppSettings, AppStatus } from '../shared/types';
 
+const projectRoot = path.resolve(fileURLToPath(new URL('../../', import.meta.url)));
+
 let mainWindow: BrowserWindow | null = null;
 let overlayWindow: BrowserWindow | null = null;
+let tray: Tray | null = null;
 let settings: AppSettings;
 let status: AppStatus = getInitialStatus();
 let helperReady = false;
@@ -211,10 +216,34 @@ async function bootstrap(): Promise<void> {
 
   await createWindows();
   await ensureOverlayWindow();
+  createTray();
 
   helperReady = await ensureNativeHelper();
 
   await ensureHotkeyListener();
+}
+
+function getTrayIconPath(): string {
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, 'icons', 'trayTemplate.png');
+  }
+  return path.join(projectRoot, 'build', 'icons', 'trayTemplate.png');
+}
+
+function createTray(): void {
+  const icon = nativeImage.createFromPath(getTrayIconPath());
+  icon.setTemplateImage(true);
+  tray = new Tray(icon);
+  tray.setToolTip('Openwhisp');
+
+  const contextMenu = Menu.buildFromTemplate([
+    { label: 'Show Openwhisp', click: () => showMainWindow() },
+    { type: 'separator' },
+    { label: 'Quit', click: () => { isQuitting = true; app.quit(); } },
+  ]);
+
+  tray.setContextMenu(contextMenu);
+  tray.on('click', () => showMainWindow());
 }
 
 app.whenReady().then(bootstrap);
