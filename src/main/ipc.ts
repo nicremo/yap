@@ -10,7 +10,7 @@ import type {
 import { RECOMMENDED_TEXT_MODEL } from '../shared/recommendations';
 import { processDictationAudio } from './dictation';
 import { applyLaunchAtLogin } from './login-item';
-import { pullOllamaModel, listOllamaModels, isOllamaReachable } from './ollama';
+import { pullOllamaModel, listOllamaModels, isOllamaReachable, ensureOllamaRunning } from './ollama';
 import { getFocusInfo } from './native-helper';
 import { getPermissionState, requestMicrophoneAccess, requestSystemAccess } from './permissions';
 import { updateSettings as persistSettings, chooseStorageDirectory } from './settings';
@@ -35,7 +35,7 @@ export function registerIpcHandlers(dependencies: IpcDependencies): void {
     if (permissions.accessibility && permissions.inputMonitoring && permissions.postEvents) {
       await dependencies.ensureHotkeyListener();
     }
-    const ollamaReachable = await isOllamaReachable(settings.ollamaBaseUrl);
+    const ollamaReachable = await ensureOllamaRunning(settings.ollamaBaseUrl);
     const ollamaModels = ollamaReachable ? await listOllamaModels(settings.ollamaBaseUrl) : [];
 
     return {

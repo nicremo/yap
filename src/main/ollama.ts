@@ -1,3 +1,6 @@
+import { execFile } from 'node:child_process';
+import fs from 'node:fs';
+
 import type { OllamaModelInfo } from '../shared/types';
 
 interface OllamaTagsResponse {
@@ -52,6 +55,40 @@ async function fetchWithTimeout(
     return await fetch(input, { ...init, signal: controller.signal });
   } finally {
     clearTimeout(timeout);
+  }
+}
+
+const OLLAMA_APP_PATH = '/Applications/Ollama.app';
+
+export function isOllamaInstalled(): boolean {
+  return fs.existsSync(OLLAMA_APP_PATH);
+}
+
+export async function launchOllamaApp(): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    execFile('open', ['-a', 'Ollama'], (error) => {
+      if (error) reject(error);
+      else resolve();
+    });
+  });
+}
+
+async function waitForOllama(baseUrl: string, attempts = 10): Promise<boolean> {
+  for (let i = 0; i < attempts; i++) {
+    if (await isOllamaReachable(baseUrl)) return true;
+    await new Promise((r) => setTimeout(r, 1_000));
+  }
+  return false;
+}
+
+export async function ensureOllamaRunning(baseUrl: string): Promise<boolean> {
+  if (await isOllamaReachable(baseUrl)) return true;
+  if (!isOllamaInstalled()) return false;
+  try {
+    await launchOllamaApp();
+    return waitForOllama(baseUrl);
+  } catch {
+    return false;
   }
 }
 
