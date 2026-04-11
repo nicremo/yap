@@ -42,26 +42,31 @@ Each style has four enhancement levels: **No Filter**, **Soft**, **Medium**, and
 
 ## Getting started
 
+**1. Install Ollama and download the text model first:**
+
 ```bash
-# Clone the repo
-git clone https://github.com/user/openwhisp.git
+# Install Ollama from https://ollama.com/download/mac, then:
+ollama serve
+
+# In a new terminal, pull the text enhancement model (~9.6 GB)
+ollama pull gemma4:e4b
+```
+
+**2. Clone and run Openwhisp:**
+
+```bash
+git clone https://github.com/giusmarci/openwhisp.git
 cd openwhisp
-
-# Install dependencies
 npm install
-
-# Compile the native Swift helper
 npm run build:native
-
-# Start the app
 npm run dev
 ```
 
 On first launch, the setup wizard will walk you through:
 
-1. **Ollama** — if not installed, the wizard links you to the download. If installed, OpenWhisp launches it automatically.
-2. **Speech model** — downloads Whisper Base Multilingual (~150 MB) for local speech recognition.
-3. **Text model** — downloads Gemma 4 E4B (~9.6 GB) for local text enhancement. This takes a few minutes on the first run.
+1. **Ollama** — verifies the connection. If Ollama is running, it connects automatically.
+2. **Speech model** — downloads Whisper Base Multilingual (~150 MB) automatically.
+3. **Text model** — detects the Gemma 4 model you already pulled.
 4. **Permissions** — microphone access for recording, plus Accessibility and Input Monitoring for Fn key listening and auto-paste.
 
 After setup, click into the text field where you want the text to go (an email, chat, code editor, etc.), then hold **Fn** and speak. When you release, the transcribed and enhanced text is automatically pasted into that field. If you move away or no text field is selected, the text is still copied to your clipboard — just use **Cmd+V** to paste it wherever you need.
