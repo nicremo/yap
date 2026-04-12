@@ -47,25 +47,25 @@ async function waitForMicrophoneAccess(attempts = 5): Promise<PermissionsState> 
 }
 
 export async function requestMicrophoneAccess(): Promise<PermissionsState> {
-  let granted = false;
+  const currentState = await getPermissionState();
 
-  try {
-    granted = await systemPreferences.askForMediaAccess('microphone');
-  } catch {
-    // Electron throws when the permission cannot be requested from the current context.
+  if (currentState.microphone === 'granted') {
+    return currentState;
   }
 
-  if (granted) {
-    return waitForMicrophoneAccess();
+  if (currentState.microphone === 'not-determined') {
+    try {
+      const granted = await systemPreferences.askForMediaAccess('microphone');
+      if (granted) {
+        return waitForMicrophoneAccess();
+      }
+    } catch {
+      // Electron throws when the permission cannot be requested from the current context.
+    }
   }
 
-  const nextState = await getPermissionState();
-  if (nextState.microphone !== 'granted') {
-    await openSettingsPane(MICROPHONE_SETTINGS_URL);
-    return waitForMicrophoneAccess();
-  }
-
-  return nextState;
+  await openSettingsPane(MICROPHONE_SETTINGS_URL);
+  return waitForMicrophoneAccess(15);
 }
 
 async function waitForSystemAccess(attempts = 10): Promise<PermissionsState> {

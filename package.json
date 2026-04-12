@@ -23,6 +23,10 @@
       {
         "from": "build/native",
         "to": "native"
+      },
+      {
+        "from": "build/icons",
+        "to": "icons"
       }
     ],
     "directories": {
