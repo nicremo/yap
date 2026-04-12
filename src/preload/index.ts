@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 import type {
+  AppRule,
   AppStatus,
   BootstrapState,
   CorrectionEntry,
@@ -37,6 +38,12 @@ const api = {
     ipcRenderer.invoke('corrections:add', from, to) as Promise<CorrectionEntry[]>,
   removeCorrection: (from: string) =>
     ipcRenderer.invoke('corrections:remove', from) as Promise<CorrectionEntry[]>,
+  addAppRule: (rule: AppRule) =>
+    ipcRenderer.invoke('appRules:add', rule) as Promise<AppRule[]>,
+  removeAppRule: (appIdentifier: string) =>
+    ipcRenderer.invoke('appRules:remove', appIdentifier) as Promise<AppRule[]>,
+  updateAppRule: (appIdentifier: string, styleMode: string, enhancementLevel: string) =>
+    ipcRenderer.invoke('appRules:update', appIdentifier, styleMode, enhancementLevel) as Promise<AppRule[]>,
   captureFocusTarget: () =>
     ipcRenderer.invoke('dictation:captureTarget') as Promise<FocusInfo>,
   processAudio: (request: DictationRequest) =>

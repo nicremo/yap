@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 
 import type {
+  AppRule,
   AppStatus,
   BootstrapState,
   CorrectionEntry,
@@ -28,6 +29,9 @@ declare global {
       removeDictionaryWord: (word: string) => Promise<DictionaryEntry[]>;
       addCorrection: (from: string, to: string) => Promise<CorrectionEntry[]>;
       removeCorrection: (from: string) => Promise<CorrectionEntry[]>;
+      addAppRule: (rule: AppRule) => Promise<AppRule[]>;
+      removeAppRule: (appIdentifier: string) => Promise<AppRule[]>;
+      updateAppRule: (appIdentifier: string, styleMode: string, enhancementLevel: string) => Promise<AppRule[]>;
       captureFocusTarget: () => Promise<FocusInfo>;
       processAudio: (request: DictationRequest) => Promise<{
         rawText: string;

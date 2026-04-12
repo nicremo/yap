@@ -10,6 +10,7 @@ import type {
 import { RECOMMENDED_TEXT_MODEL } from '../shared/recommendations';
 import { isApiKeySet } from './api-key';
 import { testCloudConnection } from './cloud-transcription';
+import { loadAppRules, addAppRule, removeAppRule, updateAppRule } from './app-rules';
 import { loadDictionary, addDictionaryEntry, removeDictionaryEntry, loadCorrections, addCorrection, removeCorrection } from './dictionary';
 import { processDictationAudio } from './dictation';
 import { applyLaunchAtLogin } from './login-item';
@@ -54,6 +55,7 @@ export function registerIpcHandlers(dependencies: IpcDependencies): void {
       openaiApiKeySet: isApiKeySet(settings),
       dictionary: await loadDictionary(),
       corrections: await loadCorrections(),
+      appRules: await loadAppRules(),
       status: dependencies.getStatus(),
     };
   };
@@ -180,6 +182,29 @@ export function registerIpcHandlers(dependencies: IpcDependencies): void {
     return removeCorrection(from);
   });
 
+  ipcMain.handle('appRules:add', async (_event, rule: unknown) => {
+    if (!rule || typeof rule !== 'object') throw new Error('Expected object for app rule.');
+    const r = rule as Record<string, unknown>;
+    if (typeof r.appIdentifier !== 'string' || typeof r.label !== 'string') throw new Error('Invalid app rule.');
+    return addAppRule(rule as import('../shared/types').AppRule);
+  });
+
+  ipcMain.handle('appRules:remove', async (_event, appIdentifier: unknown) => {
+    if (typeof appIdentifier !== 'string') throw new Error('Expected string for app identifier.');
+    return removeAppRule(appIdentifier);
+  });
+
+  ipcMain.handle('appRules:update', async (_event, appIdentifier: unknown, styleMode: unknown, enhancementLevel: unknown) => {
+    if (typeof appIdentifier !== 'string' || typeof styleMode !== 'string' || typeof enhancementLevel !== 'string') {
+      throw new Error('Invalid app rule update parameters.');
+    }
+    return updateAppRule(
+      appIdentifier,
+      styleMode as import('../shared/types').StyleMode,
+      enhancementLevel as import('../shared/types').EnhancementLevel,
+    );
+  });
+
   ipcMain.handle('dictation:captureTarget', async () => getFocusInfo());
 
   ipcMain.handle('dictation:processAudio', async (_event, request: DictationRequest) =>
@@ -188,6 +213,7 @@ export function registerIpcHandlers(dependencies: IpcDependencies): void {
       settings: dependencies.getSettings(),
       dictionary: await loadDictionary(),
       corrections: await loadCorrections(),
+      appRules: await loadAppRules(),
       targetFocus: request.targetFocus,
       setStatus: dependencies.setStatus,
     }),

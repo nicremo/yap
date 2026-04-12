@@ -23,6 +23,13 @@ export interface CorrectionEntry {
   addedAt: string;
 }
 
+export interface AppRule {
+  appIdentifier: string;
+  label: string;
+  styleMode: StyleMode;
+  enhancementLevel: EnhancementLevel;
+}
+
 export interface AppSettings {
   storageDirectory: string;
   whisperModel: string;
@@ -82,6 +89,7 @@ export interface BootstrapState {
   openaiApiKeySet: boolean;
   dictionary: DictionaryEntry[];
   corrections: CorrectionEntry[];
+  appRules: AppRule[];
   status: AppStatus;
 }
 

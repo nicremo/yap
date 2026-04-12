@@ -4,7 +4,7 @@ import { Home01Icon, PaintBrush01Icon, CubeIcon, Settings01Icon, BookOpen01Icon 
 
 import { AudioRecorder } from './audio-recorder';
 import logoUrl from './logo.png';
-import type { AppStatus, BootstrapState, CorrectionEntry, DictionaryEntry, EnhancementLevel, FocusInfo, StyleMode } from '../shared/types';
+import type { AppRule, AppStatus, BootstrapState, CorrectionEntry, DictionaryEntry, EnhancementLevel, FocusInfo, StyleMode } from '../shared/types';
 import { CLOUD_MODELS, RECOMMENDED_TEXT_MODEL, RECOMMENDED_WHISPER_LABEL } from '../shared/recommendations';
 import type { CloudTranscriptionModel } from '../shared/types';
 
@@ -455,16 +455,19 @@ function MainView({ bootstrap, status, busyAction, onAction, onRefresh }: {
         <div className="sidebar-footer">
           <button className="btn btn-link btn-muted" onClick={() => void onAction('setup', () => window.openWhisp.updateSettings({ setupComplete: false }))}>Reset Setup</button>
           <div className="sidebar-credits">
+            <span className="credit-muted">Original by</span>
             <button className="credit-link" onClick={() => void window.openWhisp.openExternal('https://x.com/GiusMarci')}>@GiusMarci</button>
-            <span className="credit-dot" />
-            <button className="credit-link" onClick={() => void window.openWhisp.openExternal('https://raelume.ai')}>raelume.ai</button>
+          </div>
+          <div className="sidebar-credits">
+            <span className="credit-muted">Enhanced by</span>
+            <button className="credit-link" onClick={() => void window.openWhisp.openExternal('https://github.com/nicremo')}>Fabian Bitz</button>
           </div>
         </div>
       </aside>
 
       <main className="content">
         {page === 'home' && <HomePage status={status} bootstrap={bootstrap} setPage={setPage} />}
-        {page === 'style' && <StylePage bootstrap={bootstrap} onAction={onAction} />}
+        {page === 'style' && <StylePage bootstrap={bootstrap} onAction={onAction} onRefresh={onRefresh} />}
         {page === 'models' && <ModelsPage bootstrap={bootstrap} busyAction={busyAction} onAction={onAction} />}
         {page === 'dictionary' && <DictionaryPage bootstrap={bootstrap} onRefresh={onRefresh} />}
         {page === 'preferences' && <PreferencesPage bootstrap={bootstrap} onAction={onAction} />}
@@ -528,14 +531,29 @@ function HomePage({ status, bootstrap, setPage }: { status: AppStatus; bootstrap
 
 /* ── Style ─────────────────────────────────────── */
 
-function StylePage({ bootstrap, onAction }: { bootstrap: BootstrapState; onAction: (l: string, a: () => Promise<BootstrapState>) => Promise<void> }) {
+function StylePage({ bootstrap, onAction, onRefresh }: { bootstrap: BootstrapState; onAction: (l: string, a: () => Promise<BootstrapState>) => Promise<void>; onRefresh: () => Promise<BootstrapState> }) {
   const activeStyle = STYLE_OPTIONS.find((s) => s.value === bootstrap.settings.styleMode) ?? STYLE_OPTIONS[0];
+  const [rules, setRules] = useState<AppRule[]>(bootstrap.appRules);
+
+  useEffect(() => { setRules(bootstrap.appRules); }, [bootstrap.appRules]);
+
+  const handleRemoveRule = async (appId: string) => {
+    const updated = await window.openWhisp.removeAppRule(appId);
+    setRules(updated);
+    void onRefresh();
+  };
+
+  const handleUpdateRule = async (appId: string, style: string, level: string) => {
+    const updated = await window.openWhisp.updateAppRule(appId, style, level);
+    setRules(updated);
+    void onRefresh();
+  };
 
   return (
     <div className="page">
       <div className="page-header">
         <h2 className="page-title serif">Style</h2>
-        <p className="page-desc">Choose your dictation style and enhancement level.</p>
+        <p className="page-desc">Choose your default dictation style. App rules override it automatically.</p>
       </div>
 
       <div className="style-tabs">
@@ -578,6 +596,39 @@ function StylePage({ bootstrap, onAction }: { bootstrap: BootstrapState; onActio
             </button>
           );
         })}
+      </div>
+
+      <div className="card" style={{ marginTop: 24 }}>
+        <div className="card-head"><h3>App Rules <span className="dict-count">{rules.length}</span></h3></div>
+        <p className="setting-hint">Style and level are applied automatically when dictating in these apps. Other apps use your default above.</p>
+        {rules.length > 0 && (
+          <div className="app-rules-list">
+            {rules.map((rule) => (
+              <div key={rule.appIdentifier} className="app-rule-row">
+                <span className="app-rule-name">{rule.label}</span>
+                <select
+                  className="app-rule-select"
+                  value={rule.styleMode}
+                  onChange={(e) => void handleUpdateRule(rule.appIdentifier, e.target.value, rule.enhancementLevel)}
+                >
+                  <option value="conversation">Conversation</option>
+                  <option value="vibe-coding">Vibe Coding</option>
+                </select>
+                <select
+                  className="app-rule-select"
+                  value={rule.enhancementLevel}
+                  onChange={(e) => void handleUpdateRule(rule.appIdentifier, rule.styleMode, e.target.value)}
+                >
+                  <option value="none">No Filter</option>
+                  <option value="soft">Soft</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </select>
+                <button className="btn btn-ghost btn-sm dict-remove" onClick={() => void handleRemoveRule(rule.appIdentifier)}>Remove</button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

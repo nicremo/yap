@@ -1,7 +1,8 @@
 import { clipboard } from 'electron';
 
-import type { AppSettings, AppStatus, CorrectionEntry, DictionaryEntry, FocusInfo, ProcessAudioResult } from '../shared/types';
+import type { AppRule, AppSettings, AppStatus, CorrectionEntry, DictionaryEntry, FocusInfo, ProcessAudioResult } from '../shared/types';
 import { getApiKey, isApiKeySet } from './api-key';
+import { resolveStyleForApp } from './app-rules';
 import { CloudTranscriptionError, transcribeWithCloud } from './cloud-transcription';
 import { buildDictionaryContext, buildWhisperPrompt } from './dictionary';
 import { getEnhancementPrompt } from './prompts';
@@ -14,6 +15,7 @@ interface ProcessDictationOptions {
   settings: AppSettings;
   dictionary: DictionaryEntry[];
   corrections: CorrectionEntry[];
+  appRules: AppRule[];
   targetFocus?: FocusInfo;
   setStatus: (status: AppStatus) => void;
 }
@@ -130,21 +132,30 @@ export async function processDictationAudio({
   settings,
   dictionary,
   corrections,
+  appRules,
   targetFocus,
   setStatus,
 }: ProcessDictationOptions): Promise<ProcessAudioResult> {
   const whisperPrompt = buildWhisperPrompt(dictionary, corrections);
   const dictionaryContext = buildDictionaryContext(dictionary, corrections);
 
+  const resolved = resolveStyleForApp(
+    targetFocus,
+    appRules,
+    settings.styleMode,
+    settings.enhancementLevel,
+  );
+
   console.log('[openwhisp:dictation] start', {
     mode: settings.transcriptionMode,
     cloudModel: settings.cloudModel,
     language: settings.cloudLanguage,
-    enhancement: settings.enhancementLevel,
+    style: resolved.styleMode,
+    enhancement: resolved.enhancementLevel,
+    matchedApp: resolved.matchedApp ?? 'default',
     textModel: settings.textModel,
     dictWords: dictionary.length,
     corrections: corrections.length,
-    whisperPromptLength: whisperPrompt.length,
   });
 
   const { text: rawText, source: transcriptionSource } = await transcribe(wavBase64, settings, setStatus, whisperPrompt);
@@ -175,7 +186,7 @@ export async function processDictationAudio({
     finalText = await rewriteWithOllama(
       settings.ollamaBaseUrl,
       settings.textModel,
-      getEnhancementPrompt(settings.styleMode, settings.enhancementLevel, dictionaryContext),
+      getEnhancementPrompt(resolved.styleMode, resolved.enhancementLevel, dictionaryContext),
       rawText,
     );
   } catch (error) {
