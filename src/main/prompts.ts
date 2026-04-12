@@ -67,10 +67,20 @@ const LEVEL_INSTRUCTIONS: Record<EnhancementLevel, string> = {
    Build the final prompt: BASE + STYLE + LEVEL
    ──────────────────────────────────────────────── */
 
+const LANGUAGE_REINFORCEMENTS: Record<string, string> = {
+  de: 'CRITICAL: Deine Ausgabe MUSS auf Deutsch sein. Behalte englische Fachbegriffe bei, wenn sie im Input vorkommen (z.B. "Commit", "API", "Cloud"). Uebersetze nichts. Gib den Text in der gleichen Sprache zurueck, wie er gesprochen wurde.',
+  en: 'CRITICAL: Your output language is ENGLISH. Respond ONLY in English.',
+  fr: 'CRITICAL: Your output language is FRENCH (Fran\u00e7ais). R\u00e9pondez UNIQUEMENT en fran\u00e7ais.',
+  es: 'CRITICAL: Your output language is SPANISH (Espa\u00f1ol). Responda SOLO en espa\u00f1ol.',
+  it: 'CRITICAL: Your output language is ITALIAN (Italiano). Rispondete SOLO in italiano.',
+  pt: 'CRITICAL: Your output language is PORTUGUESE (Portugu\u00eas). Responda APENAS em portugu\u00eas.',
+};
+
 export function getEnhancementPrompt(
   style: StyleMode,
   level: EnhancementLevel,
   dictionaryContext?: string,
+  language?: string,
 ): string {
   const parts = [
     BASE_RULES,
@@ -79,6 +89,10 @@ export function getEnhancementPrompt(
     '',
     LEVEL_INSTRUCTIONS[level],
   ];
+
+  if (language && LANGUAGE_REINFORCEMENTS[language]) {
+    parts.push('', LANGUAGE_REINFORCEMENTS[language]);
+  }
 
   if (dictionaryContext) {
     parts.push('', dictionaryContext);

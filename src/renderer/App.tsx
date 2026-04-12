@@ -99,8 +99,11 @@ export function App() {
   const recorderRef = useRef<AudioRecorder | null>(null);
   const recordingRef = useRef(false);
   const processingRef = useRef(false);
+  const handsfreeRef = useRef(false);
+  const pendingDownRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bootstrapRef = useRef<BootstrapState | null>(null);
   const targetFocusRef = useRef<FocusInfo | null>(null);
+  const [isHandsfree, setIsHandsfree] = useState(false);
 
   useEffect(() => { bootstrapRef.current = bootstrap; }, [bootstrap]);
 
@@ -114,10 +117,40 @@ export function App() {
     };
     void load();
     const stopStatus = window.openWhisp.onStatus((s) => { if (mounted) setStatus(s); });
+    const DOUBLE_CLICK_MS = 300;
     const stopHotkey = OVERLAY_VIEW
       ? window.openWhisp.onHotkey((e) => {
-          if (e.type === 'down') void handleHotkeyDown();
-          if (e.type === 'up') void handleHotkeyUp();
+          if (e.type === 'down') {
+            if (recordingRef.current && handsfreeRef.current) {
+              handsfreeRef.current = false;
+              setIsHandsfree(false);
+              void handleHotkeyUp();
+              return;
+            }
+
+            if (recordingRef.current || processingRef.current) return;
+
+            if (pendingDownRef.current) {
+              clearTimeout(pendingDownRef.current);
+              pendingDownRef.current = null;
+              handsfreeRef.current = true;
+              setIsHandsfree(true);
+              void handleHotkeyDown();
+              return;
+            }
+
+            pendingDownRef.current = setTimeout(() => {
+              pendingDownRef.current = null;
+              handsfreeRef.current = false;
+              setIsHandsfree(false);
+              void handleHotkeyDown();
+            }, DOUBLE_CLICK_MS);
+          }
+          if (e.type === 'up') {
+            if (handsfreeRef.current) return;
+            if (pendingDownRef.current) return;
+            void handleHotkeyUp();
+          }
         })
       : () => undefined;
     return () => { mounted = false; stopStatus(); stopHotkey(); };
@@ -226,7 +259,7 @@ export function App() {
     }
   };
 
-  if (OVERLAY_VIEW) return <OverlayBar status={status} audioLevel={audioLevel} />;
+  if (OVERLAY_VIEW) return <OverlayBar status={status} audioLevel={audioLevel} handsfree={isHandsfree} />;
   if (!bootstrap) {
     return <main className="app-shell loading-shell"><div className="loading-spinner" /><span className="loading-text">Loading Openwhisp</span></main>;
   }
@@ -1055,18 +1088,32 @@ function ToggleRow({ title, description, checked, onChange }: { title: string; d
    Overlay Bar
    ──────────────────────────────────────────────── */
 
-function OverlayBar({ status, audioLevel }: { status: AppStatus; audioLevel: number }) {
+function OverlayBar({ status, audioLevel, handsfree }: { status: AppStatus; audioLevel: number; handsfree: boolean }) {
   const isIdle = status.phase === 'idle';
   const isListening = status.phase === 'listening';
   const isProcessing = status.phase === 'transcribing' || status.phase === 'rewriting' || status.phase === 'pasting';
   const isDone = status.phase === 'done';
-  const isActive = !isIdle;
+
+  if (isIdle) {
+    return (
+      <div className="overlay-shell">
+        <div className="overlay-bar overlay-bar-idle">
+          <div className="idle-dots">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <span key={i} className="idle-dot" />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="overlay-shell">
-      <div className={`overlay-bar${isActive ? ' overlay-bar-active' : ''}${isProcessing ? ' overlay-processing' : ''}${isDone ? ' overlay-done' : ''}`}>
+      <div className={`overlay-bar overlay-bar-active${isProcessing ? ' overlay-processing' : ''}${isDone ? ' overlay-done' : ''}${handsfree && isListening ? ' overlay-handsfree' : ''}`}>
+        {handsfree && isListening && <span className="handsfree-indicator" />}
         <AudioGrid level={audioLevel} listening={isListening} processing={isProcessing} />
-        <span className="overlay-label">{isIdle ? 'Press Fn to dictate' : status.title}</span>
+        <span className="overlay-label">{handsfree && isListening ? 'Handsfree' : status.title}</span>
       </div>
     </div>
   );

@@ -186,7 +186,7 @@ export async function processDictationAudio({
     finalText = await rewriteWithOllama(
       settings.ollamaBaseUrl,
       settings.textModel,
-      getEnhancementPrompt(resolved.styleMode, resolved.enhancementLevel, dictionaryContext),
+      getEnhancementPrompt(resolved.styleMode, resolved.enhancementLevel, dictionaryContext, settings.cloudLanguage),
       rawText,
     );
   } catch (error) {

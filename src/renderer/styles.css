@@ -687,11 +687,45 @@ button { cursor: pointer; }
   display: flex; align-items: center; gap: 10px;
   padding: 8px 14px; border-radius: 12px;
   background: rgba(255,255,255,0.85);
+  transition: all 0.2s ease;
   border: 1px solid rgba(26,26,26,0.06);
   box-shadow: 0 4px 16px rgba(0,0,0,0.06);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   transition: all 0.25s ease;
+}
+
+.overlay-bar-idle {
+  padding: 6px 12px; border-radius: 14px;
+  background: rgba(255,255,255,0.6);
+  backdrop-filter: blur(8px);
+  gap: 0;
+}
+
+.idle-dots {
+  display: flex; align-items: center; gap: 4px;
+}
+
+.idle-dot {
+  width: 4px; height: 4px; border-radius: 50%;
+  background: rgba(26,26,26,0.25);
+}
+
+.overlay-handsfree {
+  border: 2px solid var(--red);
+}
+
+.handsfree-indicator {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--red);
+  flex-shrink: 0;
+  animation: handsfree-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes handsfree-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
 .overlay-bar-active {

@@ -26,7 +26,7 @@ struct EventMessage: Codable {
     let message: String?
 }
 
-private var fnIsDown = false
+private var rightOptionIsDown = false
 
 func emitJSON<T: Encodable>(_ value: T) {
     let encoder = JSONEncoder()
@@ -209,13 +209,13 @@ private func flagsChangedCallback(
     }
 
     let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
-    guard keyCode == 63 else {
+    guard keyCode == 61 else {
         return Unmanaged.passUnretained(event)
     }
 
-    let isDown = event.flags.contains(.maskSecondaryFn)
-    if isDown != fnIsDown {
-        fnIsDown = isDown
+    let isDown = event.flags.contains(.maskAlternate)
+    if isDown != rightOptionIsDown {
+        rightOptionIsDown = isDown
         emitJSON(EventMessage(type: isDown ? "fnDown" : "fnUp", message: nil))
     }
 

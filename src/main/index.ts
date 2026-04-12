@@ -64,21 +64,11 @@ async function showOverlay(): Promise<void> {
   window.showInactive();
 }
 
-function hideOverlay(): void {
-  if (overlayWindow && !overlayWindow.isDestroyed()) {
-    overlayWindow.hide();
-  }
-}
-
 function setStatus(nextStatus: AppStatus): void {
   status = nextStatus;
   broadcast('app:status', nextStatus);
 
-  if (settings.showOverlay || nextStatus.phase !== 'idle') {
-    void showOverlay();
-  } else {
-    hideOverlay();
-  }
+  void showOverlay();
 }
 
 function showMainWindow(): void {
