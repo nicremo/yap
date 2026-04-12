@@ -2,86 +2,86 @@
 
 ![OpenWhisp](assets/cover.png)
 
-**WisprFlow Alternative, komplett kostenlos.** Halte **Fn**, sprich, lass los. Deine Worte werden transkribiert, poliert und direkt eingefuegt. Cloud-Transkription via Groq (kostenlos!) mit lokalem LLM Post-Processing.
+**Free WisprFlow alternative.** Hold **Fn**, speak, release. Your words are transcribed via cloud AI, polished by a local LLM, and pasted right where you need them. German-optimized, works with any language.
 
-> Fork von [OpenWhisp](https://github.com/giusmarci/openwhisp) von [Raelume](https://raelume.ai), erweitert um Cloud-Transkription, kleinere/schnellere Modelle und Deutsch-Optimierung.
+> Enhanced fork of [OpenWhisp](https://github.com/giusmarci/openwhisp) by [Raelume](https://raelume.ai). Adds cloud transcription, smaller/faster models, and multi-language support.
 
-## Was ist anders gegenueber dem Original?
+## What's different from the original?
 
 | Feature | Original OpenWhisp | Enhanced |
 |---|---|---|
-| **Transkription** | Nur lokal (Whisper Base, 150 MB) | Cloud via Groq (Whisper Large v3) + lokaler Fallback |
-| **Genauigkeit** | Basis | Deutlich besser (Large v3 statt Base) |
-| **Text-Model** | gemma4:e4b (9.6 GB) | qwen3.5:2b (2.7 GB), 3.5x kleiner |
-| **Sprache** | Englisch-fokussiert | Deutsch-optimiert (konfigurierbar) |
-| **Cloud-Kosten** | Keine (alles lokal) | Kostenlos (Groq Free Tier: 2 Stunden Audio/Tag) |
-| **RAM-Bedarf** | ~12 GB (Whisper + Gemma 4) | ~3 GB (nur Ollama LLM, Transkription laeuft in der Cloud) |
-| **API Key Sicherheit** | Nicht relevant | Verschluesselt via macOS Keychain |
-| **Offline** | Ja | Ja (automatischer Fallback auf lokales Whisper) |
+| **Transcription** | Local only (Whisper Base, 150 MB) | Cloud via Groq (Whisper Large v3) + local fallback |
+| **Accuracy** | Basic | Significantly better (Large v3 vs Base) |
+| **Text model** | gemma4:e4b (9.6 GB) | qwen3.5:2b (2.7 GB), 3.5x smaller |
+| **Language** | English-focused | German-optimized (configurable to any language) |
+| **Cloud cost** | None (all local) | Free (Groq Free Tier: 2 hours of audio per day) |
+| **RAM usage** | ~12 GB (Whisper + Gemma 4) | ~3 GB (only Ollama LLM, transcription runs in the cloud) |
+| **API key security** | N/A | Encrypted via macOS Keychain |
+| **Offline mode** | Yes | Yes (automatic fallback to local Whisper) |
 
-## So funktioniert es
+## How it works
 
-1. **Fn halten**: OpenWhisp hoert zu
-2. **Sprechen**: Audio wird aufgenommen
-3. **Fn loslassen**: Groq transkribiert (Cloud), Ollama poliert den Text (lokal), Ergebnis wird eingefuegt
+1. **Hold Fn** to start recording
+2. **Speak** naturally
+3. **Release Fn** and the pipeline kicks in:
 
 ```
-Audio -> Groq Whisper Large v3 (Cloud, kostenlos)
+Audio -> Groq Whisper Large v3 (cloud, free)
            |
            v
-      Roher Text (Deutsch)
+      Raw text (in your language)
            |
            v
-      Ollama qwen3.5:2b (lokal, 2.7 GB)
+      Ollama qwen3.5:2b (local, 2.7 GB)
            |
            v
-      Polierter Text -> Clipboard -> Auto-Paste
+      Polished text -> Clipboard -> Auto-paste
 ```
 
-Kein Internet? Kein Problem. OpenWhisp faellt automatisch auf lokales Whisper zurueck.
+No internet? No problem. OpenWhisp automatically falls back to local Whisper.
 
 ## Features
 
-- **Cloud + Local Hybrid**: Groq fuer beste Genauigkeit, lokales Whisper als Fallback
-- **Deutsch-optimiert**: Transkription und LLM-Rewrite auf Deutsch konfiguriert
-- **Winziges LLM**: qwen3.5:2b (2.7 GB) statt 9.6 GB, laeuft auf jedem Mac
-- **3 Transkriptions-Modi**: Auto (Cloud + Fallback), Cloud-only, Local-only
-- **Styles**: Conversation und Vibe Coding Modi
+- **Cloud + Local Hybrid**: Groq for best accuracy, local Whisper as offline fallback
+- **Tiny LLM**: qwen3.5:2b (2.7 GB) instead of 9.6 GB, runs on any Mac
+- **3 Transcription Modes**: Auto (cloud + fallback), Cloud-only, Local-only
+- **Styles**: Conversation and Vibe Coding modes
 - **4 Enhancement Levels**: No Filter, Soft, Medium, High
-- **Intent Resolution**: "Mach es weiss... nein doch schwarz" -> nur der finale Intent
-- **Auto-Paste**: Text wird direkt in die aktive App eingefuegt
-- **API Key verschluesselt**: Gespeichert via macOS Keychain, nie im Klartext
-- **Konfigurierbarer API Provider**: Groq, OpenAI, Lemonfox.ai oder jeder OpenAI-kompatible Anbieter
+- **Intent Resolution**: "Make it white... actually, black" resolves to final intent only
+- **Auto-Paste**: Text is pasted directly into the active app
+- **Encrypted API Key**: Stored via macOS Keychain, never in plaintext
+- **Configurable Provider**: Groq, OpenAI, Lemonfox.ai, or any OpenAI-compatible provider
+- **Language Selector**: German, English, French, Spanish, and 90+ more
 
-## Warum Groq?
+## Why Groq?
 
-| Anbieter | Preis/Minute | Modell | Free Tier |
+| Provider | Price/min | Model | Free Tier |
 |---|---|---|---|
-| **Groq** | $0.0002 | Whisper Large v3 | 7.200 Sek/Std (2h Audio/Tag kostenlos) |
-| OpenAI | $0.006 | Whisper v2 | Nein |
-| Lemonfox | $0.003 | Whisper Large v3 | 1 Monat gratis |
+| **Groq** | $0.0002 | Whisper Large v3 | 7,200 sec/hr (~2 hrs of audio per day, free) |
+| OpenAI | $0.006 | Whisper v2 | None |
+| Lemonfox | $0.003 | Whisper Large v3 | 1 month free |
 
-Groq ist **30x guenstiger als OpenAI** und bietet ein grosszuegiges Free Tier. Fuer normalen Gebrauch (ein paar Minuten Diktat pro Tag) ist es **komplett kostenlos**.
+Groq is **30x cheaper than OpenAI** and offers a generous free tier. For normal usage (a few minutes of dictation per day), it is **completely free**.
 
 ## Quick Start
 
-### 1. Ollama installieren und Text-Model laden
+### 1. Install Ollama and pull the text model
 
 ```bash
-# Ollama installieren: https://ollama.com/download/mac
+# Install Ollama: https://ollama.com/download/mac
 ollama serve
 
-# Text-Enhancement Model laden (nur 2.7 GB!)
+# Pull the text enhancement model (only 2.7 GB!)
 ollama pull qwen3.5:2b
 ```
 
-### 2. Groq API Key holen (kostenlos)
+### 2. Get a Groq API key (free)
 
-1. Gehe zu [console.groq.com](https://console.groq.com)
-2. Account erstellen (kostenlos)
-3. API Key generieren
+1. Go to [console.groq.com](https://console.groq.com)
+2. Create an account (free)
+3. Generate an API key
 
-### 3. App starten
+### 3. Clone and run
 
 ```bash
 git clone https://github.com/nicremo/openwhisp-enhanced.git
@@ -93,107 +93,99 @@ npm run dev
 
 ### 4. Setup Wizard
 
-Der Setup Wizard fuehrt dich durch:
+The setup wizard walks you through:
 
-1. **Transcription Engine**: Groq API Key eingeben (oder lokales Whisper downloaden)
-2. **Ollama**: Verbindung pruefen
-3. **Permissions**: Mikrofon, Accessibility, Input Monitoring
+1. **Transcription Engine**: Enter your Groq API key (or download local Whisper as fallback)
+2. **Ollama**: Verify the connection
+3. **Permissions**: Microphone, Accessibility, Input Monitoring
 
-Danach: Fn halten, sprechen, loslassen. Fertig.
+After setup: hold **Fn**, speak, release. Done.
 
-## Auf Englisch umstellen
+## Changing the language
 
-Die App ist standardmaessig auf Deutsch konfiguriert. So stellst du auf Englisch um:
+The app defaults to German. To switch to English (or any other language):
 
-1. **Models-Seite** oeffnen
-2. **Language** Dropdown von "Deutsch" auf "English" wechseln
-3. Fertig. Die Transkription und das LLM-Rewrite laufen ab sofort auf Englisch.
+1. Open the **Models** page
+2. Change the **Language** dropdown to your language
+3. Done. Both transcription and LLM rewrite will use your selected language.
 
-Oder in der Settings-Datei (`~/Library/Application Support/OpenWhisp/settings.json`):
+Supported: German, English, French, Spanish, Italian, Portuguese, Dutch, Polish, Japanese, Chinese, Korean, and 90+ more via Whisper.
 
-```json
-{
-  "cloudLanguage": "en"
-}
-```
+## Models
 
-Unterstuetzte Sprachen: Deutsch, English, Francais, Espanol, Italiano, Portugues, Nederlands, Polski, Japanisch, Chinesisch, Koreanisch und 90+ weitere.
-
-## Modelle
-
-| Zweck | Model | Groesse | Anbieter |
+| Purpose | Model | Size | Provider |
 |---|---|---|---|
-| Transkription (Cloud) | Whisper Large v3 | Cloud | Groq (kostenlos) |
-| Transkription (Lokal) | whisper-base | ~150 MB | Lokal via HuggingFace |
-| Text Enhancement | qwen3.5:2b | ~2.7 GB | Lokal via Ollama |
+| Transcription (cloud) | Whisper Large v3 | Cloud | Groq (free) |
+| Transcription (local) | whisper-base | ~150 MB | Local via HuggingFace |
+| Text enhancement | qwen3.5:2b | ~2.7 GB | Local via Ollama |
 
-### Alternative Cloud-Anbieter
+### Alternative Cloud Providers
 
-Die App funktioniert mit jedem OpenAI-kompatiblen Anbieter. Einfach Base URL und API Key aendern:
+The app works with any OpenAI-compatible provider. Just change the Base URL and API key on the Models page:
 
-| Anbieter | Base URL | Model |
+| Provider | Base URL | Model |
 |---|---|---|
-| Groq (Standard) | `https://api.groq.com/openai` | `whisper-large-v3` |
+| Groq (default) | `https://api.groq.com/openai` | `whisper-large-v3` |
 | OpenAI | `https://api.openai.com` | `gpt-4o-mini-transcribe` |
 | Lemonfox | `https://api.lemonfox.ai` | `whisper-1` |
 
-### Alternative Text-Modelle
+### Alternative Text Models
 
-Jedes Ollama-Modell funktioniert. Empfehlungen nach Groesse:
+Any Ollama model works. Recommendations by size:
 
-| Model | Groesse | Qualitaet | Speed |
+| Model | Size | Quality | Speed |
 |---|---|---|---|
-| qwen3.5:2b (Standard) | 2.7 GB | Sehr gut | Schnell |
-| qwen3:4b | 2.5 GB | Exzellent | Schnell |
-| gemma3:4b | 3.3 GB | Exzellent | Mittel |
-| qwen3.5:4b | 3.4 GB | Top | Mittel |
+| qwen3.5:2b (default) | 2.7 GB | Very good | Fast |
+| qwen3:4b | 2.5 GB | Excellent | Fast |
+| gemma3:4b | 3.3 GB | Excellent | Medium |
+| qwen3.5:4b | 3.4 GB | Top tier | Medium |
 
 ## Tech Stack
 
-- **Electron** + **React** + **TypeScript**
-- **Groq API** (oder OpenAI-kompatibel) fuer Cloud-Transkription
-- **@huggingface/transformers** fuer lokale Whisper Inferenz (Fallback)
-- **Ollama** fuer lokales LLM Text-Enhancement
-- **Swift** nativer macOS Helper fuer Fn-Key, Fokus-Erkennung, Auto-Paste
-- **electron-vite** Build Tooling
-- **Electron safeStorage** fuer verschluesselte API Key Speicherung
+- **Electron** + **React** + **TypeScript** for the desktop shell and UI
+- **Groq API** (or any OpenAI-compatible provider) for cloud transcription
+- **@huggingface/transformers** for local Whisper inference (offline fallback)
+- **Ollama** for local LLM text enhancement
+- **Swift** native macOS helper for Fn key listening, focus detection, and paste simulation
+- **electron-vite** for build tooling
+- **Electron safeStorage** for encrypted API key storage via macOS Keychain
 
-## Projektstruktur
+## Project Structure
 
 ```
 src/
   main/
-    api-key.ts          # API Key Verschluesselung (macOS Keychain)
-    cloud-transcription.ts  # Cloud STT (Groq/OpenAI-kompatibel)
-    dictation.ts        # Pipeline: Transkription -> Rewrite -> Paste
-    transcription.ts    # Lokale Whisper Inferenz (Fallback)
-    ollama.ts           # Ollama API Client + Auto-Launch
-    prompts.ts          # Prompt Matrix (Style x Enhancement Level)
-    settings.ts         # Settings Persistenz
-    windows.ts          # Fenster-Verwaltung
+    api-key.ts              # API key encryption (macOS Keychain)
+    cloud-transcription.ts  # Cloud STT (Groq/OpenAI-compatible)
+    dictation.ts            # Pipeline: transcribe -> rewrite -> paste
+    transcription.ts        # Local Whisper inference (fallback)
+    ollama.ts               # Ollama API client + auto-launch
+    prompts.ts              # Prompt matrix (style x enhancement level)
+    settings.ts             # Settings persistence
+    windows.ts              # Window management
   renderer/
-    App.tsx             # UI: Sidebar, Pages, Setup Wizard, Overlay
-    styles.css          # Styling
-    audio-recorder.ts   # Web Audio Recorder mit Level Metering
-  preload/              # Electron Preload Bridge
-  shared/               # Geteilte Types und Konstanten
+    App.tsx                 # UI: sidebar, pages, setup wizard, overlay
+    styles.css              # Styling
+    audio-recorder.ts       # Web Audio recorder with level metering
+  preload/                  # Electron preload bridge
+  shared/                   # Shared types and constants
 swift/
-  OpenWhispHelper.swift # Nativer macOS Helper
+  OpenWhispHelper.swift     # Native macOS helper
 ```
 
-## Building
+## Building for distribution
 
 ```bash
 npm run package
 ```
 
-Erstellt die Electron App, kompiliert den Swift Helper und packt alles in `.dmg` und `.zip` im `release/` Verzeichnis.
+Builds the Electron app, compiles the Swift helper, and packages everything into a `.dmg` and `.zip` in the `release/` directory.
 
 ## Credits
 
-- Urspruengliches [OpenWhisp](https://github.com/giusmarci/openwhisp) von [GiusMarci](https://x.com/GiusMarci) / [Raelume](https://raelume.ai)
-- Enhanced Version von [Fabian](https://github.com/nicremo)
+- Original [OpenWhisp](https://github.com/giusmarci/openwhisp) by [GiusMarci](https://x.com/GiusMarci) / [Raelume](https://raelume.ai)
+- Enhanced version by [Fabian](https://github.com/nicremo)
 
 ## License
 
-MIT (wie das Original)
+MIT (same as the original)
