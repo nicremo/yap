@@ -3,6 +3,7 @@ import path from 'node:path';
 
 import type { AppSettings, EnhancementLevel } from '../shared/types';
 import {
+  RECOMMENDED_CLOUD_MODEL,
   RECOMMENDED_TEXT_MODEL,
   RECOMMENDED_WHISPER_LABEL,
   RECOMMENDED_WHISPER_MODEL,
@@ -30,6 +31,11 @@ export function createDefaultSettings(): AppSettings {
     textModel: RECOMMENDED_TEXT_MODEL,
     styleMode: 'conversation',
     enhancementLevel: 'medium',
+    transcriptionMode: 'auto',
+    cloudModel: RECOMMENDED_CLOUD_MODEL,
+    cloudApiBaseUrl: 'https://api.groq.com/openai',
+    cloudLanguage: 'de',
+    openaiApiKeyEncrypted: '',
     autoPaste: true,
     showOverlay: false,
     launchAtLogin: false,

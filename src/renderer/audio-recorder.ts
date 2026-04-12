@@ -84,10 +84,25 @@ export class AudioRecorder {
   private chunks: Float32Array[] = [];
   private inputSampleRate = 48_000;
 
+  private async findBuiltInMicrophone(): Promise<string | undefined> {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const inputs = devices.filter((d) => d.kind === 'audioinput');
+    const builtIn = inputs.find(
+      (d) => d.label.toLowerCase().includes('macbook') || d.label.toLowerCase().includes('built-in'),
+    );
+    return builtIn?.deviceId;
+  }
+
   private async ensureStream(): Promise<MediaStream> {
     if (this.stream) {
-      return this.stream;
+      const tracks = this.stream.getAudioTracks();
+      if (tracks.length > 0 && tracks[0].readyState === 'live') {
+        return this.stream;
+      }
+      this.stream = null;
     }
+
+    const builtInId = await this.findBuiltInMicrophone();
 
     this.stream = await navigator.mediaDevices.getUserMedia({
       audio: {
@@ -95,6 +110,7 @@ export class AudioRecorder {
         echoCancellation: true,
         noiseSuppression: true,
         autoGainControl: true,
+        ...(builtInId ? { deviceId: { exact: builtInId } } : {}),
       },
     });
 

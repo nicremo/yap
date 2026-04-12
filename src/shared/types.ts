@@ -1,5 +1,7 @@
 export type EnhancementLevel = 'none' | 'soft' | 'medium' | 'high';
 export type StyleMode = 'conversation' | 'vibe-coding';
+export type TranscriptionMode = 'auto' | 'cloud' | 'local';
+export type CloudTranscriptionModel = 'gpt-4o-mini-transcribe' | 'gpt-4o-transcribe' | 'whisper-1' | 'whisper-large-v3' | 'whisper-large-v3-turbo' | 'distil-whisper-large-v3-en';
 
 export type OverlayPhase =
   | 'idle'
@@ -18,6 +20,11 @@ export interface AppSettings {
   textModel: string;
   styleMode: StyleMode;
   enhancementLevel: EnhancementLevel;
+  transcriptionMode: TranscriptionMode;
+  cloudModel: CloudTranscriptionModel;
+  cloudApiBaseUrl: string;
+  cloudLanguage: string;
+  openaiApiKeyEncrypted: string;
   autoPaste: boolean;
   showOverlay: boolean;
   launchAtLogin: boolean;
@@ -61,6 +68,7 @@ export interface BootstrapState {
   recommendedModelInstalled: boolean;
   speechModelReady: boolean;
   helperReady: boolean;
+  openaiApiKeySet: boolean;
   status: AppStatus;
 }
 
@@ -69,6 +77,7 @@ export interface ProcessAudioResult {
   finalText: string;
   pasted: boolean;
   focusInfo?: FocusInfo;
+  transcriptionSource: 'cloud' | 'local';
 }
 
 export interface DictationRequest {
@@ -83,6 +92,11 @@ export interface HotkeyEvent {
 export interface UpdateSettingsInput {
   styleMode?: StyleMode;
   enhancementLevel?: EnhancementLevel;
+  transcriptionMode?: TranscriptionMode;
+  cloudModel?: CloudTranscriptionModel;
+  cloudApiBaseUrl?: string;
+  cloudLanguage?: string;
+  openaiApiKey?: string;
   textModel?: string;
   ollamaBaseUrl?: string;
   storageDirectory?: string;

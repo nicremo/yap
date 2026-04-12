@@ -20,6 +20,8 @@ declare global {
       prepareSpeechModel: () => Promise<BootstrapState>;
       refreshOllama: () => Promise<BootstrapState>;
       pullRecommendedModel: () => Promise<BootstrapState>;
+      testApiKey: (apiKey: string, baseUrl?: string) => Promise<{ valid: boolean; error?: string }>;
+      clearApiKey: () => Promise<BootstrapState>;
       captureFocusTarget: () => Promise<FocusInfo>;
       processAudio: (request: DictationRequest) => Promise<{
         rawText: string;

@@ -8,6 +8,8 @@ import type {
   UpdateSettingsInput,
 } from '../shared/types';
 import { RECOMMENDED_TEXT_MODEL } from '../shared/recommendations';
+import { isApiKeySet } from './api-key';
+import { testCloudConnection } from './cloud-transcription';
 import { processDictationAudio } from './dictation';
 import { applyLaunchAtLogin } from './login-item';
 import { pullOllamaModel, listOllamaModels, isOllamaReachable, ensureOllamaRunning } from './ollama';
@@ -48,6 +50,7 @@ export function registerIpcHandlers(dependencies: IpcDependencies): void {
       ),
       speechModelReady: await directoryHasEntries(storage.models),
       helperReady: dependencies.getHelperReady(),
+      openaiApiKeySet: isApiKeySet(settings),
       status: dependencies.getStatus(),
     };
   };
@@ -139,6 +142,18 @@ export function registerIpcHandlers(dependencies: IpcDependencies): void {
       detail: 'Hold Fn to dictate. Release Fn to paste.',
     });
 
+    return buildBootstrapState();
+  });
+
+  ipcMain.handle('openai:testKey', async (_event, apiKey: string, baseUrl?: string) =>
+    testCloudConnection(apiKey, baseUrl ?? dependencies.getSettings().cloudApiBaseUrl),
+  );
+
+  ipcMain.handle('openai:clearKey', async () => {
+    const nextSettings = await persistSettings(dependencies.getSettings(), {
+      openaiApiKey: '',
+    });
+    dependencies.setSettings(nextSettings);
     return buildBootstrapState();
   });
 

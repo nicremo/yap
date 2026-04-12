@@ -2,6 +2,7 @@ import { dialog, app } from 'electron';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
+import { encryptApiKey } from './api-key';
 import { createDefaultSettings } from './defaults';
 import type { AppSettings, UpdateSettingsInput } from '../shared/types';
 
@@ -34,10 +35,18 @@ export async function updateSettings(
   current: AppSettings,
   updates: UpdateSettingsInput,
 ): Promise<AppSettings> {
-  const nextSettings = {
+  const { openaiApiKey, ...settingUpdates } = updates;
+
+  const nextSettings: AppSettings = {
     ...current,
-    ...updates,
+    ...settingUpdates,
   };
+
+  if (openaiApiKey !== undefined) {
+    nextSettings.openaiApiKeyEncrypted = openaiApiKey.length > 0
+      ? encryptApiKey(openaiApiKey)
+      : '';
+  }
 
   await saveSettings(nextSettings);
   return nextSettings;

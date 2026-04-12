@@ -5,7 +5,8 @@ import { Home01Icon, PaintBrush01Icon, CubeIcon, Settings01Icon } from '@hugeico
 import { AudioRecorder } from './audio-recorder';
 import logoUrl from './logo.png';
 import type { AppStatus, BootstrapState, EnhancementLevel, FocusInfo, StyleMode } from '../shared/types';
-import { RECOMMENDED_TEXT_MODEL, RECOMMENDED_WHISPER_LABEL } from '../shared/recommendations';
+import { CLOUD_MODELS, RECOMMENDED_TEXT_MODEL, RECOMMENDED_WHISPER_LABEL } from '../shared/recommendations';
+import type { CloudTranscriptionModel } from '../shared/types';
 
 const OVERLAY_VIEW = window.location.hash === '#overlay';
 
@@ -177,13 +178,16 @@ export function App() {
       await window.openWhisp.showMainWindow();
       return;
     }
-    if (!current.speechModelReady) {
-      pushStatus({ phase: 'error', title: 'Speech model unavailable', detail: 'Download the speech model first.' });
+    const canTranscribe =
+      (current.settings.transcriptionMode !== 'local' && current.openaiApiKeySet) ||
+      current.speechModelReady;
+    if (!canTranscribe) {
+      pushStatus({ phase: 'error', title: 'No transcription engine', detail: 'Set up an OpenAI API key or download the local speech model.' });
       await window.openWhisp.showMainWindow();
       return;
     }
-    if (!current.ollamaReachable || !modelInstalled) {
-      pushStatus({ phase: 'error', title: 'Text model unavailable', detail: 'Start Ollama and install the rewrite model.' });
+    if (current.settings.enhancementLevel !== 'none' && (!current.ollamaReachable || !modelInstalled)) {
+      pushStatus({ phase: 'error', title: 'Text model unavailable', detail: 'Start Ollama and install the rewrite model, or set enhancement to No Filter.' });
       await window.openWhisp.showMainWindow();
       return;
     }
@@ -242,7 +246,7 @@ function SetupWizard({ bootstrap, busyAction, onAction, onRefresh, onComplete }:
   onAction: (l: string, a: () => Promise<BootstrapState>) => Promise<void>;
   onRefresh: () => Promise<BootstrapState>; onComplete: () => void;
 }) {
-  const steps = ['welcome', 'ollama', 'models', 'permissions', 'ready'] as const;
+  const steps = ['welcome', 'transcription', 'ollama', 'permissions', 'ready'] as const;
   type Step = (typeof steps)[number];
   const [step, setStep] = useState<Step>('welcome');
   const idx = steps.indexOf(step);
@@ -266,8 +270,8 @@ function SetupWizard({ bootstrap, busyAction, onAction, onRefresh, onComplete }:
             <div className="setup-nav"><div /><button className="btn btn-primary" onClick={next}>Get Started</button></div>
           </div>
         )}
+        {step === 'transcription' && <TranscriptionStep bootstrap={bootstrap} busyAction={busyAction} onAction={onAction} onRefresh={onRefresh} onNext={next} onBack={back} />}
         {step === 'ollama' && <OllamaStep bootstrap={bootstrap} onRefresh={onRefresh} onNext={next} onBack={back} />}
-        {step === 'models' && <ModelsStep bootstrap={bootstrap} busyAction={busyAction} onAction={onAction} onNext={next} onBack={back} />}
         {step === 'permissions' && <PermissionsStep bootstrap={bootstrap} busyAction={busyAction} onAction={onAction} onNext={next} onBack={back} />}
         {step === 'ready' && (
           <div className="setup-step setup-step-center">
@@ -310,26 +314,79 @@ function OllamaStep({ bootstrap, onRefresh, onNext, onBack }: { bootstrap: Boots
   );
 }
 
-function ModelsStep({ bootstrap, busyAction, onAction, onNext, onBack }: { bootstrap: BootstrapState; busyAction: string | null; onAction: (l: string, a: () => Promise<BootstrapState>) => Promise<void>; onNext: () => void; onBack: () => void }) {
+function TranscriptionStep({ bootstrap, busyAction, onAction, onRefresh, onNext, onBack }: { bootstrap: BootstrapState; busyAction: string | null; onAction: (l: string, a: () => Promise<BootstrapState>) => Promise<void>; onRefresh: () => Promise<BootstrapState>; onNext: () => void; onBack: () => void }) {
+  const [apiKey, setApiKey] = useState('');
+  const [keyStatus, setKeyStatus] = useState<'idle' | 'testing' | 'valid' | 'invalid'>('idle');
+  const [keyError, setKeyError] = useState('');
+
+  const handleTestAndSave = async () => {
+    if (!apiKey) return;
+    setKeyStatus('testing');
+    const result = await window.openWhisp.testApiKey(apiKey);
+    if (result.valid) {
+      setKeyStatus('valid');
+      setKeyError('');
+      await onAction('settings', () => window.openWhisp.updateSettings({ openaiApiKey: apiKey }));
+      await onRefresh();
+    } else {
+      setKeyStatus('invalid');
+      setKeyError(result.error ?? 'Validation failed.');
+    }
+  };
+
+  const canContinue = bootstrap.openaiApiKeySet || bootstrap.speechModelReady;
+
   return (
     <div className="setup-step">
-      <h1 className="setup-title serif">Download Models</h1>
-      <p className="setup-desc">Two AI models power Openwhisp — one for speech and one for text enhancement.</p>
+      <h1 className="setup-title serif">Transcription Engine</h1>
+      <p className="setup-desc">Choose how Openwhisp turns your voice into text. Set up one or both.</p>
+
       <div className="s-card">
-        <div className="s-card-label">Speech to Text</div>
+        <div className="s-card-label">Cloud (Recommended)</div>
         <div className="s-card-row">
-          <div className="s-card-info"><strong>{RECOMMENDED_WHISPER_LABEL}</strong><span>Local speech recognition</span></div>
-          {bootstrap.speechModelReady ? <span className="badge badge-ready"><CheckIcon size={12} /> Ready</span> : <button className="btn btn-sm btn-primary" disabled={busyAction === 'speech'} onClick={() => void onAction('speech', () => window.openWhisp.prepareSpeechModel())}>{busyAction === 'speech' ? 'Downloading...' : 'Download'}</button>}
+          <div className="s-card-info"><strong>OpenAI Transcription</strong><span>Superior accuracy via cloud API</span></div>
+          {bootstrap.openaiApiKeySet
+            ? <span className="badge badge-ready"><CheckIcon size={12} /> Ready</span>
+            : <span className="badge badge-pending">Needs API key</span>
+          }
+        </div>
+        {!bootstrap.openaiApiKeySet && (
+          <div className="s-card-bottom">
+            <div className="api-key-field">
+              <input
+                type="password"
+                className="setting-input"
+                placeholder="sk-..."
+                value={apiKey}
+                onChange={(e) => { setApiKey(e.target.value); setKeyStatus('idle'); }}
+              />
+              <button
+                className="btn btn-sm btn-primary"
+                disabled={!apiKey || keyStatus === 'testing'}
+                onClick={() => void handleTestAndSave()}
+              >
+                {keyStatus === 'testing' ? 'Testing...' : 'Save'}
+              </button>
+            </div>
+            {keyStatus === 'valid' && <span className="api-key-status api-key-ok">Valid API key</span>}
+            {keyStatus === 'invalid' && <span className="api-key-status api-key-err">{keyError}</span>}
+            <button className="btn btn-link btn-muted" style={{ marginTop: 4, fontSize: 12 }} onClick={() => void window.openWhisp.openExternal('https://platform.openai.com/api-keys')}>Get an API key</button>
+          </div>
+        )}
+      </div>
+
+      <div className="s-card">
+        <div className="s-card-label">Local (Offline Fallback)</div>
+        <div className="s-card-row">
+          <div className="s-card-info"><strong>{RECOMMENDED_WHISPER_LABEL}</strong><span>Privacy-first, runs on your Mac</span></div>
+          {bootstrap.speechModelReady
+            ? <span className="badge badge-ready"><CheckIcon size={12} /> Ready</span>
+            : <button className="btn btn-sm btn-primary" disabled={busyAction === 'speech'} onClick={() => void onAction('speech', () => window.openWhisp.prepareSpeechModel())}>{busyAction === 'speech' ? 'Downloading...' : 'Download'}</button>
+          }
         </div>
       </div>
-      <div className="s-card">
-        <div className="s-card-label">Text Enhancement</div>
-        <div className="s-card-row">
-          <div className="s-card-info"><strong>{RECOMMENDED_TEXT_MODEL}</strong><span>Polishes your transcribed text</span></div>
-          {bootstrap.recommendedModelInstalled ? <span className="badge badge-ready"><CheckIcon size={12} /> Ready</span> : <button className="btn btn-sm btn-primary" disabled={busyAction === 'model' || !bootstrap.ollamaReachable} onClick={() => void onAction('model', () => window.openWhisp.pullRecommendedModel())}>{busyAction === 'model' ? 'Downloading...' : 'Download'}</button>}
-        </div>
-      </div>
-      <div className="setup-nav"><button className="btn btn-ghost" onClick={onBack}>Back</button><button className="btn btn-primary" onClick={onNext} disabled={!bootstrap.speechModelReady || !bootstrap.recommendedModelInstalled}>Continue</button></div>
+
+      <div className="setup-nav"><button className="btn btn-ghost" onClick={onBack}>Back</button><button className="btn btn-primary" onClick={onNext} disabled={!canContinue}>Continue</button></div>
     </div>
   );
 }
@@ -451,8 +508,8 @@ function HomePage({ status, bootstrap, setPage }: { status: AppStatus; bootstrap
             <span className="stat-label">{level?.label ?? 'Medium'}</span>
           </button>
           <button className="stat-card" onClick={() => setPage('models')}>
-            <span className="stat-value stat-value-sm">{bootstrap.settings.textModel.split(':')[0]}</span>
-            <span className="stat-label">Text model</span>
+            <span className="stat-value">{bootstrap.settings.transcriptionMode === 'local' ? 'Local' : bootstrap.settings.transcriptionMode === 'cloud' ? 'Cloud' : 'Auto'}</span>
+            <span className="stat-label">Transcription</span>
           </button>
           <button className="stat-card" onClick={() => setPage('models')}>
             <span className={`stat-value ${bootstrap.ollamaReachable ? 'stat-ok' : 'stat-off'}`}>{bootstrap.ollamaReachable ? 'Online' : 'Offline'}</span>
@@ -523,9 +580,149 @@ function StylePage({ bootstrap, onAction }: { bootstrap: BootstrapState; onActio
 
 /* ── Models ───────────────────────────────────── */
 
+function TranscriptionCard({ bootstrap, onAction }: { bootstrap: BootstrapState; onAction: (l: string, a: () => Promise<BootstrapState>) => Promise<void> }) {
+  const [apiKey, setApiKey] = useState('');
+  const [baseUrl, setBaseUrl] = useState(bootstrap.settings.cloudApiBaseUrl);
+  const [keyStatus, setKeyStatus] = useState<'idle' | 'testing' | 'valid' | 'invalid'>('idle');
+  const [keyError, setKeyError] = useState('');
+  const mode = bootstrap.settings.transcriptionMode;
+  const showCloudFields = mode !== 'local';
+
+  useEffect(() => { setBaseUrl(bootstrap.settings.cloudApiBaseUrl); }, [bootstrap.settings.cloudApiBaseUrl]);
+
+  const handleTestKey = async () => {
+    if (!apiKey) return;
+    setKeyStatus('testing');
+    const result = await window.openWhisp.testApiKey(apiKey, baseUrl);
+    if (result.valid) {
+      setKeyStatus('valid');
+      setKeyError('');
+      void onAction('settings', () => window.openWhisp.updateSettings({ openaiApiKey: apiKey }));
+    } else {
+      setKeyStatus('invalid');
+      setKeyError(result.error ?? 'Validation failed.');
+    }
+  };
+
+  const handleClearKey = () => {
+    setApiKey('');
+    setKeyStatus('idle');
+    setKeyError('');
+    void onAction('settings', async () => window.openWhisp.clearApiKey());
+  };
+
+  return (
+    <div className="card">
+      <div className="card-head"><h3>Transcription</h3></div>
+      <div className="setting-row">
+        <label className="setting-label">Source</label>
+        <div className="source-selector">
+          {(['auto', 'cloud', 'local'] as const).map((value) => (
+            <button
+              key={value}
+              className={`source-btn${mode === value ? ' source-btn-active' : ''}`}
+              onClick={() => void onAction('settings', () => window.openWhisp.updateSettings({ transcriptionMode: value }))}
+            >
+              {value === 'auto' ? 'Auto' : value === 'cloud' ? 'Cloud' : 'Local'}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="setting-hint">
+        {mode === 'auto' && 'OpenAI API with local Whisper fallback when offline.'}
+        {mode === 'cloud' && 'OpenAI API only. Requires internet and API key.'}
+        {mode === 'local' && 'Local Whisper only. No data leaves your Mac.'}
+      </div>
+      {showCloudFields && (
+        <>
+          <div className="setting-row" style={{ marginTop: 12 }}>
+            <label className="setting-label" htmlFor="api-key">API Key</label>
+            {bootstrap.openaiApiKeySet ? (
+              <div className="api-key-field">
+                <span className="badge badge-ready"><CheckIcon size={12} /> Saved</span>
+                <button className="btn btn-sm btn-ghost" onClick={handleClearKey}>Clear</button>
+              </div>
+            ) : (
+              <div className="api-key-field">
+                <input
+                  id="api-key"
+                  type="password"
+                  className="setting-input"
+                  placeholder="sk-..."
+                  value={apiKey}
+                  onChange={(e) => { setApiKey(e.target.value); setKeyStatus('idle'); }}
+                />
+                <button
+                  className="btn btn-sm btn-secondary"
+                  disabled={!apiKey || keyStatus === 'testing'}
+                  onClick={() => void handleTestKey()}
+                >
+                  {keyStatus === 'testing' ? 'Testing...' : 'Save'}
+                </button>
+              </div>
+            )}
+          </div>
+          {keyStatus === 'valid' && <span className="api-key-status api-key-ok">Valid API key</span>}
+          {keyStatus === 'invalid' && <span className="api-key-status api-key-err">{keyError}</span>}
+          {!bootstrap.openaiApiKeySet && (
+            <button className="btn btn-link btn-muted" style={{ marginTop: 4, fontSize: 12 }} onClick={() => void window.openWhisp.openExternal('https://platform.openai.com/api-keys')}>Get an API key</button>
+          )}
+          <div className="setting-row" style={{ marginTop: 12 }}>
+            <label className="setting-label" htmlFor="cloud-language">Language</label>
+            <select
+              id="cloud-language"
+              className="setting-select"
+              value={bootstrap.settings.cloudLanguage}
+              onChange={(e) => void onAction('settings', () => window.openWhisp.updateSettings({ cloudLanguage: e.target.value }))}
+            >
+              <option value="">Auto-detect</option>
+              <option value="de">Deutsch</option>
+              <option value="en">English</option>
+              <option value="fr">Fran&#231;ais</option>
+              <option value="es">Espa&#241;ol</option>
+              <option value="it">Italiano</option>
+              <option value="pt">Portugu&#234;s</option>
+              <option value="nl">Nederlands</option>
+              <option value="pl">Polski</option>
+              <option value="ja">&#26085;&#26412;&#35486;</option>
+              <option value="zh">&#20013;&#25991;</option>
+              <option value="ko">&#54620;&#44397;&#50612;</option>
+            </select>
+          </div>
+          <div className="setting-row" style={{ marginTop: 12 }}>
+            <label className="setting-label" htmlFor="cloud-base-url">API Base URL</label>
+            <input
+              id="cloud-base-url"
+              className="setting-input"
+              value={baseUrl}
+              onChange={(e) => setBaseUrl(e.target.value)}
+              onBlur={() => void onAction('settings', () => window.openWhisp.updateSettings({ cloudApiBaseUrl: baseUrl }))}
+              placeholder="https://api.openai.com"
+            />
+          </div>
+          <div className="setting-row" style={{ marginTop: 12 }}>
+            <label className="setting-label" htmlFor="cloud-model">Cloud model</label>
+            <select
+              id="cloud-model"
+              className="setting-select"
+              value={bootstrap.settings.cloudModel}
+              onChange={(e) => void onAction('settings', () => window.openWhisp.updateSettings({ cloudModel: e.target.value as CloudTranscriptionModel }))}
+            >
+              {CLOUD_MODELS.map((m) => (
+                <option key={m.id} value={m.id}>{m.label} ({m.price})</option>
+              ))}
+            </select>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function ModelsPage({ bootstrap, busyAction, onAction }: { bootstrap: BootstrapState; busyAction: string | null; onAction: (l: string, a: () => Promise<BootstrapState>) => Promise<void> }) {
   const [ollamaUrl, setOllamaUrl] = useState(bootstrap.settings.ollamaBaseUrl);
   useEffect(() => { setOllamaUrl(bootstrap.settings.ollamaBaseUrl); }, [bootstrap.settings.ollamaBaseUrl]);
+  const mode = bootstrap.settings.transcriptionMode;
 
   return (
     <div className="page">
@@ -534,8 +731,14 @@ function ModelsPage({ bootstrap, busyAction, onAction }: { bootstrap: BootstrapS
         <p className="page-desc">Configure the AI models that power your dictation.</p>
       </div>
 
-      <div className="card">
-        <div className="card-head"><h3>Speech to Text</h3></div>
+      <TranscriptionCard bootstrap={bootstrap} onAction={onAction} />
+
+      <div className={`card${mode === 'cloud' ? ' card-dimmed' : ''}`}>
+        <div className="card-head">
+          <h3>Local Speech Model</h3>
+          {mode === 'auto' && <span className="badge badge-pending">Offline fallback</span>}
+          {mode === 'cloud' && <span className="badge badge-pending">Not used</span>}
+        </div>
         <div className="model-row">
           <div className="model-info">
             <strong>{bootstrap.settings.whisperLabel}</strong>

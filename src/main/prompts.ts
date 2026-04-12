@@ -11,7 +11,7 @@ const BASE_RULES = [
   'RULES:',
   '1. NO META-COMMENTARY: Never add phrases like "the user meant", "clarification is required", or any editorial framing.',
   '2. NO QUOTES: Do not wrap the output in quotation marks.',
-  '3. SAME LANGUAGE: Output in the same language the speaker used.',
+  '3. SAME LANGUAGE: You MUST output in the EXACT same language as the input. If the input is German, your output MUST be German. If the input is English, your output MUST be English. NEVER translate.',
   '4. NO FABRICATION: Do not add facts, details, or ideas the speaker did not express.',
   '5. OUTPUT: Return only the final text. Nothing else.',
 ].join('\n');

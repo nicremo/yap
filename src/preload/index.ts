@@ -23,6 +23,10 @@ const api = {
   refreshOllama: () => ipcRenderer.invoke('models:refreshOllama') as Promise<BootstrapState>,
   pullRecommendedModel: () =>
     ipcRenderer.invoke('models:pullRecommended') as Promise<BootstrapState>,
+  testApiKey: (apiKey: string, baseUrl?: string) =>
+    ipcRenderer.invoke('openai:testKey', apiKey, baseUrl) as Promise<{ valid: boolean; error?: string }>,
+  clearApiKey: () =>
+    ipcRenderer.invoke('openai:clearKey') as Promise<BootstrapState>,
   captureFocusTarget: () =>
     ipcRenderer.invoke('dictation:captureTarget') as Promise<FocusInfo>,
   processAudio: (request: DictationRequest) =>
