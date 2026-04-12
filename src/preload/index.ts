@@ -3,6 +3,8 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type {
   AppStatus,
   BootstrapState,
+  CorrectionEntry,
+  DictionaryEntry,
   DictationRequest,
   FocusInfo,
   HotkeyEvent,
@@ -27,6 +29,14 @@ const api = {
     ipcRenderer.invoke('openai:testKey', apiKey, baseUrl) as Promise<{ valid: boolean; error?: string }>,
   clearApiKey: () =>
     ipcRenderer.invoke('openai:clearKey') as Promise<BootstrapState>,
+  addDictionaryWord: (word: string) =>
+    ipcRenderer.invoke('dictionary:add', word) as Promise<DictionaryEntry[]>,
+  removeDictionaryWord: (word: string) =>
+    ipcRenderer.invoke('dictionary:remove', word) as Promise<DictionaryEntry[]>,
+  addCorrection: (from: string, to: string) =>
+    ipcRenderer.invoke('corrections:add', from, to) as Promise<CorrectionEntry[]>,
+  removeCorrection: (from: string) =>
+    ipcRenderer.invoke('corrections:remove', from) as Promise<CorrectionEntry[]>,
   captureFocusTarget: () =>
     ipcRenderer.invoke('dictation:captureTarget') as Promise<FocusInfo>,
   processAudio: (request: DictationRequest) =>

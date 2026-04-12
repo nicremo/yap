@@ -1,8 +1,9 @@
 import { clipboard } from 'electron';
 
-import type { AppSettings, AppStatus, FocusInfo, ProcessAudioResult } from '../shared/types';
+import type { AppSettings, AppStatus, CorrectionEntry, DictionaryEntry, FocusInfo, ProcessAudioResult } from '../shared/types';
 import { getApiKey, isApiKeySet } from './api-key';
 import { CloudTranscriptionError, transcribeWithCloud } from './cloud-transcription';
+import { buildDictionaryContext, buildWhisperPrompt } from './dictionary';
 import { getEnhancementPrompt } from './prompts';
 import { rewriteWithOllama } from './ollama';
 import { getFocusInfo, triggerPaste } from './native-helper';
@@ -11,6 +12,8 @@ import { ensureStorage } from './storage';
 interface ProcessDictationOptions {
   wavBase64: string;
   settings: AppSettings;
+  dictionary: DictionaryEntry[];
+  corrections: CorrectionEntry[];
   targetFocus?: FocusInfo;
   setStatus: (status: AppStatus) => void;
 }
@@ -31,6 +34,7 @@ function createIdleStatus(): AppStatus {
 async function transcribeViaCloud(
   wavBase64: string,
   settings: AppSettings,
+  whisperPrompt?: string,
 ): Promise<string> {
   const apiKey = getApiKey(settings);
   if (!apiKey) {
@@ -43,6 +47,7 @@ async function transcribeViaCloud(
     settings.cloudModel,
     settings.cloudApiBaseUrl,
     settings.cloudLanguage || undefined,
+    whisperPrompt || undefined,
   );
 }
 
@@ -59,6 +64,7 @@ async function transcribe(
   wavBase64: string,
   settings: AppSettings,
   setStatus: (status: AppStatus) => void,
+  whisperPrompt?: string,
 ): Promise<TranscriptionResult> {
   if (settings.transcriptionMode === 'local') {
     setStatus({
@@ -78,7 +84,7 @@ async function transcribe(
       detail: `Transcribing via OpenAI (${settings.cloudModel}).`,
     });
 
-    const text = await transcribeViaCloud(wavBase64, settings);
+    const text = await transcribeViaCloud(wavBase64, settings, whisperPrompt);
     return { text, source: 'cloud' };
   }
 
@@ -90,7 +96,7 @@ async function transcribe(
     });
 
     try {
-      const text = await transcribeViaCloud(wavBase64, settings);
+      const text = await transcribeViaCloud(wavBase64, settings, whisperPrompt);
       return { text, source: 'cloud' };
     } catch (error) {
       if (error instanceof CloudTranscriptionError && error.isRetryable) {
@@ -122,10 +128,28 @@ async function transcribe(
 export async function processDictationAudio({
   wavBase64,
   settings,
+  dictionary,
+  corrections,
   targetFocus,
   setStatus,
 }: ProcessDictationOptions): Promise<ProcessAudioResult> {
-  const { text: rawText, source: transcriptionSource } = await transcribe(wavBase64, settings, setStatus);
+  const whisperPrompt = buildWhisperPrompt(dictionary, corrections);
+  const dictionaryContext = buildDictionaryContext(dictionary, corrections);
+
+  console.log('[openwhisp:dictation] start', {
+    mode: settings.transcriptionMode,
+    cloudModel: settings.cloudModel,
+    language: settings.cloudLanguage,
+    enhancement: settings.enhancementLevel,
+    textModel: settings.textModel,
+    dictWords: dictionary.length,
+    corrections: corrections.length,
+    whisperPromptLength: whisperPrompt.length,
+  });
+
+  const { text: rawText, source: transcriptionSource } = await transcribe(wavBase64, settings, setStatus, whisperPrompt);
+
+  console.log('[openwhisp:dictation] raw', { source: transcriptionSource, text: rawText });
 
   if (!rawText) {
     setStatus({
@@ -151,7 +175,7 @@ export async function processDictationAudio({
     finalText = await rewriteWithOllama(
       settings.ollamaBaseUrl,
       settings.textModel,
-      getEnhancementPrompt(settings.styleMode, settings.enhancementLevel),
+      getEnhancementPrompt(settings.styleMode, settings.enhancementLevel, dictionaryContext),
       rawText,
     );
   } catch (error) {
@@ -167,6 +191,8 @@ export async function processDictationAudio({
       rawText,
     });
   }
+
+  console.log('[openwhisp:dictation] final', { rewriteFallback: usedRewriteFallback, text: finalText });
 
   clipboard.writeText(finalText);
 

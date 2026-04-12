@@ -12,6 +12,17 @@ export type OverlayPhase =
   | 'done'
   | 'error';
 
+export interface DictionaryEntry {
+  word: string;
+  addedAt: string;
+}
+
+export interface CorrectionEntry {
+  from: string;
+  to: string;
+  addedAt: string;
+}
+
 export interface AppSettings {
   storageDirectory: string;
   whisperModel: string;
@@ -69,6 +80,8 @@ export interface BootstrapState {
   speechModelReady: boolean;
   helperReady: boolean;
   openaiApiKeySet: boolean;
+  dictionary: DictionaryEntry[];
+  corrections: CorrectionEntry[];
   status: AppStatus;
 }
 

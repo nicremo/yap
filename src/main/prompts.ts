@@ -70,12 +70,19 @@ const LEVEL_INSTRUCTIONS: Record<EnhancementLevel, string> = {
 export function getEnhancementPrompt(
   style: StyleMode,
   level: EnhancementLevel,
+  dictionaryContext?: string,
 ): string {
-  return [
+  const parts = [
     BASE_RULES,
     '',
     STYLE_INSTRUCTIONS[style],
     '',
     LEVEL_INSTRUCTIONS[level],
-  ].join('\n');
+  ];
+
+  if (dictionaryContext) {
+    parts.push('', dictionaryContext);
+  }
+
+  return parts.join('\n');
 }

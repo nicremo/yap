@@ -210,6 +210,7 @@ export async function rewriteWithOllama(
         body: JSON.stringify({
           model: modelName,
           stream: false,
+          think: false,
           keep_alive: '10m',
           options: {
             temperature: 0,
@@ -253,8 +254,15 @@ export async function rewriteWithOllama(
   }
 }
 
+function stripThinkingTags(text: string): string {
+  return text
+    .replace(/<think>[\s\S]*?<\/think>/g, '')
+    .replace(/<think>[\s\S]*$/g, '')
+    .trim();
+}
+
 function cleanRewriteOutput(content: string | undefined, rawText: string): string {
-  const trimmed = content?.trim();
+  const trimmed = stripThinkingTags(content ?? '').trim();
   if (!trimmed) {
     return rawText;
   }

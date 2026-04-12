@@ -10,6 +10,7 @@ import type {
 import { RECOMMENDED_TEXT_MODEL } from '../shared/recommendations';
 import { isApiKeySet } from './api-key';
 import { testCloudConnection } from './cloud-transcription';
+import { loadDictionary, addDictionaryEntry, removeDictionaryEntry, loadCorrections, addCorrection, removeCorrection } from './dictionary';
 import { processDictationAudio } from './dictation';
 import { applyLaunchAtLogin } from './login-item';
 import { pullOllamaModel, listOllamaModels, isOllamaReachable, ensureOllamaRunning } from './ollama';
@@ -51,6 +52,8 @@ export function registerIpcHandlers(dependencies: IpcDependencies): void {
       speechModelReady: await directoryHasEntries(storage.models),
       helperReady: dependencies.getHelperReady(),
       openaiApiKeySet: isApiKeySet(settings),
+      dictionary: await loadDictionary(),
+      corrections: await loadCorrections(),
       status: dependencies.getStatus(),
     };
   };
@@ -157,12 +160,34 @@ export function registerIpcHandlers(dependencies: IpcDependencies): void {
     return buildBootstrapState();
   });
 
+  ipcMain.handle('dictionary:add', async (_event, word: unknown) => {
+    if (typeof word !== 'string') throw new Error('Expected string for dictionary word.');
+    return addDictionaryEntry(word);
+  });
+
+  ipcMain.handle('dictionary:remove', async (_event, word: unknown) => {
+    if (typeof word !== 'string') throw new Error('Expected string for dictionary word.');
+    return removeDictionaryEntry(word);
+  });
+
+  ipcMain.handle('corrections:add', async (_event, from: unknown, to: unknown) => {
+    if (typeof from !== 'string' || typeof to !== 'string') throw new Error('Expected strings for correction.');
+    return addCorrection(from, to);
+  });
+
+  ipcMain.handle('corrections:remove', async (_event, from: unknown) => {
+    if (typeof from !== 'string') throw new Error('Expected string for correction.');
+    return removeCorrection(from);
+  });
+
   ipcMain.handle('dictation:captureTarget', async () => getFocusInfo());
 
   ipcMain.handle('dictation:processAudio', async (_event, request: DictationRequest) =>
     processDictationAudio({
       wavBase64: request.wavBase64,
       settings: dependencies.getSettings(),
+      dictionary: await loadDictionary(),
+      corrections: await loadCorrections(),
       targetFocus: request.targetFocus,
       setStatus: dependencies.setStatus,
     }),

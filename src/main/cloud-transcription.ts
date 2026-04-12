@@ -109,6 +109,7 @@ export async function transcribeWithCloud(
   model: CloudTranscriptionModel,
   baseUrl: string = DEFAULT_BASE_URL,
   language?: string,
+  prompt?: string,
 ): Promise<string> {
   if (!apiKey) {
     throw new CloudTranscriptionError({ kind: 'auth', cause: 'No API key provided.' });
@@ -124,6 +125,9 @@ export async function transcribeWithCloud(
   form.append('response_format', 'text');
   if (language) {
     form.append('language', language);
+  }
+  if (prompt) {
+    form.append('prompt', prompt);
   }
 
   let response: Response;

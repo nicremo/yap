@@ -1,16 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { Home01Icon, PaintBrush01Icon, CubeIcon, Settings01Icon } from '@hugeicons/core-free-icons';
+import { Home01Icon, PaintBrush01Icon, CubeIcon, Settings01Icon, BookOpen01Icon } from '@hugeicons/core-free-icons';
 
 import { AudioRecorder } from './audio-recorder';
 import logoUrl from './logo.png';
-import type { AppStatus, BootstrapState, EnhancementLevel, FocusInfo, StyleMode } from '../shared/types';
+import type { AppStatus, BootstrapState, CorrectionEntry, DictionaryEntry, EnhancementLevel, FocusInfo, StyleMode } from '../shared/types';
 import { CLOUD_MODELS, RECOMMENDED_TEXT_MODEL, RECOMMENDED_WHISPER_LABEL } from '../shared/recommendations';
 import type { CloudTranscriptionModel } from '../shared/types';
 
 const OVERLAY_VIEW = window.location.hash === '#overlay';
 
-type Page = 'home' | 'style' | 'models' | 'preferences';
+type Page = 'home' | 'style' | 'models' | 'dictionary' | 'preferences';
 
 interface LevelOption {
   value: EnhancementLevel;
@@ -234,7 +234,7 @@ export function App() {
     return <SetupWizard bootstrap={bootstrap} busyAction={busyAction} onAction={runAction} onRefresh={refreshBootstrap} onComplete={() => void runAction('setup', () => window.openWhisp.updateSettings({ setupComplete: true }))} />;
   }
 
-  return <MainView bootstrap={bootstrap} status={status} busyAction={busyAction} onAction={runAction} />;
+  return <MainView bootstrap={bootstrap} status={status} busyAction={busyAction} onAction={runAction} onRefresh={refreshBootstrap} />;
 }
 
 /* ────────────────────────────────────────────────
@@ -419,9 +419,10 @@ function PermissionsStep({ bootstrap, busyAction, onAction, onNext, onBack }: { 
    Main View – sidebar + pages
    ──────────────────────────────────────────────── */
 
-function MainView({ bootstrap, status, busyAction, onAction }: {
+function MainView({ bootstrap, status, busyAction, onAction, onRefresh }: {
   bootstrap: BootstrapState; status: AppStatus; busyAction: string | null;
   onAction: (l: string, a: () => Promise<BootstrapState>) => Promise<void>;
+  onRefresh: () => Promise<BootstrapState>;
 }) {
   const [page, setPage] = useState<Page>('home');
 
@@ -444,6 +445,9 @@ function MainView({ bootstrap, status, busyAction, onAction }: {
           <button className={`nav-item${page === 'models' ? ' nav-item-active' : ''}`} onClick={() => setPage('models')}>
             <HugeiconsIcon icon={CubeIcon} size={18} strokeWidth={2} /> Models
           </button>
+          <button className={`nav-item${page === 'dictionary' ? ' nav-item-active' : ''}`} onClick={() => setPage('dictionary')}>
+            <HugeiconsIcon icon={BookOpen01Icon} size={18} strokeWidth={2} /> Dictionary
+          </button>
           <button className={`nav-item${page === 'preferences' ? ' nav-item-active' : ''}`} onClick={() => setPage('preferences')}>
             <HugeiconsIcon icon={Settings01Icon} size={18} strokeWidth={2} /> Preferences
           </button>
@@ -462,6 +466,7 @@ function MainView({ bootstrap, status, busyAction, onAction }: {
         {page === 'home' && <HomePage status={status} bootstrap={bootstrap} setPage={setPage} />}
         {page === 'style' && <StylePage bootstrap={bootstrap} onAction={onAction} />}
         {page === 'models' && <ModelsPage bootstrap={bootstrap} busyAction={busyAction} onAction={onAction} />}
+        {page === 'dictionary' && <DictionaryPage bootstrap={bootstrap} onRefresh={onRefresh} />}
         {page === 'preferences' && <PreferencesPage bootstrap={bootstrap} onAction={onAction} />}
       </main>
     </div>
@@ -780,6 +785,141 @@ function ModelsPage({ bootstrap, busyAction, onAction }: { bootstrap: BootstrapS
             <input id="ollama-url" className="setting-input" value={ollamaUrl} onChange={(e) => setOllamaUrl(e.target.value)} onBlur={() => void onAction('settings', () => window.openWhisp.updateSettings({ ollamaBaseUrl: ollamaUrl }))} />
             <span className={`url-badge${bootstrap.ollamaReachable ? ' url-badge-ok' : ' url-badge-off'}`}>{bootstrap.ollamaReachable ? 'Connected' : 'Offline'}</span>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Dictionary ───────────────────────────────── */
+
+function DictionaryPage({ bootstrap, onRefresh }: { bootstrap: BootstrapState; onRefresh: () => Promise<BootstrapState> }) {
+  const [words, setWords] = useState<DictionaryEntry[]>(bootstrap.dictionary);
+  const [corrections, setCorrections] = useState<CorrectionEntry[]>(bootstrap.corrections);
+  const [addMode, setAddMode] = useState<'word' | 'correction'>('word');
+  const [newWord, setNewWord] = useState('');
+  const [corrFrom, setCorrFrom] = useState('');
+  const [corrTo, setCorrTo] = useState('');
+
+  useEffect(() => { setWords(bootstrap.dictionary); }, [bootstrap.dictionary]);
+  useEffect(() => { setCorrections(bootstrap.corrections); }, [bootstrap.corrections]);
+
+  const handleAddWord = async () => {
+    const trimmed = newWord.trim();
+    if (!trimmed) return;
+    const updated = await window.openWhisp.addDictionaryWord(trimmed);
+    setWords(updated);
+    setNewWord('');
+    void onRefresh();
+  };
+
+  const handleRemoveWord = async (word: string) => {
+    const updated = await window.openWhisp.removeDictionaryWord(word);
+    setWords(updated);
+    void onRefresh();
+  };
+
+  const handleAddCorrection = async () => {
+    const from = corrFrom.trim();
+    const to = corrTo.trim();
+    if (!from || !to) return;
+    const updated = await window.openWhisp.addCorrection(from, to);
+    setCorrections(updated);
+    setCorrFrom('');
+    setCorrTo('');
+    void onRefresh();
+  };
+
+  const handleRemoveCorrection = async (from: string) => {
+    const updated = await window.openWhisp.removeCorrection(from);
+    setCorrections(updated);
+    void onRefresh();
+  };
+
+  return (
+    <div className="page">
+      <div className="page-header">
+        <h2 className="page-title serif">Dictionary</h2>
+        <p className="page-desc">Teach OpenWhisp your vocabulary. Words get spelled correctly, misspellings get auto-corrected.</p>
+      </div>
+
+      <div className="card">
+        <div className="card-head">
+          <h3>Add Entry</h3>
+          <div className="source-selector">
+            <button className={`source-btn${addMode === 'word' ? ' source-btn-active' : ''}`} onClick={() => setAddMode('word')}>Word</button>
+            <button className={`source-btn${addMode === 'correction' ? ' source-btn-active' : ''}`} onClick={() => setAddMode('correction')}>Misspelling</button>
+          </div>
+        </div>
+        {addMode === 'word' ? (
+          <>
+            <div className="dict-add-row">
+              <input
+                className="setting-input dict-input"
+                placeholder="e.g. Kubernetes, DHBW, Supabase..."
+                value={newWord}
+                onChange={(e) => setNewWord(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') void handleAddWord(); }}
+              />
+              <button className="btn btn-primary btn-sm" disabled={!newWord.trim()} onClick={() => void handleAddWord()}>Add</button>
+            </div>
+            <p className="setting-hint">Spelling hints for Whisper. Names, brands, acronyms.</p>
+          </>
+        ) : (
+          <>
+            <div className="dict-add-row">
+              <input
+                className="setting-input dict-input"
+                placeholder="Whisper hears..."
+                value={corrFrom}
+                onChange={(e) => setCorrFrom(e.target.value)}
+              />
+              <span className="corr-arrow">-&gt;</span>
+              <input
+                className="setting-input dict-input"
+                placeholder="Should be..."
+                value={corrTo}
+                onChange={(e) => setCorrTo(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') void handleAddCorrection(); }}
+              />
+              <button className="btn btn-primary btn-sm" disabled={!corrFrom.trim() || !corrTo.trim()} onClick={() => void handleAddCorrection()}>Add</button>
+            </div>
+            <p className="setting-hint">Fix words that Whisper consistently gets wrong.</p>
+          </>
+        )}
+      </div>
+
+      <div className="dict-columns">
+        <div className="card dict-col">
+          <div className="card-head"><h3>Words <span className="dict-count">{words.length}</span></h3></div>
+          {words.length === 0 ? (
+            <p className="dict-empty">No words yet.</p>
+          ) : (
+            <div className="dict-list">
+              {words.map((entry) => (
+                <div key={entry.word} className="dict-entry">
+                  <span className="dict-word">{entry.word}</span>
+                  <button className="btn btn-ghost btn-sm dict-remove" onClick={() => void handleRemoveWord(entry.word)}>Remove</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="card dict-col">
+          <div className="card-head"><h3>Misspellings <span className="dict-count">{corrections.length}</span></h3></div>
+          {corrections.length === 0 ? (
+            <p className="dict-empty">No corrections yet.</p>
+          ) : (
+            <div className="dict-list">
+              {corrections.map((entry) => (
+                <div key={entry.from} className="dict-entry">
+                  <span className="dict-word"><span className="corr-from">{entry.from}</span> <span className="corr-arrow">-&gt;</span> <span className="corr-to">{entry.to}</span></span>
+                  <button className="btn btn-ghost btn-sm dict-remove" onClick={() => void handleRemoveCorrection(entry.from)}>Remove</button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

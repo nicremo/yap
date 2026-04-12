@@ -3,6 +3,8 @@
 import type {
   AppStatus,
   BootstrapState,
+  CorrectionEntry,
+  DictionaryEntry,
   DictationRequest,
   FocusInfo,
   HotkeyEvent,
@@ -22,6 +24,10 @@ declare global {
       pullRecommendedModel: () => Promise<BootstrapState>;
       testApiKey: (apiKey: string, baseUrl?: string) => Promise<{ valid: boolean; error?: string }>;
       clearApiKey: () => Promise<BootstrapState>;
+      addDictionaryWord: (word: string) => Promise<DictionaryEntry[]>;
+      removeDictionaryWord: (word: string) => Promise<DictionaryEntry[]>;
+      addCorrection: (from: string, to: string) => Promise<CorrectionEntry[]>;
+      removeCorrection: (from: string) => Promise<CorrectionEntry[]>;
       captureFocusTarget: () => Promise<FocusInfo>;
       processAudio: (request: DictationRequest) => Promise<{
         rawText: string;
