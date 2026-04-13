@@ -5,6 +5,7 @@ import { getApiKey, isApiKeySet } from './api-key';
 import { resolveStyleForApp } from './app-rules';
 import { CloudTranscriptionError, transcribeWithCloud } from './cloud-transcription';
 import { buildDictionaryContext, buildWhisperPrompt } from './dictionary';
+import { rewriteWithCloud } from './cloud-rewrite';
 import { getEnhancementPrompt } from './prompts';
 import { rewriteWithOllama } from './ollama';
 import { getFocusInfo, triggerPaste } from './native-helper';
@@ -171,36 +172,66 @@ export async function processDictationAudio({
     throw new Error('No speech was detected in the recording.');
   }
 
-  setStatus({
-    phase: 'rewriting',
-    title: 'Polishing',
-    detail: `${settings.textModel} is applying the selected rewrite level. The first request can take a moment while Ollama warms the model.`,
-    preview: rawText,
-    rawText,
-  });
-
+  const enhancementPrompt = getEnhancementPrompt(resolved.styleMode, resolved.enhancementLevel, dictionaryContext, settings.cloudLanguage);
   let finalText = rawText;
   let usedRewriteFallback = false;
 
-  try {
-    finalText = await rewriteWithOllama(
-      settings.ollamaBaseUrl,
-      settings.textModel,
-      getEnhancementPrompt(resolved.styleMode, resolved.enhancementLevel, dictionaryContext, settings.cloudLanguage),
-      rawText,
-    );
-  } catch (error) {
-    usedRewriteFallback = true;
+  if (settings.rewriteMode === 'cloud' && isApiKeySet(settings)) {
     setStatus({
-      phase: 'error',
-      title: 'Rewrite unavailable',
-      detail:
-        error instanceof Error
-          ? `${error.message} OpenWhisp will use the raw transcription for now.`
-          : 'OpenWhisp could not finish the rewrite pass, so it will use the raw transcription.',
+      phase: 'rewriting',
+      title: 'Polishing',
+      detail: `${settings.cloudRewriteModel} is polishing your text via cloud.`,
       preview: rawText,
       rawText,
     });
+
+    const apiKey = getApiKey(settings);
+    if (apiKey) {
+      try {
+        finalText = await rewriteWithCloud(
+          settings.cloudApiBaseUrl,
+          apiKey,
+          settings.cloudRewriteModel,
+          enhancementPrompt,
+          rawText,
+        );
+      } catch (cloudError) {
+        console.warn('[openwhisp] Cloud rewrite failed, falling back to Ollama:', cloudError instanceof Error ? cloudError.message : cloudError);
+        try {
+          setStatus({
+            phase: 'rewriting',
+            title: 'Polishing locally',
+            detail: `Cloud unavailable, using ${settings.textModel} via Ollama.`,
+            preview: rawText,
+            rawText,
+          });
+          finalText = await rewriteWithOllama(settings.ollamaBaseUrl, settings.textModel, enhancementPrompt, rawText);
+        } catch {
+          usedRewriteFallback = true;
+        }
+      }
+    }
+  } else {
+    setStatus({
+      phase: 'rewriting',
+      title: 'Polishing',
+      detail: `${settings.textModel} is applying the selected rewrite level.`,
+      preview: rawText,
+      rawText,
+    });
+
+    try {
+      finalText = await rewriteWithOllama(settings.ollamaBaseUrl, settings.textModel, enhancementPrompt, rawText);
+    } catch (error) {
+      usedRewriteFallback = true;
+      setStatus({
+        phase: 'error',
+        title: 'Rewrite unavailable',
+        detail: error instanceof Error ? error.message : 'Could not rewrite.',
+        preview: rawText,
+        rawText,
+      });
+    }
   }
 
   console.log('[openwhisp:dictation] final', { rewriteFallback: usedRewriteFallback, text: finalText });

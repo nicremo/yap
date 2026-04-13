@@ -219,8 +219,9 @@ export function App() {
       await window.openWhisp.showMainWindow();
       return;
     }
-    if (current.settings.enhancementLevel !== 'none' && (!current.ollamaReachable || !modelInstalled)) {
-      pushStatus({ phase: 'error', title: 'Text model unavailable', detail: 'Start Ollama and install the rewrite model, or set enhancement to No Filter.' });
+    const needsOllama = current.settings.enhancementLevel !== 'none' && current.settings.rewriteMode === 'local';
+    if (needsOllama && (!current.ollamaReachable || !modelInstalled)) {
+      pushStatus({ phase: 'error', title: 'Text model unavailable', detail: 'Start Ollama, install the rewrite model, or switch to Cloud rewrite.' });
       await window.openWhisp.showMainWindow();
       return;
     }
@@ -846,18 +847,44 @@ function ModelsPage({ bootstrap, busyAction, onAction }: { bootstrap: BootstrapS
           <button className="btn btn-link" onClick={() => void onAction('refresh', () => window.openWhisp.refreshOllama())}>Refresh</button>
         </div>
         <div className="setting-row">
-          <label className="setting-label" htmlFor="model-select">Rewrite model</label>
-          <select id="model-select" className="setting-select" value={bootstrap.settings.textModel} onChange={(e) => void onAction('settings', () => window.openWhisp.updateSettings({ textModel: e.target.value }))}>
-            {bootstrap.ollamaModels.length === 0
-              ? <option value={bootstrap.settings.textModel}>{bootstrap.settings.textModel}</option>
-              : bootstrap.ollamaModels.map((m) => <option key={m.name} value={m.name}>{m.name} ({formatBytes(m.size)})</option>)
-            }
-          </select>
+          <label className="setting-label">Rewrite via</label>
+          <div className="source-selector">
+            <button className={`source-btn${bootstrap.settings.rewriteMode === 'cloud' ? ' source-btn-active' : ''}`} onClick={() => void onAction('settings', () => window.openWhisp.updateSettings({ rewriteMode: 'cloud' }))}>Cloud</button>
+            <button className={`source-btn${bootstrap.settings.rewriteMode === 'local' ? ' source-btn-active' : ''}`} onClick={() => void onAction('settings', () => window.openWhisp.updateSettings({ rewriteMode: 'local' }))}>Local</button>
+          </div>
         </div>
-        {!bootstrap.recommendedModelInstalled && bootstrap.ollamaReachable && (
-          <button className="btn btn-sm btn-primary" style={{ marginTop: 10 }} disabled={busyAction === 'model'} onClick={() => void onAction('model', () => window.openWhisp.pullRecommendedModel())}>
-            {busyAction === 'model' ? 'Downloading...' : `Download ${RECOMMENDED_TEXT_MODEL}`}
-          </button>
+        <div className="setting-hint">
+          {bootstrap.settings.rewriteMode === 'cloud' ? 'Fast rewrite via Groq cloud API. Falls back to Ollama when offline.' : 'Local rewrite via Ollama. No data leaves your Mac.'}
+        </div>
+        {bootstrap.settings.rewriteMode === 'cloud' && (
+          <div className="setting-row" style={{ marginTop: 12 }}>
+            <label className="setting-label" htmlFor="cloud-rewrite-model">Cloud model</label>
+            <select id="cloud-rewrite-model" className="setting-select" value={bootstrap.settings.cloudRewriteModel} onChange={(e) => void onAction('settings', () => window.openWhisp.updateSettings({ cloudRewriteModel: e.target.value }))}>
+              <option value="openai/gpt-oss-20b">GPT-OSS 20B (1000 t/s)</option>
+              <option value="openai/gpt-oss-120b">GPT-OSS 120B (500 t/s)</option>
+              <option value="qwen/qwen3-32b">Qwen3 32B (400 t/s)</option>
+              <option value="llama-3.3-70b-versatile">Llama 3.3 70B (280 t/s)</option>
+              <option value="llama-3.1-8b-instant">Llama 3.1 8B (560 t/s)</option>
+            </select>
+          </div>
+        )}
+        {bootstrap.settings.rewriteMode === 'local' && (
+          <>
+            <div className="setting-row" style={{ marginTop: 12 }}>
+              <label className="setting-label" htmlFor="model-select">Ollama model</label>
+              <select id="model-select" className="setting-select" value={bootstrap.settings.textModel} onChange={(e) => void onAction('settings', () => window.openWhisp.updateSettings({ textModel: e.target.value }))}>
+                {bootstrap.ollamaModels.length === 0
+                  ? <option value={bootstrap.settings.textModel}>{bootstrap.settings.textModel}</option>
+                  : bootstrap.ollamaModels.map((m) => <option key={m.name} value={m.name}>{m.name} ({formatBytes(m.size)})</option>)
+                }
+              </select>
+            </div>
+            {!bootstrap.recommendedModelInstalled && bootstrap.ollamaReachable && (
+              <button className="btn btn-sm btn-primary" style={{ marginTop: 10 }} disabled={busyAction === 'model'} onClick={() => void onAction('model', () => window.openWhisp.pullRecommendedModel())}>
+                {busyAction === 'model' ? 'Downloading...' : `Download ${RECOMMENDED_TEXT_MODEL}`}
+              </button>
+            )}
+          </>
         )}
       </div>
 

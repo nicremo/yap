@@ -1,6 +1,7 @@
 export type EnhancementLevel = 'none' | 'soft' | 'medium' | 'high';
 export type StyleMode = 'conversation' | 'vibe-coding';
 export type TranscriptionMode = 'auto' | 'cloud' | 'local';
+export type RewriteMode = 'cloud' | 'local';
 export type CloudTranscriptionModel = 'gpt-4o-mini-transcribe' | 'gpt-4o-transcribe' | 'whisper-1' | 'whisper-large-v3' | 'whisper-large-v3-turbo' | 'distil-whisper-large-v3-en';
 
 export type OverlayPhase =
@@ -36,6 +37,8 @@ export interface AppSettings {
   whisperLabel: string;
   ollamaBaseUrl: string;
   textModel: string;
+  rewriteMode: RewriteMode;
+  cloudRewriteModel: string;
   styleMode: StyleMode;
   enhancementLevel: EnhancementLevel;
   transcriptionMode: TranscriptionMode;
@@ -119,6 +122,8 @@ export interface UpdateSettingsInput {
   cloudLanguage?: string;
   openaiApiKey?: string;
   textModel?: string;
+  rewriteMode?: RewriteMode;
+  cloudRewriteModel?: string;
   ollamaBaseUrl?: string;
   storageDirectory?: string;
   autoPaste?: boolean;

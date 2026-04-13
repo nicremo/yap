@@ -29,6 +29,8 @@ export function createDefaultSettings(): AppSettings {
     whisperLabel: RECOMMENDED_WHISPER_LABEL,
     ollamaBaseUrl: 'http://127.0.0.1:11434',
     textModel: RECOMMENDED_TEXT_MODEL,
+    rewriteMode: 'cloud',
+    cloudRewriteModel: 'openai/gpt-oss-20b',
     styleMode: 'conversation',
     enhancementLevel: 'medium',
     transcriptionMode: 'auto',
