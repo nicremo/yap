@@ -311,7 +311,7 @@ function SetupWizard({ bootstrap, busyAction, onAction, onRefresh, onComplete }:
           <div className="setup-step setup-step-center">
             <div className="fn-key"><span>fn</span></div>
             <h1 className="setup-title serif">Welcome to Openwhisp</h1>
-            <p className="setup-desc">Local dictation powered by Whisper and Ollama. Your voice stays on your machine.</p>
+            <p className="setup-desc">Hold a key, speak, release. Your voice is transcribed, polished, and pasted. Free and open source.</p>
             <div className="setup-nav"><div /><button className="btn btn-primary" onClick={next}>Get Started</button></div>
           </div>
         )}
@@ -322,7 +322,7 @@ function SetupWizard({ bootstrap, busyAction, onAction, onRefresh, onComplete }:
           <div className="setup-step setup-step-center">
             <div className="ready-icon"><CheckIcon size={32} /></div>
             <h1 className="setup-title serif">You're All Set</h1>
-            <p className="setup-desc">Hold Fn to dictate. Release it and Openwhisp handles the rest.</p>
+            <p className="setup-desc">Hold your dictation key to speak. Release it and Openwhisp handles the rest.</p>
             <div className="setup-nav"><button className="btn btn-ghost" onClick={back}>Back</button><button className="btn btn-primary" onClick={onComplete}>Start Dictating</button></div>
           </div>
         )}
@@ -334,10 +334,11 @@ function SetupWizard({ bootstrap, busyAction, onAction, onRefresh, onComplete }:
 function OllamaStep({ bootstrap, onRefresh, onNext, onBack }: { bootstrap: BootstrapState; onRefresh: () => Promise<BootstrapState>; onNext: () => void; onBack: () => void }) {
   const [checking, setChecking] = useState(false);
   const retry = async () => { setChecking(true); await onRefresh(); setChecking(false); };
+  const hasCloudRewrite = bootstrap.openaiApiKeySet;
   return (
     <div className="setup-step">
-      <h1 className="setup-title serif">Connect to Ollama</h1>
-      <p className="setup-desc">Ollama runs AI models locally. Openwhisp uses it to enhance your dictated text.</p>
+      <h1 className="setup-title serif">Text Enhancement</h1>
+      <p className="setup-desc">Ollama polishes your dictated text locally. Optional if you use cloud rewriting via Groq.</p>
       <div className="s-card">
         <div className="s-card-row">
           <div className="s-card-info"><strong>Ollama Server</strong><span>{bootstrap.settings.ollamaBaseUrl}</span></div>
@@ -345,7 +346,7 @@ function OllamaStep({ bootstrap, onRefresh, onNext, onBack }: { bootstrap: Boots
         </div>
         {!bootstrap.ollamaReachable && (
           <div className="s-card-bottom">
-            <p className="s-card-hint">Install and start Ollama to continue.</p>
+            <p className="s-card-hint">{hasCloudRewrite ? 'Optional: install Ollama for local text enhancement, or skip to use cloud rewriting.' : 'Install and start Ollama to continue.'}</p>
             <div className="btn-group">
               <button className="btn btn-secondary" onClick={() => void window.openWhisp.openExternal('https://ollama.com/download/mac')}>Install Ollama</button>
               <button className="btn btn-secondary" onClick={() => void retry()} disabled={checking}>{checking ? 'Checking...' : 'Retry'}</button>
@@ -354,7 +355,13 @@ function OllamaStep({ bootstrap, onRefresh, onNext, onBack }: { bootstrap: Boots
         )}
         {bootstrap.ollamaReachable && bootstrap.ollamaModels.length > 0 && <div className="s-card-meta">{bootstrap.ollamaModels.length} model{bootstrap.ollamaModels.length !== 1 ? 's' : ''} available</div>}
       </div>
-      <div className="setup-nav"><button className="btn btn-ghost" onClick={onBack}>Back</button><button className="btn btn-primary" onClick={onNext} disabled={!bootstrap.ollamaReachable}>Continue</button></div>
+      <div className="setup-nav">
+        <button className="btn btn-ghost" onClick={onBack}>Back</button>
+        <div className="btn-group">
+          {!bootstrap.ollamaReachable && hasCloudRewrite && <button className="btn btn-ghost" onClick={onNext}>Skip</button>}
+          <button className="btn btn-primary" onClick={onNext} disabled={!bootstrap.ollamaReachable && !hasCloudRewrite}>Continue</button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -387,9 +394,9 @@ function TranscriptionStep({ bootstrap, busyAction, onAction, onRefresh, onNext,
       <p className="setup-desc">Choose how Openwhisp turns your voice into text. Set up one or both.</p>
 
       <div className="s-card">
-        <div className="s-card-label">Cloud (Recommended)</div>
+        <div className="s-card-label">Cloud via Groq (Recommended, Free)</div>
         <div className="s-card-row">
-          <div className="s-card-info"><strong>OpenAI Transcription</strong><span>Superior accuracy via cloud API</span></div>
+          <div className="s-card-info"><strong>Whisper Large v3</strong><span>Best accuracy, free tier covers 2 hours/day</span></div>
           {bootstrap.openaiApiKeySet
             ? <span className="badge badge-ready"><CheckIcon size={12} /> Ready</span>
             : <span className="badge badge-pending">Needs API key</span>
@@ -401,7 +408,7 @@ function TranscriptionStep({ bootstrap, busyAction, onAction, onRefresh, onNext,
               <input
                 type="password"
                 className="setting-input"
-                placeholder="sk-..."
+                placeholder="gsk_..."
                 value={apiKey}
                 onChange={(e) => { setApiKey(e.target.value); setKeyStatus('idle'); }}
               />
@@ -415,7 +422,7 @@ function TranscriptionStep({ bootstrap, busyAction, onAction, onRefresh, onNext,
             </div>
             {keyStatus === 'valid' && <span className="api-key-status api-key-ok">Valid API key</span>}
             {keyStatus === 'invalid' && <span className="api-key-status api-key-err">{keyError}</span>}
-            <button className="btn btn-link btn-muted" style={{ marginTop: 4, fontSize: 12 }} onClick={() => void window.openWhisp.openExternal('https://platform.openai.com/api-keys')}>Get an API key</button>
+            <button className="btn btn-link btn-muted" style={{ marginTop: 4, fontSize: 12 }} onClick={() => void window.openWhisp.openExternal('https://console.groq.com/keys')}>Get a free Groq API key</button>
           </div>
         )}
       </div>
@@ -423,7 +430,7 @@ function TranscriptionStep({ bootstrap, busyAction, onAction, onRefresh, onNext,
       <div className="s-card">
         <div className="s-card-label">Local (Offline Fallback)</div>
         <div className="s-card-row">
-          <div className="s-card-info"><strong>{RECOMMENDED_WHISPER_LABEL}</strong><span>Privacy-first, runs on your Mac</span></div>
+          <div className="s-card-info"><strong>{RECOMMENDED_WHISPER_LABEL}</strong><span>Privacy-first, runs on your Mac, no internet needed</span></div>
           {bootstrap.speechModelReady
             ? <span className="badge badge-ready"><CheckIcon size={12} /> Ready</span>
             : <button className="btn btn-sm btn-primary" disabled={busyAction === 'speech'} onClick={() => void onAction('speech', () => window.openWhisp.prepareSpeechModel())}>{busyAction === 'speech' ? 'Downloading...' : 'Download'}</button>

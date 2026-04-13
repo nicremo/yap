@@ -81,7 +81,19 @@ ollama pull qwen3.5:2b
 2. Create an account (free)
 3. Generate an API key
 
-### 3. Clone and run
+### 3. Download the app
+
+Grab the latest `.dmg` from [Releases](https://github.com/nicremo/openwhisp-enhanced/releases), open it and drag OpenWhisp to your Applications folder.
+
+Since the app is not signed with an Apple Developer certificate, macOS will block it on first launch. Run this once in Terminal to allow it:
+
+```bash
+xattr -cr /Applications/OpenWhisp.app
+```
+
+Then open OpenWhisp normally. You only need to do this once.
+
+### 3b. Or build from source
 
 ```bash
 git clone https://github.com/nicremo/openwhisp-enhanced.git

@@ -35,6 +35,8 @@
     },
     "mac": {
       "category": "public.app-category.productivity",
+      "identity": "Fabian Bitzer (5DKU7FFK4X)",
+      "notarize": true,
       "target": [
         "dmg",
         "zip"
