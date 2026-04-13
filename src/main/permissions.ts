@@ -3,12 +3,15 @@ import { shell, systemPreferences } from 'electron';
 import type { PermissionsState } from '../shared/types';
 import { getNativePermissionState, requestNativePermissions } from './native-helper';
 
+const isMac = process.platform === 'darwin';
+
 const MICROPHONE_SETTINGS_URL =
   'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone';
 const ACCESSIBILITY_SETTINGS_URL =
   'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility';
 const INPUT_MONITORING_SETTINGS_URL =
   'x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent';
+const WINDOWS_MICROPHONE_SETTINGS_URL = 'ms-settings:privacy-microphone';
 
 async function openSettingsPane(targetUrl: string): Promise<void> {
   try {
@@ -18,19 +21,30 @@ async function openSettingsPane(targetUrl: string): Promise<void> {
   }
 }
 
-export async function getPermissionState(): Promise<PermissionsState> {
-  const nativePermissions = await getNativePermissionState();
-  const microphone = systemPreferences.getMediaAccessStatus('microphone');
-  console.log('[openwhisp] mic status:', microphone, '| native:', JSON.stringify(nativePermissions));
-
-  return {
-    microphone:
+function getMicrophoneStatus(): PermissionsState['microphone'] {
+  try {
+    const microphone = systemPreferences.getMediaAccessStatus('microphone');
+    if (
       microphone === 'granted' ||
       microphone === 'denied' ||
       microphone === 'restricted' ||
       microphone === 'not-determined'
-        ? microphone
-        : 'unknown',
+    ) {
+      return microphone;
+    }
+  } catch {
+    // getMediaAccessStatus can throw on unsupported platforms.
+  }
+  return 'unknown';
+}
+
+export async function getPermissionState(): Promise<PermissionsState> {
+  const nativePermissions = await getNativePermissionState();
+  const microphone = getMicrophoneStatus();
+  console.log('[openwhisp] mic status:', microphone, '| native:', JSON.stringify(nativePermissions));
+
+  return {
+    microphone,
     accessibility: nativePermissions.accessibility,
     inputMonitoring: nativePermissions.inputMonitoring,
     postEvents: nativePermissions.postEvents,
@@ -53,7 +67,7 @@ export async function requestMicrophoneAccess(): Promise<PermissionsState> {
     return currentState;
   }
 
-  if (currentState.microphone === 'not-determined') {
+  if (isMac && currentState.microphone === 'not-determined') {
     try {
       const granted = await systemPreferences.askForMediaAccess('microphone');
       if (granted) {
@@ -64,7 +78,7 @@ export async function requestMicrophoneAccess(): Promise<PermissionsState> {
     }
   }
 
-  await openSettingsPane(MICROPHONE_SETTINGS_URL);
+  await openSettingsPane(isMac ? MICROPHONE_SETTINGS_URL : WINDOWS_MICROPHONE_SETTINGS_URL);
   return waitForMicrophoneAccess(15);
 }
 
@@ -78,6 +92,11 @@ async function waitForSystemAccess(attempts = 10): Promise<PermissionsState> {
 }
 
 export async function requestSystemAccess(): Promise<PermissionsState> {
+  // On Windows the native helper reports all system permissions as granted.
+  if (!isMac) {
+    return getPermissionState();
+  }
+
   await requestNativePermissions();
   const nextState = await getPermissionState();
 

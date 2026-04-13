@@ -2,6 +2,8 @@ import { fileURLToPath } from 'node:url';
 
 import { BrowserWindow, screen } from 'electron';
 
+const isMac = process.platform === 'darwin';
+
 const preloadPath = fileURLToPath(new URL('../preload/index.cjs', import.meta.url));
 const rendererFilePath = fileURLToPath(new URL('../renderer/index.html', import.meta.url));
 const overlayWidth = 320;
@@ -37,11 +39,9 @@ export async function createMainWindow(): Promise<BrowserWindow> {
     minHeight: 520,
     show: false,
     backgroundColor: '#f5f5ef',
-    titleBarStyle: 'hiddenInset',
-    trafficLightPosition: {
-      x: 18,
-      y: 18,
-    },
+    ...(isMac
+      ? { titleBarStyle: 'hiddenInset' as const, trafficLightPosition: { x: 18, y: 18 } }
+      : { autoHideMenuBar: true }),
     webPreferences: {
       preload: preloadPath,
       contextIsolation: true,
@@ -87,7 +87,9 @@ export async function createOverlayWindow(): Promise<BrowserWindow> {
     },
   });
 
-  window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  if (isMac) {
+    window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  }
   window.setAlwaysOnTop(true, 'floating');
   window.setIgnoreMouseEvents(true);
   positionOverlayWindow(window);

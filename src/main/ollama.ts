@@ -1,7 +1,11 @@
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
+import path from 'node:path';
 
 import type { OllamaModelInfo } from '../shared/types';
+
+const isMac = process.platform === 'darwin';
+const isWindows = process.platform === 'win32';
 
 interface OllamaTagsResponse {
   models?: Array<{
@@ -58,18 +62,47 @@ async function fetchWithTimeout(
   }
 }
 
-const OLLAMA_APP_PATH = '/Applications/Ollama.app';
+const OLLAMA_MAC_PATH = '/Applications/Ollama.app';
+
+function getOllamaWindowsPath(): string | null {
+  const localAppData = process.env.LOCALAPPDATA;
+  if (!localAppData) return null;
+  const candidate = path.join(localAppData, 'Programs', 'Ollama', 'ollama.exe');
+  return fs.existsSync(candidate) ? candidate : null;
+}
 
 export function isOllamaInstalled(): boolean {
-  return fs.existsSync(OLLAMA_APP_PATH);
+  if (isMac) return fs.existsSync(OLLAMA_MAC_PATH);
+  if (isWindows) return getOllamaWindowsPath() !== null;
+  return false;
 }
 
 export async function launchOllamaApp(): Promise<void> {
   return new Promise<void>((resolve, reject) => {
-    execFile('open', ['-a', 'Ollama'], (error) => {
-      if (error) reject(error);
-      else resolve();
-    });
+    if (isMac) {
+      execFile('open', ['-a', 'Ollama'], (error) => {
+        if (error) reject(error);
+        else resolve();
+      });
+      return;
+    }
+
+    if (isWindows) {
+      const exePath = getOllamaWindowsPath();
+      if (!exePath) {
+        reject(new Error('Ollama is not installed.'));
+        return;
+      }
+      const child = execFile(exePath, ['serve'], (error: Error | null) => {
+        if (error) reject(error);
+        else resolve();
+      });
+      child.unref();
+      resolve();
+      return;
+    }
+
+    reject(new Error('Unsupported platform for Ollama auto-launch.'));
   });
 }
 
