@@ -8,6 +8,7 @@ import type {
   DictionaryEntry,
   DictationRequest,
   FocusInfo,
+  HistoryEntry,
   HotkeyEvent,
   UpdateSettingsInput,
 } from '../shared/types';
@@ -44,6 +45,10 @@ const api = {
     ipcRenderer.invoke('appRules:remove', appIdentifier) as Promise<AppRule[]>,
   updateAppRule: (appIdentifier: string, styleMode: string, enhancementLevel: string) =>
     ipcRenderer.invoke('appRules:update', appIdentifier, styleMode, enhancementLevel) as Promise<AppRule[]>,
+  removeHistoryEntry: (id: string) =>
+    ipcRenderer.invoke('history:remove', id) as Promise<HistoryEntry[]>,
+  clearHistory: () =>
+    ipcRenderer.invoke('history:clear') as Promise<HistoryEntry[]>,
   captureFocusTarget: () =>
     ipcRenderer.invoke('dictation:captureTarget') as Promise<FocusInfo>,
   processAudio: (request: DictationRequest) =>

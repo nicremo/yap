@@ -981,3 +981,136 @@ button { cursor: pointer; }
 @media (max-width: 900px) {
   .dict-columns { grid-template-columns: 1fr; }
 }
+
+/* ────────────────────────────────────────────────
+   History
+   ──────────────────────────────────────────────── */
+
+.empty-state {
+  font-size: 14px;
+  color: var(--text-3);
+  padding: 24px 0;
+  text-align: center;
+}
+
+.history-entry {
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
+  overflow: hidden;
+  transition: border-color 0.15s ease;
+}
+
+.history-entry:last-child { margin-bottom: 0; }
+.history-entry:hover { border-color: var(--border); }
+
+.history-entry-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.history-entry-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.history-entry-text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.history-entry-expanded .history-entry-text {
+  -webkit-line-clamp: unset;
+}
+
+.history-entry-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.history-meta-time {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.history-meta-tag {
+  font-size: 11px;
+  color: var(--text-3);
+  background: rgba(0, 0, 0, 0.04);
+  padding: 2px 7px;
+  border-radius: 4px;
+  text-transform: capitalize;
+}
+
+.history-chevron {
+  flex-shrink: 0;
+  color: var(--text-3);
+  margin-top: 4px;
+  transition: transform 0.2s ease;
+}
+
+.history-chevron-open {
+  transform: rotate(180deg);
+}
+
+.history-entry-detail {
+  padding: 0 16px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.history-raw-block {
+  background: #fafaf8;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+}
+
+.history-raw-text {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-2);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.history-detail-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.history-detail-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.history-detail-value {
+  font-size: 13px;
+  color: var(--text-2);
+  text-transform: capitalize;
+}
+
+.history-entry-actions {
+  display: flex;
+  gap: 8px;
+  padding-top: 4px;
+}

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { Home01Icon, PaintBrush01Icon, CubeIcon, Settings01Icon, BookOpen01Icon } from '@hugeicons/core-free-icons';
+import { Home01Icon, PaintBrush01Icon, CubeIcon, Settings01Icon, BookOpen01Icon, Clock01Icon } from '@hugeicons/core-free-icons';
 
 import { AudioRecorder } from './audio-recorder';
 import logoUrl from './logo.png';
@@ -10,7 +10,7 @@ import type { CloudTranscriptionModel } from '../shared/types';
 
 const OVERLAY_VIEW = window.location.hash === '#overlay';
 
-type Page = 'home' | 'style' | 'models' | 'dictionary' | 'preferences';
+type Page = 'home' | 'style' | 'models' | 'dictionary' | 'history' | 'preferences';
 
 interface LevelOption {
   value: EnhancementLevel;
@@ -482,6 +482,9 @@ function MainView({ bootstrap, status, busyAction, onAction, onRefresh }: {
           <button className={`nav-item${page === 'dictionary' ? ' nav-item-active' : ''}`} onClick={() => setPage('dictionary')}>
             <HugeiconsIcon icon={BookOpen01Icon} size={18} strokeWidth={2} /> Dictionary
           </button>
+          <button className={`nav-item${page === 'history' ? ' nav-item-active' : ''}`} onClick={() => setPage('history')}>
+            <HugeiconsIcon icon={Clock01Icon} size={18} strokeWidth={2} /> History
+          </button>
           <button className={`nav-item${page === 'preferences' ? ' nav-item-active' : ''}`} onClick={() => setPage('preferences')}>
             <HugeiconsIcon icon={Settings01Icon} size={18} strokeWidth={2} /> Preferences
           </button>
@@ -504,6 +507,7 @@ function MainView({ bootstrap, status, busyAction, onAction, onRefresh }: {
         {page === 'style' && <StylePage bootstrap={bootstrap} onAction={onAction} onRefresh={onRefresh} />}
         {page === 'models' && <ModelsPage bootstrap={bootstrap} busyAction={busyAction} onAction={onAction} />}
         {page === 'dictionary' && <DictionaryPage bootstrap={bootstrap} onRefresh={onRefresh} />}
+        {page === 'history' && <HistoryPage bootstrap={bootstrap} onRefresh={onRefresh} />}
         {page === 'preferences' && <PreferencesPage bootstrap={bootstrap} onAction={onAction} />}
       </main>
     </div>
@@ -1037,6 +1041,105 @@ function DictionaryPage({ bootstrap, onRefresh }: { bootstrap: BootstrapState; o
   );
 }
 
+/* ── History ──────────────────────────────────── */
+
+function formatHistoryDate(iso: string): string {
+  const date = new Date(iso);
+  const now = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const isYesterday = date.toDateString() === yesterday.toDateString();
+
+  const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  if (isToday) return `Today, ${time}`;
+  if (isYesterday) return `Yesterday, ${time}`;
+  return `${date.toLocaleDateString([], { day: 'numeric', month: 'short' })}, ${time}`;
+}
+
+function HistoryPage({ bootstrap, onRefresh }: { bootstrap: BootstrapState; onRefresh: () => Promise<BootstrapState> }) {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const history = bootstrap.history;
+
+  const handleRemove = async (id: string) => {
+    await window.openWhisp.removeHistoryEntry(id);
+    await onRefresh();
+  };
+
+  const handleClear = async () => {
+    await window.openWhisp.clearHistory();
+    await onRefresh();
+  };
+
+  const handleCopy = (text: string) => {
+    void navigator.clipboard.writeText(text);
+  };
+
+  return (
+    <div className="page">
+      <div className="page-header">
+        <h2 className="page-title serif">History</h2>
+        <p className="page-desc">Every dictation is saved here automatically.</p>
+      </div>
+
+      <div className="card">
+        <div className="card-head">
+          <h3>Recent dictations</h3>
+          {history.length > 0 && (
+            <button className="btn btn-link btn-muted" onClick={() => void handleClear()}>Clear all</button>
+          )}
+        </div>
+
+        {history.length === 0 && (
+          <p className="empty-state">No dictations yet. Hold the right Option key and start speaking.</p>
+        )}
+
+        {history.map((entry) => {
+          const isExpanded = expandedId === entry.id;
+          const hasRaw = entry.rawText !== entry.finalText;
+          return (
+            <div key={entry.id} className={`history-entry${isExpanded ? ' history-entry-expanded' : ''}`}>
+              <div className="history-entry-header" onClick={() => setExpandedId(isExpanded ? null : entry.id)}>
+                <div className="history-entry-main">
+                  <p className="history-entry-text">{entry.finalText}</p>
+                  <div className="history-entry-meta">
+                    <span className="history-meta-time">{formatHistoryDate(entry.createdAt)}</span>
+                    {entry.appName && <span className="history-meta-tag">{entry.appName}</span>}
+                    <span className="history-meta-tag">{entry.transcriptionSource}</span>
+                  </div>
+                </div>
+                <svg className={`history-chevron${isExpanded ? ' history-chevron-open' : ''}`} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </div>
+
+              {isExpanded && (
+                <div className="history-entry-detail">
+                  {hasRaw && (
+                    <div className="history-raw-block">
+                      <span className="history-detail-label">Raw transcription</span>
+                      <p className="history-raw-text">{entry.rawText}</p>
+                    </div>
+                  )}
+                  <div className="history-detail-row">
+                    <span className="history-detail-label">Style</span>
+                    <span className="history-detail-value">{entry.styleMode} / {entry.enhancementLevel}</span>
+                  </div>
+                  <div className="history-entry-actions">
+                    <button className="btn btn-sm btn-primary" onClick={() => handleCopy(entry.finalText)}>Copy</button>
+                    {hasRaw && <button className="btn btn-sm btn-secondary" onClick={() => handleCopy(entry.rawText)}>Copy raw</button>}
+                    <button className="btn btn-sm btn-muted" onClick={() => void handleRemove(entry.id)}>Remove</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /* ── Preferences ──────────────────────────────── */
 
 function PreferencesPage({ bootstrap, onAction }: { bootstrap: BootstrapState; onAction: (l: string, a: () => Promise<BootstrapState>) => Promise<void> }) {
@@ -1054,6 +1157,7 @@ function PreferencesPage({ bootstrap, onAction }: { bootstrap: BootstrapState; o
       <div className="card">
         <div className="card-head"><h3>Behavior</h3></div>
         <ToggleRow title="Auto-paste" description="Paste into the active app after rewriting" checked={bootstrap.settings.autoPaste} onChange={(v) => void onAction('settings', () => window.openWhisp.updateSettings({ autoPaste: v }))} />
+        <ToggleRow title="Copy to clipboard" description="Copy the result to your clipboard after each dictation" checked={bootstrap.settings.copyToClipboard} onChange={(v) => void onAction('settings', () => window.openWhisp.updateSettings({ copyToClipboard: v }))} />
         <ToggleRow title="Show overlay" description="Show the dictation badge on screen" checked={bootstrap.settings.showOverlay} onChange={(v) => void onAction('settings', () => window.openWhisp.updateSettings({ showOverlay: v }))} />
         <ToggleRow title="Launch at login" description="Start Openwhisp when you log in" checked={bootstrap.settings.launchAtLogin} onChange={(v) => void onAction('settings', () => window.openWhisp.updateSettings({ launchAtLogin: v }))} />
       </div>

@@ -39,6 +39,7 @@ export function createDefaultSettings(): AppSettings {
     cloudLanguage: 'de',
     openaiApiKeyEncrypted: '',
     autoPaste: true,
+    copyToClipboard: false,
     showOverlay: false,
     launchAtLogin: false,
     setupComplete: false,

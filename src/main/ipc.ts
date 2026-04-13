@@ -13,6 +13,7 @@ import { testCloudConnection } from './cloud-transcription';
 import { loadAppRules, addAppRule, removeAppRule, updateAppRule } from './app-rules';
 import { loadDictionary, addDictionaryEntry, removeDictionaryEntry, loadCorrections, addCorrection, removeCorrection } from './dictionary';
 import { processDictationAudio } from './dictation';
+import { loadHistory, addHistoryEntry, removeHistoryEntry, clearHistory } from './history';
 import { applyLaunchAtLogin } from './login-item';
 import { pullOllamaModel, listOllamaModels, isOllamaReachable, ensureOllamaRunning } from './ollama';
 import { getFocusInfo } from './native-helper';
@@ -56,6 +57,7 @@ export function registerIpcHandlers(dependencies: IpcDependencies): void {
       dictionary: await loadDictionary(),
       corrections: await loadCorrections(),
       appRules: await loadAppRules(),
+      history: await loadHistory(),
       status: dependencies.getStatus(),
     };
   };
@@ -207,8 +209,8 @@ export function registerIpcHandlers(dependencies: IpcDependencies): void {
 
   ipcMain.handle('dictation:captureTarget', async () => getFocusInfo());
 
-  ipcMain.handle('dictation:processAudio', async (_event, request: DictationRequest) =>
-    processDictationAudio({
+  ipcMain.handle('dictation:processAudio', async (_event, request: DictationRequest) => {
+    const result = await processDictationAudio({
       wavBase64: request.wavBase64,
       settings: dependencies.getSettings(),
       dictionary: await loadDictionary(),
@@ -216,8 +218,28 @@ export function registerIpcHandlers(dependencies: IpcDependencies): void {
       appRules: await loadAppRules(),
       targetFocus: request.targetFocus,
       setStatus: dependencies.setStatus,
-    }),
-  );
+    });
+
+    await addHistoryEntry({
+      rawText: result.rawText,
+      finalText: result.finalText,
+      transcriptionSource: result.transcriptionSource,
+      styleMode: result.styleMode,
+      enhancementLevel: result.enhancementLevel,
+      appName: result.focusInfo?.appName,
+    }).catch((error) => {
+      console.warn('[openwhisp] Failed to save history entry:', error instanceof Error ? error.message : error);
+    });
+
+    return result;
+  });
+
+  ipcMain.handle('history:remove', async (_event, id: unknown) => {
+    if (typeof id !== 'string') throw new Error('Expected string for history entry id.');
+    return removeHistoryEntry(id);
+  });
+
+  ipcMain.handle('history:clear', async () => clearHistory());
 
   ipcMain.on('dictation:status', (_event, status: AppStatus) => {
     dependencies.setStatus(status);

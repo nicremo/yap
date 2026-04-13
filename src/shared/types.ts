@@ -47,6 +47,7 @@ export interface AppSettings {
   cloudLanguage: string;
   openaiApiKeyEncrypted: string;
   autoPaste: boolean;
+  copyToClipboard: boolean;
   showOverlay: boolean;
   launchAtLogin: boolean;
   setupComplete: boolean;
@@ -93,7 +94,19 @@ export interface BootstrapState {
   dictionary: DictionaryEntry[];
   corrections: CorrectionEntry[];
   appRules: AppRule[];
+  history: HistoryEntry[];
   status: AppStatus;
+}
+
+export interface HistoryEntry {
+  id: string;
+  rawText: string;
+  finalText: string;
+  transcriptionSource: 'cloud' | 'local';
+  styleMode: StyleMode;
+  enhancementLevel: EnhancementLevel;
+  appName?: string;
+  createdAt: string;
 }
 
 export interface ProcessAudioResult {
@@ -102,6 +115,8 @@ export interface ProcessAudioResult {
   pasted: boolean;
   focusInfo?: FocusInfo;
   transcriptionSource: 'cloud' | 'local';
+  styleMode: StyleMode;
+  enhancementLevel: EnhancementLevel;
 }
 
 export interface DictationRequest {
@@ -127,6 +142,7 @@ export interface UpdateSettingsInput {
   ollamaBaseUrl?: string;
   storageDirectory?: string;
   autoPaste?: boolean;
+  copyToClipboard?: boolean;
   showOverlay?: boolean;
   launchAtLogin?: boolean;
   setupComplete?: boolean;

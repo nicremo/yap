@@ -236,12 +236,18 @@ export async function processDictationAudio({
 
   console.log('[openwhisp:dictation] final', { rewriteFallback: usedRewriteFallback, text: finalText });
 
-  clipboard.writeText(finalText);
+  if (settings.copyToClipboard) {
+    clipboard.writeText(finalText);
+  }
 
   let pasted = false;
   let focusInfo = targetFocus;
 
   if (settings.autoPaste) {
+    if (!settings.copyToClipboard) {
+      clipboard.writeText(finalText);
+    }
+
     setStatus({
       phase: 'pasting',
       title: 'Pasting',
@@ -254,18 +260,19 @@ export async function processDictationAudio({
     pasted = await triggerPaste(focusInfo).catch(() => false);
   }
 
+  const doneTitle = pasted ? 'Pasted' : 'Done';
+  const doneDetail = usedRewriteFallback
+    ? pasted
+      ? 'The raw transcription was pasted because the rewrite model was unavailable.'
+      : 'The raw transcription was saved to history because the rewrite model was unavailable.'
+    : pasted
+      ? 'The refined text was pasted into the active app.'
+      : 'The refined text was saved to history.';
+
   setStatus({
     phase: 'done',
-    title: pasted ? 'Pasted' : 'Copied',
-    detail: usedRewriteFallback
-      ? pasted
-        ? 'The raw transcription was pasted because the rewrite model was unavailable.'
-        : 'The raw transcription is on the clipboard because the rewrite model was unavailable.'
-      : pasted
-        ? 'The refined text was pasted into the active app.'
-        : focusInfo?.appName
-          ? `OpenWhisp copied the text, but it could not paste into ${focusInfo.appName}.`
-          : 'The refined text is on the clipboard.',
+    title: doneTitle,
+    detail: doneDetail,
     preview: finalText,
     rawText,
   });
@@ -280,6 +287,8 @@ export async function processDictationAudio({
     pasted,
     focusInfo,
     transcriptionSource,
+    styleMode: resolved.styleMode,
+    enhancementLevel: resolved.enhancementLevel,
   };
 }
 

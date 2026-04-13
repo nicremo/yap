@@ -8,6 +8,7 @@ import type {
   DictionaryEntry,
   DictationRequest,
   FocusInfo,
+  HistoryEntry,
   HotkeyEvent,
   UpdateSettingsInput,
 } from '../shared/types';
@@ -32,6 +33,8 @@ declare global {
       addAppRule: (rule: AppRule) => Promise<AppRule[]>;
       removeAppRule: (appIdentifier: string) => Promise<AppRule[]>;
       updateAppRule: (appIdentifier: string, styleMode: string, enhancementLevel: string) => Promise<AppRule[]>;
+      removeHistoryEntry: (id: string) => Promise<HistoryEntry[]>;
+      clearHistory: () => Promise<HistoryEntry[]>;
       captureFocusTarget: () => Promise<FocusInfo>;
       processAudio: (request: DictationRequest) => Promise<{
         rawText: string;
