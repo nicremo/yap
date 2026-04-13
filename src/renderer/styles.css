@@ -1114,3 +1114,76 @@ button { cursor: pointer; }
   gap: 8px;
   padding-top: 4px;
 }
+
+/* ────────────────────────────────────────────────
+   Hotkey Recorder
+   ──────────────────────────────────────────────── */
+
+.hotkey-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.hotkey-custom {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-light);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hotkey-display-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.hotkey-sublabel {
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.hotkey-capture-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 100px;
+  padding: 6px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  letter-spacing: 0.02em;
+  color: var(--text);
+  background: #fafaf8;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.hotkey-capture-btn:hover {
+  border-color: var(--text-3);
+  background: #f5f5f0;
+}
+
+.hotkey-capture-active {
+  border-color: var(--blue);
+  background: #f0f4ff;
+  color: var(--blue);
+  animation: hotkey-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes hotkey-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.2); }
+  50% { box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15); }
+}
+
+.hotkey-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-3);
+}

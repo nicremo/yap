@@ -141,10 +141,11 @@ async function ensureHotkeyListener(): Promise<void> {
     (message) => {
       setStatus({
         phase: 'error',
-        title: 'Fn key unavailable',
+        title: 'Hotkey unavailable',
         detail: message,
       });
     },
+    settings.hotkey,
   );
 }
 
@@ -173,6 +174,11 @@ async function createWindows(): Promise<void> {
   showMainWindow();
 }
 
+async function restartHotkeyListener(): Promise<void> {
+  stopFnListener();
+  await ensureHotkeyListener();
+}
+
 async function bootstrap(): Promise<void> {
   settings = await loadSettings();
   await ensureStorage(settings);
@@ -189,6 +195,8 @@ async function bootstrap(): Promise<void> {
     showMainWindow,
     hideMainWindow,
     ensureHotkeyListener,
+    restartHotkeyListener,
+    broadcast,
   });
 
   await createWindows();

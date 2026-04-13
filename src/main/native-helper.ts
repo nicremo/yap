@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 import { app } from 'electron';
 
-import type { FocusInfo, HotkeyEvent, PermissionsState } from '../shared/types';
+import type { FocusInfo, HotkeyConfig, HotkeyEvent, PermissionsState } from '../shared/types';
 import { pathExists } from './storage';
 
 const projectRoot = path.resolve(fileURLToPath(new URL('../../', import.meta.url)));
@@ -132,13 +132,19 @@ export async function triggerPaste(targetFocus?: FocusInfo): Promise<boolean> {
 export async function startFnListener(
   onEvent: (event: HotkeyEvent) => void,
   onError?: (message: string) => void,
+  hotkey?: HotkeyConfig,
 ): Promise<boolean> {
   const helperReady = await ensureNativeHelper();
   if (!helperReady || listenerProcess) {
     return helperReady;
   }
 
-  const child = spawn(getHelperBinaryPath(), ['listen'], {
+  const args = ['listen'];
+  if (hotkey) {
+    args.push(String(hotkey.keyCode), String(hotkey.modifiers));
+  }
+
+  const child = spawn(getHelperBinaryPath(), args, {
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 

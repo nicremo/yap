@@ -31,6 +31,12 @@ export interface AppRule {
   enhancementLevel: EnhancementLevel;
 }
 
+export interface HotkeyConfig {
+  keyCode: number;
+  modifiers: number;
+  label: string;
+}
+
 export interface AppSettings {
   storageDirectory: string;
   whisperModel: string;
@@ -46,6 +52,7 @@ export interface AppSettings {
   cloudApiBaseUrl: string;
   cloudLanguage: string;
   openaiApiKeyEncrypted: string;
+  hotkey: HotkeyConfig;
   autoPaste: boolean;
   copyToClipboard: boolean;
   showOverlay: boolean;
@@ -141,6 +148,7 @@ export interface UpdateSettingsInput {
   cloudRewriteModel?: string;
   ollamaBaseUrl?: string;
   storageDirectory?: string;
+  hotkey?: HotkeyConfig;
   autoPaste?: boolean;
   copyToClipboard?: boolean;
   showOverlay?: boolean;
