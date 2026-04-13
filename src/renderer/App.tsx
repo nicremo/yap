@@ -6,7 +6,8 @@ import { AudioRecorder } from './audio-recorder';
 import logoUrl from './logo.png';
 import type { AppRule, AppStatus, BootstrapState, CorrectionEntry, DictionaryEntry, EnhancementLevel, FocusInfo, StyleMode } from '../shared/types';
 import { CLOUD_MODELS, RECOMMENDED_TEXT_MODEL, RECOMMENDED_WHISPER_LABEL } from '../shared/recommendations';
-import type { CloudTranscriptionModel } from '../shared/types';
+import { buildHotkeyLabel, FN_HOTKEY, FN_KEY_CODE, MODIFIER_FLAGS, MODIFIER_ONLY_KEYCODES } from '../shared/hotkeys';
+import type { CloudTranscriptionModel, HotkeyConfig } from '../shared/types';
 
 const OVERLAY_VIEW = window.location.hash === '#overlay';
 
@@ -118,9 +119,12 @@ export function App() {
     void load();
     const stopStatus = window.openWhisp.onStatus((s) => { if (mounted) setStatus(s); });
     const DOUBLE_CLICK_MS = 300;
+    const keyHeldRef = { current: false };
     const stopHotkey = OVERLAY_VIEW
       ? window.openWhisp.onHotkey((e) => {
           if (e.type === 'down') {
+            keyHeldRef.current = true;
+
             if (recordingRef.current && handsfreeRef.current) {
               handsfreeRef.current = false;
               setIsHandsfree(false);
@@ -143,17 +147,23 @@ export function App() {
               pendingDownRef.current = null;
               handsfreeRef.current = false;
               setIsHandsfree(false);
+              if (!keyHeldRef.current) return;
               void handleHotkeyDown();
             }, DOUBLE_CLICK_MS);
           }
           if (e.type === 'up') {
+            keyHeldRef.current = false;
             if (handsfreeRef.current) return;
             if (pendingDownRef.current) return;
             void handleHotkeyUp();
           }
         })
       : () => undefined;
-    return () => { mounted = false; stopStatus(); stopHotkey(); };
+    const stopHistory = window.openWhisp.onHistoryUpdated((history) => {
+      if (!mounted) return;
+      setBootstrap((prev) => prev ? { ...prev, history } : prev);
+    });
+    return () => { mounted = false; stopStatus(); stopHotkey(); stopHistory(); };
   }, []);
 
   useEffect(() => {
@@ -252,6 +262,7 @@ export function App() {
         preview: result.finalText,
         rawText: result.rawText,
       });
+      void refreshBootstrap();
     } catch (error) {
       pushStatus({ phase: 'error', title: 'Dictation failed', detail: error instanceof Error ? error.message : 'Could not finish dictation.' });
     } finally {
@@ -1142,6 +1153,141 @@ function HistoryPage({ bootstrap, onRefresh }: { bootstrap: BootstrapState; onRe
 
 /* ── Preferences ──────────────────────────────── */
 
+function HotkeyRecorder({ current, onSave }: { current: HotkeyConfig; onSave: (config: HotkeyConfig) => void }) {
+  const isFn = current.keyCode === FN_KEY_CODE && current.modifiers === 0;
+  const [recording, setRecording] = useState(false);
+  const [preview, setPreview] = useState<string | null>(null);
+  const pendingRef = useRef<{ keyCode: number; modifiers: number } | null>(null);
+
+  useEffect(() => {
+    if (!recording) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (e.code === 'Escape') {
+        setRecording(false);
+        setPreview(null);
+        pendingRef.current = null;
+        return;
+      }
+
+      let modifiers = 0;
+      if (e.metaKey) modifiers |= MODIFIER_FLAGS.command;
+      if (e.altKey) modifiers |= MODIFIER_FLAGS.option;
+      if (e.shiftKey) modifiers |= MODIFIER_FLAGS.shift;
+      if (e.ctrlKey) modifiers |= MODIFIER_FLAGS.control;
+
+      const keyCode = mapDomKeyCode(e.code, e.location);
+      if (keyCode < 0) return;
+
+      if (MODIFIER_ONLY_KEYCODES.has(keyCode)) {
+        pendingRef.current = { keyCode, modifiers: modifiers & ~modifierFlagForKeyCode(keyCode) };
+        setPreview(buildHotkeyLabel(keyCode, pendingRef.current.modifiers));
+        return;
+      }
+
+      const label = buildHotkeyLabel(keyCode, modifiers);
+      onSave({ keyCode, modifiers, label });
+      setRecording(false);
+      setPreview(null);
+      pendingRef.current = null;
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!pendingRef.current) return;
+
+      const config = pendingRef.current;
+      const label = buildHotkeyLabel(config.keyCode, config.modifiers);
+      onSave({ keyCode: config.keyCode, modifiers: config.modifiers, label });
+      setRecording(false);
+      pendingRef.current = null;
+      setPreview(null);
+    };
+
+    window.addEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('keyup', handleKeyUp, true);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown, true);
+      window.removeEventListener('keyup', handleKeyUp, true);
+    };
+  }, [recording, onSave]);
+
+  return (
+    <div className="hotkey-section">
+      <ToggleRow
+        title="Use Fn key"
+        description="Hold the Fn key to start dictation. You may need to change the Fn key behavior in System Settings > Keyboard."
+        checked={isFn}
+        onChange={(v) => {
+          if (v) {
+            onSave(FN_HOTKEY);
+          } else {
+            onSave({ keyCode: 61, modifiers: 0, label: 'Right \u2325' });
+          }
+          setRecording(false);
+          setPreview(null);
+        }}
+      />
+      {!isFn && (
+        <div className="hotkey-custom">
+          <div className="hotkey-display-row">
+            <span className="hotkey-sublabel">Dictation key</span>
+            <button
+              className={`hotkey-capture-btn${recording ? ' hotkey-capture-active' : ''}`}
+              onClick={() => {
+                setRecording(!recording);
+                setPreview(null);
+                pendingRef.current = null;
+              }}
+            >
+              {recording ? (preview ?? 'Press a key\u2026') : current.label}
+            </button>
+          </div>
+          {recording && <p className="hotkey-hint">Press the key or combination you want. Escape to cancel.</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function modifierFlagForKeyCode(keyCode: number): number {
+  switch (keyCode) {
+    case 54: case 55: return MODIFIER_FLAGS.command;
+    case 58: case 61: return MODIFIER_FLAGS.option;
+    case 56: case 60: return MODIFIER_FLAGS.shift;
+    case 59: case 62: return MODIFIER_FLAGS.control;
+    default: return 0;
+  }
+}
+
+function mapDomKeyCode(code: string, location: number): number {
+  const map: Record<string, number | [number, number]> = {
+    MetaLeft: 55, MetaRight: 54,
+    AltLeft: 58, AltRight: 61,
+    ShiftLeft: 56, ShiftRight: 60,
+    ControlLeft: 59, ControlRight: 62,
+    Space: 49, Enter: 36, Tab: 48, Backspace: 51, Escape: 53,
+    KeyA: 0, KeyB: 11, KeyC: 8, KeyD: 2, KeyE: 14, KeyF: 3,
+    KeyG: 5, KeyH: 4, KeyI: 34, KeyJ: 38, KeyK: 40, KeyL: 37,
+    KeyM: 46, KeyN: 45, KeyO: 31, KeyP: 35, KeyQ: 12, KeyR: 15,
+    KeyS: 1, KeyT: 17, KeyU: 32, KeyV: 9, KeyW: 13, KeyX: 7,
+    KeyY: 16, KeyZ: 6,
+    Digit0: 29, Digit1: 18, Digit2: 19, Digit3: 20, Digit4: 21,
+    Digit5: 23, Digit6: 22, Digit7: 26, Digit8: 28, Digit9: 25,
+    F1: 122, F2: 120, F3: 99, F4: 118, F5: 96, F6: 97,
+    F7: 98, F8: 100, F9: 101, F10: 109, F11: 103, F12: 111,
+    F13: 105, F14: 107, F15: 113,
+  };
+  const val = map[code];
+  if (val === undefined) return -1;
+  if (Array.isArray(val)) return location === 2 ? val[1] : val[0];
+  return val;
+}
+
 function PreferencesPage({ bootstrap, onAction }: { bootstrap: BootstrapState; onAction: (l: string, a: () => Promise<BootstrapState>) => Promise<void> }) {
   const p = bootstrap.permissions;
   const micOk = p.microphone === 'granted';
@@ -1152,6 +1298,14 @@ function PreferencesPage({ bootstrap, onAction }: { bootstrap: BootstrapState; o
       <div className="page-header">
         <h2 className="page-title serif">Preferences</h2>
         <p className="page-desc">Customize how Openwhisp works.</p>
+      </div>
+
+      <div className="card">
+        <div className="card-head"><h3>Dictation shortcut</h3></div>
+        <HotkeyRecorder
+          current={bootstrap.settings.hotkey}
+          onSave={(config) => void onAction('settings', () => window.openWhisp.updateSettings({ hotkey: config }))}
+        />
       </div>
 
       <div className="card">

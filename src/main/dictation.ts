@@ -236,17 +236,11 @@ export async function processDictationAudio({
 
   console.log('[openwhisp:dictation] final', { rewriteFallback: usedRewriteFallback, text: finalText });
 
-  if (settings.copyToClipboard) {
-    clipboard.writeText(finalText);
-  }
-
   let pasted = false;
   let focusInfo = targetFocus;
 
   if (settings.autoPaste) {
-    if (!settings.copyToClipboard) {
-      clipboard.writeText(finalText);
-    }
+    clipboard.writeText(finalText);
 
     setStatus({
       phase: 'pasting',
@@ -258,6 +252,12 @@ export async function processDictationAudio({
 
     focusInfo = targetFocus ?? (await getFocusInfo().catch(() => undefined));
     pasted = await triggerPaste(focusInfo).catch(() => false);
+
+    if (!settings.copyToClipboard) {
+      setTimeout(() => clipboard.writeText(''), 500);
+    }
+  } else if (settings.copyToClipboard) {
+    clipboard.writeText(finalText);
   }
 
   const doneTitle = pasted ? 'Pasted' : 'Done';
