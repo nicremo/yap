@@ -11,16 +11,21 @@ import type { FocusInfo, HotkeyConfig, HotkeyEvent, PermissionsState } from '../
 import { pathExists } from './storage';
 
 const projectRoot = path.resolve(fileURLToPath(new URL('../../', import.meta.url)));
-const helperSourcePath = path.join(projectRoot, 'swift', 'OpenWhispHelper.swift');
+const isWindows = process.platform === 'win32';
+const helperExt = isWindows ? '.exe' : '';
+const helperSourcePath = isWindows
+  ? path.join(projectRoot, 'windows', 'OpenWhispHelper.cpp')
+  : path.join(projectRoot, 'swift', 'OpenWhispHelper.swift');
 
 type ListenerProcess = ChildProcessByStdio<null, Readable, Readable>;
 
 let listenerProcess: ListenerProcess | null = null;
 
 function getHelperBinaryPath(): string {
+  const name = `openwhisp-helper${helperExt}`;
   return app.isPackaged
-    ? path.join(process.resourcesPath, 'native', 'openwhisp-helper')
-    : path.join(projectRoot, 'build', 'native', 'openwhisp-helper');
+    ? path.join(process.resourcesPath, 'native', name)
+    : path.join(projectRoot, 'build', 'native', name);
 }
 
 async function compileHelper(): Promise<boolean> {
@@ -33,7 +38,11 @@ async function compileHelper(): Promise<boolean> {
   await mkdir(outputDirectory, { recursive: true });
 
   return new Promise<boolean>((resolve) => {
-    const child = spawn('swiftc', [helperSourcePath, '-o', outputPath], {
+    const compileArgs = isWindows
+      ? ['g++', ['-O2', '-o', outputPath, helperSourcePath, '-luser32', '-lkernel32']]
+      : ['swiftc', [helperSourcePath, '-o', outputPath]];
+
+    const child = spawn(compileArgs[0] as string, compileArgs[1] as string[], {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
 
