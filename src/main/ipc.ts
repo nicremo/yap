@@ -42,7 +42,10 @@ export function registerIpcHandlers(dependencies: IpcDependencies): void {
     if (permissions.accessibility && permissions.inputMonitoring && permissions.postEvents) {
       await dependencies.ensureHotkeyListener();
     }
-    const ollamaReachable = await ensureOllamaRunning(settings.ollamaBaseUrl);
+    const needsOllama = settings.rewriteMode === 'local' && settings.enhancementLevel !== 'none';
+    const ollamaReachable = needsOllama
+      ? await ensureOllamaRunning(settings.ollamaBaseUrl)
+      : await isOllamaReachable(settings.ollamaBaseUrl);
     const ollamaModels = ollamaReachable ? await listOllamaModels(settings.ollamaBaseUrl) : [];
 
     return {
