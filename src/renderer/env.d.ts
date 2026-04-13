@@ -48,6 +48,7 @@ declare global {
       revealStorage: () => Promise<void>;
       onStatus: (listener: (status: AppStatus) => void) => () => void;
       onHotkey: (listener: (event: HotkeyEvent) => void) => () => void;
+      onHistoryUpdated: (listener: (history: HistoryEntry[]) => void) => () => void;
     };
   }
 }

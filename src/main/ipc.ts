@@ -30,6 +30,8 @@ interface IpcDependencies {
   showMainWindow: () => void;
   hideMainWindow: () => void;
   ensureHotkeyListener: () => Promise<void>;
+  restartHotkeyListener: () => Promise<void>;
+  broadcast: (channel: string, payload: unknown) => void;
 }
 
 export function registerIpcHandlers(dependencies: IpcDependencies): void {
@@ -65,10 +67,19 @@ export function registerIpcHandlers(dependencies: IpcDependencies): void {
   ipcMain.handle('app:bootstrap', buildBootstrapState);
 
   ipcMain.handle('settings:update', async (_event, updates: UpdateSettingsInput) => {
+    const previousHotkey = dependencies.getSettings().hotkey;
     const nextSettings = await persistSettings(dependencies.getSettings(), updates);
     await ensureStorage(nextSettings);
     applyLaunchAtLogin(nextSettings.launchAtLogin);
     dependencies.setSettings(nextSettings);
+
+    if (updates.hotkey && (
+      updates.hotkey.keyCode !== previousHotkey.keyCode ||
+      updates.hotkey.modifiers !== previousHotkey.modifiers
+    )) {
+      await dependencies.restartHotkeyListener();
+    }
+
     return buildBootstrapState();
   });
 
@@ -220,7 +231,7 @@ export function registerIpcHandlers(dependencies: IpcDependencies): void {
       setStatus: dependencies.setStatus,
     });
 
-    await addHistoryEntry({
+    const history = await addHistoryEntry({
       rawText: result.rawText,
       finalText: result.finalText,
       transcriptionSource: result.transcriptionSource,
@@ -229,7 +240,12 @@ export function registerIpcHandlers(dependencies: IpcDependencies): void {
       appName: result.focusInfo?.appName,
     }).catch((error) => {
       console.warn('[openwhisp] Failed to save history entry:', error instanceof Error ? error.message : error);
+      return null;
     });
+
+    if (history) {
+      dependencies.broadcast('history:updated', history);
+    }
 
     return result;
   });

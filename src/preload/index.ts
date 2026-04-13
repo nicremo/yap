@@ -72,6 +72,11 @@ const api = {
     ipcRenderer.on('hotkey:event', wrapped);
     return () => ipcRenderer.removeListener('hotkey:event', wrapped);
   },
+  onHistoryUpdated: (listener: (history: HistoryEntry[]) => void) => {
+    const wrapped = (_event: Electron.IpcRendererEvent, history: HistoryEntry[]) => listener(history);
+    ipcRenderer.on('history:updated', wrapped);
+    return () => ipcRenderer.removeListener('history:updated', wrapped);
+  },
 };
 
 contextBridge.exposeInMainWorld('openWhisp', api);
