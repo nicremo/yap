@@ -6,10 +6,11 @@ import { AudioRecorder } from './audio-recorder';
 import logoUrl from './logo.png';
 import type { AppRule, AppStatus, BootstrapState, CorrectionEntry, DictionaryEntry, EnhancementLevel, FocusInfo, StyleMode } from '../shared/types';
 import { CLOUD_MODELS, RECOMMENDED_TEXT_MODEL, RECOMMENDED_WHISPER_LABEL } from '../shared/recommendations';
-import { buildHotkeyLabel, FN_HOTKEY, FN_KEY_CODE, MODIFIER_FLAGS, MODIFIER_ONLY_KEYCODES } from '../shared/hotkeys';
+import { buildHotkeyLabel, FN_HOTKEY, FN_KEY_CODE, MODIFIER_FLAGS, MODIFIER_ONLY_KEYCODES, RIGHT_ALT_HOTKEY } from '../shared/hotkeys';
 import type { CloudTranscriptionModel, HotkeyConfig } from '../shared/types';
 
 const OVERLAY_VIEW = window.location.hash === '#overlay';
+const IS_WINDOWS = navigator.platform === 'Win32';
 
 type Page = 'home' | 'style' | 'models' | 'dictionary' | 'history' | 'preferences';
 
@@ -430,7 +431,7 @@ function TranscriptionStep({ bootstrap, busyAction, onAction, onRefresh, onNext,
       <div className="s-card">
         <div className="s-card-label">Local (Offline Fallback)</div>
         <div className="s-card-row">
-          <div className="s-card-info"><strong>{RECOMMENDED_WHISPER_LABEL}</strong><span>Privacy-first, runs on your Mac, no internet needed</span></div>
+          <div className="s-card-info"><strong>{RECOMMENDED_WHISPER_LABEL}</strong><span>Privacy-first, runs on your device, no internet needed</span></div>
           {bootstrap.speechModelReady
             ? <span className="badge badge-ready"><CheckIcon size={12} /> Ready</span>
             : <button className="btn btn-sm btn-primary" disabled={busyAction === 'speech'} onClick={() => void onAction('speech', () => window.openWhisp.prepareSpeechModel())}>{busyAction === 'speech' ? 'Downloading...' : 'Download'}</button>
@@ -457,11 +458,11 @@ function PermissionsStep({ bootstrap, busyAction, onAction, onNext, onBack }: { 
         </div>
         <div className="s-card-divider" />
         <div className="s-card-row">
-          <div className="s-card-info"><strong>System Access</strong><span>Fn key and auto-paste</span></div>
+          <div className="s-card-info"><strong>System Access</strong><span>{IS_WINDOWS ? 'Hotkey and auto-paste' : 'Fn key and auto-paste'}</span></div>
           {sysOk ? <span className="badge badge-ready"><CheckIcon size={12} /> Granted</span> : <button className="btn btn-sm btn-primary" disabled={busyAction === 'system'} onClick={() => void onAction('system', () => window.openWhisp.requestSystemAccess())}>{busyAction === 'system' ? 'Opening...' : 'Allow'}</button>}
         </div>
       </div>
-      {!sysOk && <p className="setup-hint">macOS will prompt you in System Settings. You may need to restart the app.</p>}
+      {!sysOk && !IS_WINDOWS && <p className="setup-hint">macOS will prompt you in System Settings. You may need to restart the app.</p>}
       <div className="setup-nav"><button className="btn btn-ghost" onClick={onBack}>Back</button><button className="btn btn-primary" onClick={onNext} disabled={!micOk || !sysOk}>Continue</button></div>
     </div>
   );
@@ -546,7 +547,7 @@ function HomePage({ status, bootstrap, setPage }: { status: AppStatus; bootstrap
       <div className="banner">
         <div className="banner-content">
           <h3 className="serif">Press Fn. Speak. Done.</h3>
-          <p>Your voice, transcribed and polished entirely on your Mac. No cloud. No latency.</p>
+          <p>Your voice, transcribed and polished entirely on your device. No cloud. No latency.</p>
         </div>
         <div className="banner-visual" aria-hidden="true">
           <div className="banner-circle" />
@@ -743,7 +744,7 @@ function TranscriptionCard({ bootstrap, onAction }: { bootstrap: BootstrapState;
       <div className="setting-hint">
         {mode === 'auto' && 'OpenAI API with local Whisper fallback when offline.'}
         {mode === 'cloud' && 'OpenAI API only. Requires internet and API key.'}
-        {mode === 'local' && 'Local Whisper only. No data leaves your Mac.'}
+        {mode === 'local' && 'Local Whisper only. No data leaves your device.'}
       </div>
       {showCloudFields && (
         <>
@@ -876,7 +877,7 @@ function ModelsPage({ bootstrap, busyAction, onAction }: { bootstrap: BootstrapS
           </div>
         </div>
         <div className="setting-hint">
-          {bootstrap.settings.rewriteMode === 'cloud' ? 'Fast rewrite via Groq cloud API. Falls back to Ollama when offline.' : 'Local rewrite via Ollama. No data leaves your Mac.'}
+          {bootstrap.settings.rewriteMode === 'cloud' ? 'Fast rewrite via Groq cloud API. Falls back to Ollama when offline.' : 'Local rewrite via Ollama. No data leaves your device.'}
         </div>
         {bootstrap.settings.rewriteMode === 'cloud' && (
           <div className="setting-row" style={{ marginTop: 12 }}>
@@ -1223,23 +1224,28 @@ function HotkeyRecorder({ current, onSave }: { current: HotkeyConfig; onSave: (c
     };
   }, [recording, onSave]);
 
+  const showFnToggle = !IS_WINDOWS;
+  const showCustomCapture = IS_WINDOWS || !isFn;
+
   return (
     <div className="hotkey-section">
-      <ToggleRow
-        title="Use Fn key"
-        description="Hold the Fn key to start dictation. You may need to change the Fn key behavior in System Settings > Keyboard."
-        checked={isFn}
-        onChange={(v) => {
-          if (v) {
-            onSave(FN_HOTKEY);
-          } else {
-            onSave({ keyCode: 61, modifiers: 0, label: 'Right \u2325' });
-          }
-          setRecording(false);
-          setPreview(null);
-        }}
-      />
-      {!isFn && (
+      {showFnToggle && (
+        <ToggleRow
+          title="Use Fn key"
+          description="Hold the Fn key to start dictation. You may need to change the Fn key behavior in System Settings > Keyboard."
+          checked={isFn}
+          onChange={(v) => {
+            if (v) {
+              onSave(FN_HOTKEY);
+            } else {
+              onSave(RIGHT_ALT_HOTKEY);
+            }
+            setRecording(false);
+            setPreview(null);
+          }}
+        />
+      )}
+      {showCustomCapture && (
         <div className="hotkey-custom">
           <div className="hotkey-display-row">
             <span className="hotkey-sublabel">Dictation key</span>
@@ -1334,20 +1340,24 @@ function PreferencesPage({ bootstrap, onAction }: { bootstrap: BootstrapState; o
             <span className={`perm-status${micOk ? ' perm-ok' : ' perm-missing'}`}>{micOk ? 'Granted' : 'Not granted'}</span>
             {!micOk && <button className="btn btn-sm btn-primary" onClick={() => void onAction('mic', () => window.openWhisp.requestMicrophoneAccess())}>Allow</button>}
           </div>
-          <div className="perm-row">
-            <span className="perm-name">Accessibility</span>
-            <span className={`perm-status${p.accessibility ? ' perm-ok' : ' perm-missing'}`}>{p.accessibility ? 'Granted' : 'Not granted'}</span>
-          </div>
-          <div className="perm-row">
-            <span className="perm-name">Input Monitoring</span>
-            <span className={`perm-status${p.inputMonitoring ? ' perm-ok' : ' perm-missing'}`}>{p.inputMonitoring ? 'Granted' : 'Not granted'}</span>
-          </div>
-          <div className="perm-row">
-            <span className="perm-name">Paste Events</span>
-            <span className={`perm-status${p.postEvents ? ' perm-ok' : ' perm-missing'}`}>{p.postEvents ? 'Granted' : 'Not granted'}</span>
-          </div>
-          {!sysOk && <button className="btn btn-sm btn-secondary" style={{ marginTop: 8 }} onClick={() => void onAction('system', () => window.openWhisp.requestSystemAccess())}>Grant Permissions</button>}
-          <button className="btn btn-link btn-muted" style={{ marginTop: 8 }} onClick={() => void window.openWhisp.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy')}>Manage in System Settings</button>
+          {!IS_WINDOWS && (
+            <>
+              <div className="perm-row">
+                <span className="perm-name">Accessibility</span>
+                <span className={`perm-status${p.accessibility ? ' perm-ok' : ' perm-missing'}`}>{p.accessibility ? 'Granted' : 'Not granted'}</span>
+              </div>
+              <div className="perm-row">
+                <span className="perm-name">Input Monitoring</span>
+                <span className={`perm-status${p.inputMonitoring ? ' perm-ok' : ' perm-missing'}`}>{p.inputMonitoring ? 'Granted' : 'Not granted'}</span>
+              </div>
+              <div className="perm-row">
+                <span className="perm-name">Paste Events</span>
+                <span className={`perm-status${p.postEvents ? ' perm-ok' : ' perm-missing'}`}>{p.postEvents ? 'Granted' : 'Not granted'}</span>
+              </div>
+              {!sysOk && <button className="btn btn-sm btn-secondary" style={{ marginTop: 8 }} onClick={() => void onAction('system', () => window.openWhisp.requestSystemAccess())}>Grant Permissions</button>}
+              <button className="btn btn-link btn-muted" style={{ marginTop: 8 }} onClick={() => void window.openWhisp.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy')}>Manage in System Settings</button>
+            </>
+          )}
         </div>
       </div>
 

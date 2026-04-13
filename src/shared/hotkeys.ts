@@ -90,4 +90,11 @@ export const FN_HOTKEY: HotkeyConfig = {
   label: 'Fn',
 };
 
+export const RIGHT_ALT_HOTKEY: HotkeyConfig = {
+  keyCode: 61,
+  modifiers: 0,
+  label: 'Right \u2325',
+};
+
 export const DEFAULT_HOTKEY: HotkeyConfig = FN_HOTKEY;
+export const DEFAULT_HOTKEY_WINDOWS: HotkeyConfig = RIGHT_ALT_HOTKEY;

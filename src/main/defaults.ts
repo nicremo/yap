@@ -2,7 +2,7 @@ import { app } from 'electron';
 import path from 'node:path';
 
 import type { AppSettings, EnhancementLevel } from '../shared/types';
-import { DEFAULT_HOTKEY } from '../shared/hotkeys';
+import { DEFAULT_HOTKEY, DEFAULT_HOTKEY_WINDOWS } from '../shared/hotkeys';
 import {
   RECOMMENDED_CLOUD_MODEL,
   RECOMMENDED_TEXT_MODEL,
@@ -39,7 +39,7 @@ export function createDefaultSettings(): AppSettings {
     cloudApiBaseUrl: 'https://api.groq.com/openai',
     cloudLanguage: 'de',
     openaiApiKeyEncrypted: '',
-    hotkey: DEFAULT_HOTKEY,
+    hotkey: process.platform === 'win32' ? DEFAULT_HOTKEY_WINDOWS : DEFAULT_HOTKEY,
     autoPaste: true,
     copyToClipboard: false,
     showOverlay: false,
