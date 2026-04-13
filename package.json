@@ -39,6 +39,8 @@
         "dmg",
         "zip"
       ],
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
       "extendInfo": {
         "NSMicrophoneUsageDescription": "OpenWhisp needs microphone access to transcribe your speech locally."
       }
