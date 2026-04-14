@@ -32,6 +32,7 @@ const projectRoot = path.resolve(fileURLToPath(new URL('../../', import.meta.url
 
 let mainWindow: BrowserWindow | null = null;
 let overlayWindow: BrowserWindow | null = null;
+let overlayRebuildTimer: ReturnType<typeof setTimeout> | null = null;
 let tray: Tray | null = null;
 let settings: AppSettings;
 let status: AppStatus = getInitialStatus();
@@ -44,6 +45,10 @@ function shutdown(): void {
   }
 
   isQuitting = true;
+  if (overlayRebuildTimer) {
+    clearTimeout(overlayRebuildTimer);
+    overlayRebuildTimer = null;
+  }
   disposeAutoUpdater();
   stopFnListener();
 }
@@ -84,6 +89,18 @@ async function ensureOverlayWindow(): Promise<BrowserWindow | null> {
   overlayWindow = await createOverlayWindow();
   attachWindowDiagnostics(overlayWindow, 'overlay', () => {
     overlayWindow = null;
+    // Proactively rebuild the overlay after a short delay so it's ready
+    // before the next dictation cycle — otherwise the user sees nothing
+    // until they trigger a new status. Debounced so a repeatedly-crashing
+    // renderer can't spin in a tight loop.
+    if (!settings?.showOverlay || isQuitting || overlayRebuildTimer) {
+      return;
+    }
+    overlayRebuildTimer = setTimeout(() => {
+      overlayRebuildTimer = null;
+      console.log('[openwhisp] overlay rebuilding after render-process-gone');
+      void showOverlay();
+    }, 2_000);
   });
   return overlayWindow;
 }
