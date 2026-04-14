@@ -1,6 +1,16 @@
 import { app, BrowserWindow, Menu, Tray, nativeImage } from 'electron';
+import log from 'electron-log/main';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+// Persist logs to `{userData}/logs/main.log` (Windows: %APPDATA%\OpenWhisp\logs\main.log).
+// Enable IPC bridge so renderer-side electron-log imports share the same sink,
+// and route every existing `console.*` call through the file transport.
+log.initialize();
+log.transports.file.level = 'info';
+log.transports.file.maxSize = 5 * 1024 * 1024;
+log.transports.console.level = 'info';
+Object.assign(console, log.functions);
 
 import { getInitialStatus } from './dictation';
 import { registerIpcHandlers } from './ipc';
@@ -226,6 +236,14 @@ async function restartHotkeyListener(): Promise<void> {
 }
 
 async function bootstrap(): Promise<void> {
+  console.log('[openwhisp] boot', {
+    version: app.getVersion(),
+    platform: process.platform,
+    arch: process.arch,
+    electron: process.versions.electron,
+    logPath: log.transports.file.getFile().path,
+  });
+
   settings = await loadSettings();
   await ensureStorage(settings);
   applyLaunchAtLogin(settings.launchAtLogin);

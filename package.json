@@ -67,6 +67,7 @@
     "@hugeicons/core-free-icons": "^4.1.1",
     "@hugeicons/react": "^1.1.6",
     "@huggingface/transformers": "^4.0.1",
+    "electron-log": "^5.4.3",
     "react": "^19.2.5",
     "react-dom": "^19.2.5"
   },
