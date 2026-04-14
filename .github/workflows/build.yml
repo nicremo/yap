@@ -47,6 +47,8 @@ jobs:
           path: |
             release/*.dmg
             release/*.zip
+            release/latest-mac.yml
+            release/*.blockmap
           if-no-files-found: error
           retention-days: 30
 
@@ -88,6 +90,8 @@ jobs:
           path: |
             release/*.exe
             release/*.zip
+            release/latest.yml
+            release/*.blockmap
           if-no-files-found: error
           retention-days: 30
 
@@ -105,7 +109,7 @@ jobs:
       - name: Flatten artifacts
         run: |
           mkdir -p release
-          find artifacts -type f \( -name '*.dmg' -o -name '*.exe' -o -name '*.zip' \) -exec mv {} release/ \;
+          find artifacts -type f \( -name '*.dmg' -o -name '*.exe' -o -name '*.zip' -o -name '*.yml' -o -name '*.blockmap' \) -exec mv {} release/ \;
           ls -la release/
 
       - name: Create GitHub Release
@@ -118,5 +122,8 @@ jobs:
             release/*.dmg
             release/*.exe
             release/*.zip
+            release/latest.yml
+            release/latest-mac.yml
+            release/*.blockmap
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
