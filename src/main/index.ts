@@ -1,5 +1,5 @@
 import { app, BrowserWindow, Menu, Tray, nativeImage } from 'electron';
-import log from 'electron-log/main';
+import log from 'electron-log/main.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 

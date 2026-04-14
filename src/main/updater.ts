@@ -1,5 +1,5 @@
 import { app, Notification } from 'electron';
-import log from 'electron-log/main';
+import log from 'electron-log/main.js';
 import { autoUpdater, type ProgressInfo, type UpdateInfo } from 'electron-updater';
 
 const FIRST_CHECK_DELAY_MS = 3_000;
