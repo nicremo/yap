@@ -19,6 +19,7 @@ interface ProcessDictationOptions {
   appRules: AppRule[];
   targetFocus?: FocusInfo;
   setStatus: (status: AppStatus) => void;
+  getStatus: () => AppStatus;
 }
 
 interface TranscriptionResult {
@@ -136,6 +137,7 @@ export async function processDictationAudio({
   appRules,
   targetFocus,
   setStatus,
+  getStatus,
 }: ProcessDictationOptions): Promise<ProcessAudioResult> {
   const whisperPrompt = buildWhisperPrompt(dictionary, corrections);
   const dictionaryContext = buildDictionaryContext(dictionary, corrections);
@@ -269,16 +271,21 @@ export async function processDictationAudio({
       ? 'The refined text was pasted into the active app.'
       : 'The refined text was saved to history.';
 
-  setStatus({
+  const doneStatus: AppStatus = {
     phase: 'done',
     title: doneTitle,
     detail: doneDetail,
     preview: finalText,
     rawText,
-  });
+  };
+  setStatus(doneStatus);
 
   setTimeout(() => {
-    setStatus(createIdleStatus());
+    // Only reset to idle if nothing else has overwritten the status meanwhile
+    // (e.g. a new dictation cycle started by the user pressing the hotkey again).
+    if (getStatus() === doneStatus) {
+      setStatus(createIdleStatus());
+    }
   }, 1_500);
 
   return {

@@ -232,6 +232,7 @@ export function registerIpcHandlers(dependencies: IpcDependencies): void {
       appRules: await loadAppRules(),
       targetFocus: request.targetFocus,
       setStatus: dependencies.setStatus,
+      getStatus: dependencies.getStatus,
     });
 
     const history = await addHistoryEntry({
