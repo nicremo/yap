@@ -288,10 +288,29 @@ export async function rewriteWithOllama(
 }
 
 function stripThinkingTags(text: string): string {
-  return text
+  let result = text;
+
+  // Qwen/DeepSeek thinking tags
+  result = result
     .replace(/<think>[\s\S]*?<\/think>/g, '')
-    .replace(/<think>[\s\S]*$/g, '')
-    .trim();
+    .replace(/<think>[\s\S]*$/g, '');
+
+  // OpenAI Harmony format (GPT-OSS): everything after the "final" channel is the answer
+  const finalChannelMatch = result.match(/<\|?channel\|?>\s*final[\s\S]*?<\|?message\|?>([\s\S]*?)(?:<\|?end\|?>|<\|?return\|?>|$)/i);
+  if (finalChannelMatch?.[1]) {
+    result = finalChannelMatch[1];
+  } else {
+    // Fallback: any leftover <channel|> marker, take everything after the last one
+    const lastChannelIdx = result.lastIndexOf('<channel|>');
+    if (lastChannelIdx >= 0) {
+      result = result.slice(lastChannelIdx + '<channel|>'.length);
+    }
+  }
+
+  // Strip any remaining harmony-style control tokens
+  result = result.replace(/<\|[^|>]*\|>/g, '');
+
+  return result.trim();
 }
 
 function cleanRewriteOutput(content: string | undefined, rawText: string): string {
