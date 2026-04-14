@@ -33,7 +33,7 @@ jobs:
         run: npm run build
 
       - name: Build native helper (Swift)
-        run: npm run build:native:mac
+        run: npm run build:native
 
       - name: Package (unsigned)
         run: npx electron-builder --mac --config.mac.identity=null --config.mac.notarize=false
