@@ -281,9 +281,11 @@ export async function processDictationAudio({
   setStatus(doneStatus);
 
   setTimeout(() => {
-    // Only reset to idle if nothing else has overwritten the status meanwhile
-    // (e.g. a new dictation cycle started by the user pressing the hotkey again).
-    if (getStatus() === doneStatus) {
+    // Renderer may emit its own `done` status via `pushStatus` after
+    // `processAudio` resolves, producing a different object reference.
+    // Compare by phase so the idle reset still fires; bail out only if a
+    // new dictation cycle moved the state to a non-done phase.
+    if (getStatus().phase === 'done') {
       setStatus(createIdleStatus());
     }
   }, 1_500);

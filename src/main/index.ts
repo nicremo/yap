@@ -44,19 +44,45 @@ function broadcast(channel: string, payload: unknown): void {
   }
 }
 
+function isBrowserWindowAlive(window: BrowserWindow): boolean {
+  return (
+    !window.isDestroyed() &&
+    !window.webContents.isDestroyed() &&
+    !window.webContents.isCrashed()
+  );
+}
+
 async function ensureOverlayWindow(): Promise<BrowserWindow | null> {
-  if (overlayWindow && !overlayWindow.isDestroyed()) {
-    return overlayWindow;
+  const existing = overlayWindow;
+  if (existing && isBrowserWindowAlive(existing)) {
+    return existing;
   }
 
+  // Previous instance is gone or its renderer crashed: drop the stale
+  // reference so a fresh window is created instead of reusing a dead one.
+  if (existing && !existing.isDestroyed()) {
+    try {
+      existing.destroy();
+    } catch (error) {
+      console.warn('[openwhisp] Failed to destroy stale overlay window:', error);
+    }
+  }
+  overlayWindow = null;
+
   overlayWindow = await createOverlayWindow();
-  attachWindowDiagnostics(overlayWindow, 'overlay');
+  attachWindowDiagnostics(overlayWindow, 'overlay', () => {
+    overlayWindow = null;
+  });
   return overlayWindow;
 }
 
 async function showOverlay(): Promise<void> {
+  if (!settings?.showOverlay) {
+    return;
+  }
+
   const window = await ensureOverlayWindow();
-  if (!window || window.isDestroyed()) {
+  if (!window || !isBrowserWindowAlive(window)) {
     return;
   }
 
@@ -74,7 +100,7 @@ function setStatus(nextStatus: AppStatus): void {
   status = nextStatus;
   broadcast('app:status', nextStatus);
 
-  if (nextStatus.phase === 'error') {
+  if (nextStatus.phase === 'error' || !settings?.showOverlay) {
     hideOverlay();
   } else {
     void showOverlay();
@@ -102,7 +128,11 @@ function hideMainWindow(): void {
   mainWindow.hide();
 }
 
-function attachWindowDiagnostics(window: BrowserWindow, label: string): void {
+function attachWindowDiagnostics(
+  window: BrowserWindow,
+  label: string,
+  onGone?: () => void,
+): void {
   window.webContents.on('did-finish-load', () => {
     console.log(`[openwhisp] ${label} did-finish-load`);
   });
@@ -119,6 +149,12 @@ function attachWindowDiagnostics(window: BrowserWindow, label: string): void {
 
   window.webContents.on('render-process-gone', (_event, details) => {
     console.error(`[openwhisp] ${label} render-process-gone`, JSON.stringify(details));
+    // Clear the stale reference so the next showOverlay() rebuilds the window.
+    onGone?.();
+  });
+
+  window.on('closed', () => {
+    onGone?.();
   });
 
   window.on('unresponsive', () => {
@@ -197,7 +233,14 @@ async function bootstrap(): Promise<void> {
   registerIpcHandlers({
     getSettings: () => settings,
     setSettings: (nextSettings) => {
+      const overlayWasEnabled = settings?.showOverlay ?? true;
       settings = nextSettings;
+
+      if (!nextSettings.showOverlay) {
+        hideOverlay();
+      } else if (!overlayWasEnabled) {
+        void showOverlay();
+      }
     },
     getStatus: () => status,
     setStatus,
