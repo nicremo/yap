@@ -1,6 +1,13 @@
 import { app, Notification } from 'electron';
 import log from 'electron-log/main.js';
-import { autoUpdater, type ProgressInfo, type UpdateInfo } from 'electron-updater';
+// electron-updater is published as a CommonJS module with no "exports"
+// field, so Node's strict ESM loader rejects named imports at runtime
+// (TypeScript + esModuleInterop quietly accept them, which is why this
+// only surfaced in the packaged build). Import the default and destructure.
+import electronUpdater from 'electron-updater';
+import type { ProgressInfo, UpdateInfo } from 'electron-updater';
+
+const { autoUpdater } = electronUpdater;
 
 const FIRST_CHECK_DELAY_MS = 3_000;
 const PERIODIC_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
