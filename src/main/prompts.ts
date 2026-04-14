@@ -64,6 +64,19 @@ const LEVEL_INSTRUCTIONS: Record<EnhancementLevel, string> = {
 };
 
 /* ────────────────────────────────────────────────
+   Optional list-formatting rule, added at soft+ levels
+   so an enumerated list gets rendered as Markdown.
+   ──────────────────────────────────────────────── */
+
+const LIST_FORMATTING_RULE = [
+  'LIST FORMATTING: If the speaker clearly enumerates multiple items, render them as a Markdown list.',
+  'Enumeration cues include (non-exhaustive): "first… second… third…", "firstly/secondly/thirdly", "one… two… three…", "point A, point B", "also/next/finally/additionally", German "erstens/zweitens/drittens", "zum einen/zum anderen", "punkt eins/punkt zwei", "außerdem/darüber hinaus".',
+  'Use "- " for unordered items; use "1. ", "2. ", "3. " only when the order matters or the speaker explicitly numbers them.',
+  'Put each item on its own line. Keep the speaker\'s wording within each item; do not invent or reorder items.',
+  'Do NOT trigger on mere counting ("the numbers are one two three"), on simple conjunctions ("apples and oranges"), or on quantities ("for three days"). Only enumerations of list-like items.',
+].join(' ');
+
+/* ────────────────────────────────────────────────
    Build the final prompt: BASE + STYLE + LEVEL
    ──────────────────────────────────────────────── */
 
@@ -89,6 +102,13 @@ export function getEnhancementPrompt(
     '',
     LEVEL_INSTRUCTIONS[level],
   ];
+
+  // List formatting is a meaningful rewrite and would contradict the
+  // "keep exact wording" constraint at the `none` level, so only apply
+  // it from `soft` upward.
+  if (level !== 'none') {
+    parts.push('', LIST_FORMATTING_RULE);
+  }
 
   if (language && LANGUAGE_REINFORCEMENTS[language]) {
     parts.push('', LANGUAGE_REINFORCEMENTS[language]);
