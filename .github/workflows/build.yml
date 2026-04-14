@@ -10,60 +10,6 @@ permissions:
   contents: write
 
 jobs:
-  build-mac:
-    name: Build macOS
-    runs-on: macos-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Type check
-        run: npx tsc --noEmit
-
-      - name: Build app
-        run: npm run build
-
-      - name: Build native helper (Swift)
-        run: npm run build:native
-
-      - name: Package (signed if secrets available, otherwise unsigned)
-        run: |
-          if [ -n "$CSC_LINK" ] && [ -n "$APPLE_ID" ]; then
-            echo "Building signed + notarized macOS build"
-            npx electron-builder --mac --publish never
-          else
-            echo "Building unsigned macOS (set CSC_LINK, CSC_KEY_PASSWORD, APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID secrets to enable signing)"
-            npx electron-builder --mac --publish never --config.mac.identity=null --config.mac.notarize=false
-          fi
-        env:
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-build
-          path: |
-            release/*.dmg
-            release/*.zip
-            release/latest-mac.yml
-            release/*.blockmap
-          if-no-files-found: error
-          retention-days: 30
-
   build-windows:
     name: Build Windows
     runs-on: windows-latest
@@ -109,7 +55,7 @@ jobs:
 
   release:
     name: Create Release
-    needs: [build-mac, build-windows]
+    needs: [build-windows]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
@@ -121,7 +67,7 @@ jobs:
       - name: Flatten artifacts
         run: |
           mkdir -p release
-          find artifacts -type f \( -name '*.dmg' -o -name '*.exe' -o -name '*.zip' -o -name '*.yml' -o -name '*.blockmap' \) -exec mv {} release/ \;
+          find artifacts -type f \( -name '*.exe' -o -name '*.zip' -o -name '*.yml' -o -name '*.blockmap' \) -exec mv {} release/ \;
           ls -la release/
 
       - name: Create GitHub Release
@@ -130,12 +76,16 @@ jobs:
           draft: ${{ github.event_name == 'workflow_dispatch' }}
           generate_release_notes: true
           tag_name: ${{ github.ref_name }}
+          body: |
+            ## Downloads
+
+            **Windows:** install the NSIS installer below; updates land automatically on future releases.
+
+            **macOS:** a signed build is uploaded manually after each release. If you do not see a `.dmg` asset yet, check back shortly or open the issue tracker.
           files: |
-            release/*.dmg
             release/*.exe
             release/*.zip
             release/latest.yml
-            release/latest-mac.yml
             release/*.blockmap
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
