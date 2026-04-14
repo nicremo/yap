@@ -61,6 +61,11 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "nicremo",
+      "repo": "openwhisp-enhanced"
     }
   },
   "dependencies": {
@@ -68,6 +73,7 @@
     "@hugeicons/react": "^1.1.6",
     "@huggingface/transformers": "^4.0.1",
     "electron-log": "^5.4.3",
+    "electron-updater": "^6.8.3",
     "react": "^19.2.5",
     "react-dom": "^19.2.5"
   },

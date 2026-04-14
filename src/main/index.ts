@@ -24,6 +24,7 @@ import {
 import { getPermissionState } from './permissions';
 import { loadSettings } from './settings';
 import { ensureStorage } from './storage';
+import { disposeAutoUpdater, initializeAutoUpdater } from './updater';
 import { createMainWindow, createOverlayWindow, positionOverlayWindow } from './windows';
 import type { AppSettings, AppStatus } from '../shared/types';
 
@@ -43,6 +44,7 @@ function shutdown(): void {
   }
 
   isQuitting = true;
+  disposeAutoUpdater();
   stopFnListener();
 }
 
@@ -278,6 +280,8 @@ async function bootstrap(): Promise<void> {
   helperReady = await ensureNativeHelper();
 
   await ensureHotkeyListener();
+
+  initializeAutoUpdater();
 }
 
 function getTrayIconPath(): string {
