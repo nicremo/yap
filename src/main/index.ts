@@ -26,6 +26,8 @@ import { loadSettings } from './settings';
 import { ensureStorage } from './storage';
 import { disposeAutoUpdater, initializeAutoUpdater } from './updater';
 import { createMainWindow, createOverlayWindow, positionOverlayWindow } from './windows';
+import { loadHistory, clearAudioReferences } from './history';
+import { sweepAudioStore } from './audio-store';
 import type { AppSettings, AppStatus } from '../shared/types';
 
 const projectRoot = path.resolve(fileURLToPath(new URL('../../', import.meta.url)));
@@ -39,6 +41,26 @@ let status: AppStatus = getInitialStatus();
 let helperReady = false;
 let isQuitting = false;
 
+const AUDIO_CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1000;
+let audioCleanupTimer: ReturnType<typeof setInterval> | null = null;
+
+async function runAudioCleanup(): Promise<void> {
+  if (!settings) return;
+  try {
+    const entries = await loadHistory();
+    const sweep = await sweepAudioStore(settings, entries);
+    if (sweep.expiredEntryIds.length > 0) {
+      const updated = await clearAudioReferences(sweep.expiredEntryIds);
+      broadcast('history:updated', updated);
+    }
+    if (sweep.expiredEntryIds.length > 0 || sweep.orphanFiles.length > 0) {
+      console.log('[openwhisp] audio cleanup', sweep);
+    }
+  } catch (error) {
+    console.warn('[openwhisp] audio cleanup failed:', error instanceof Error ? error.message : error);
+  }
+}
+
 function shutdown(): void {
   if (isQuitting) {
     return;
@@ -48,6 +70,10 @@ function shutdown(): void {
   if (overlayRebuildTimer) {
     clearTimeout(overlayRebuildTimer);
     overlayRebuildTimer = null;
+  }
+  if (audioCleanupTimer) {
+    clearInterval(audioCleanupTimer);
+    audioCleanupTimer = null;
   }
   disposeAutoUpdater();
   stopFnListener();
@@ -265,6 +291,8 @@ async function bootstrap(): Promise<void> {
 
   settings = await loadSettings();
   await ensureStorage(settings);
+  void runAudioCleanup();
+  audioCleanupTimer = setInterval(() => { void runAudioCleanup(); }, AUDIO_CLEANUP_INTERVAL_MS);
   applyLaunchAtLogin(settings.launchAtLogin);
 
   registerIpcHandlers({
