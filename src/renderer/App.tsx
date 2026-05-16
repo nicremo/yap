@@ -1192,7 +1192,9 @@ function HistoryPage({ bootstrap, onRefresh }: { bootstrap: BootstrapState; onRe
                     {entry.appName && <span className="history-meta-tag">{entry.appName}</span>}
                     {entry.transcriptionSource && <span className="history-meta-tag">{entry.transcriptionSource}</span>}
                     <span className={`history-meta-tag history-meta-tag-${statusInfo.tone}`}>{statusInfo.label}</span>
-                    <span className={`history-meta-tag history-meta-tag-${audioAvailable ? 'ok' : 'muted'}`}>{audioLabel}</span>
+                    {(audioAvailable || entry.status !== 'success') && (
+                      <span className={`history-meta-tag history-meta-tag-${audioAvailable ? 'ok' : 'muted'}`}>{audioLabel}</span>
+                    )}
                   </div>
                 </div>
                 <svg className={`history-chevron${isExpanded ? ' history-chevron-open' : ''}`} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

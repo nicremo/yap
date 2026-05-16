@@ -38,7 +38,7 @@ declare global {
       clearHistory: () => Promise<HistoryEntry[]>;
       retranscribe: (id: string, mode: RetranscribeMode) => Promise<HistoryEntry[]>;
       revealAudio: (id: string) => Promise<void>;
-      cleanupAudio: () => Promise<void>;
+      cleanupAudio: () => Promise<HistoryEntry[]>;
       captureFocusTarget: () => Promise<FocusInfo>;
       processAudio: (request: DictationRequest) => Promise<{
         rawText: string;

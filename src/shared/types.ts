@@ -123,11 +123,6 @@ export interface HistoryEntry {
   errorMessage?: string;
 }
 
-export interface RetranscribeResult {
-  entry: HistoryEntry;
-  history: HistoryEntry[];
-}
-
 export interface ProcessAudioResult {
   rawText: string;
   finalText: string;
