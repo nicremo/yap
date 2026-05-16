@@ -1,10 +1,12 @@
 import { ipcMain, shell } from 'electron';
+import { randomUUID } from 'node:crypto';
 
 import type {
   AppSettings,
   AppStatus,
   BootstrapState,
   DictationRequest,
+  RetranscribeMode,
   UpdateSettingsInput,
 } from '../shared/types';
 import { RECOMMENDED_TEXT_MODEL } from '../shared/recommendations';
@@ -13,7 +15,21 @@ import { testCloudConnection } from './cloud-transcription';
 import { loadAppRules, addAppRule, removeAppRule, updateAppRule } from './app-rules';
 import { loadDictionary, addDictionaryEntry, removeDictionaryEntry, loadCorrections, addCorrection, removeCorrection } from './dictionary';
 import { processDictationAudio } from './dictation';
-import { loadHistory, addHistoryEntry, removeHistoryEntry, clearHistory } from './history';
+import {
+  addHistoryEntry,
+  clearAudioReferences,
+  clearHistory,
+  loadHistory,
+  removeHistoryEntry,
+  updateHistoryEntry,
+} from './history';
+import {
+  deleteAudioRecording,
+  resolveAudioPath,
+  sweepAudioStore,
+  writeAudioRecording,
+} from './audio-store';
+import { retranscribeEntry } from './retranscribe';
 import { applyLaunchAtLogin } from './login-item';
 import { pullOllamaModel, listOllamaModels, isOllamaReachable, ensureOllamaRunning } from './ollama';
 import { getFocusInfo } from './native-helper';
@@ -224,42 +240,129 @@ export function registerIpcHandlers(dependencies: IpcDependencies): void {
   ipcMain.handle('dictation:captureTarget', async () => getFocusInfo());
 
   ipcMain.handle('dictation:processAudio', async (_event, request: DictationRequest) => {
-    const result = await processDictationAudio({
-      wavBase64: request.wavBase64,
-      settings: dependencies.getSettings(),
-      dictionary: await loadDictionary(),
-      corrections: await loadCorrections(),
-      appRules: await loadAppRules(),
-      targetFocus: request.targetFocus,
-      setStatus: dependencies.setStatus,
-      getStatus: dependencies.getStatus,
-    });
+    const settings = dependencies.getSettings();
+    const entryId = randomUUID();
+    let audioFilename: string | null = null;
 
-    const history = await addHistoryEntry({
-      rawText: result.rawText,
-      finalText: result.finalText,
-      transcriptionSource: result.transcriptionSource,
-      styleMode: result.styleMode,
-      enhancementLevel: result.enhancementLevel,
-      appName: result.focusInfo?.appName,
-    }).catch((error) => {
-      console.warn('[openwhisp] Failed to save history entry:', error instanceof Error ? error.message : error);
-      return null;
-    });
-
-    if (history) {
-      dependencies.broadcast('history:updated', history);
+    try {
+      const stored = await writeAudioRecording(settings, entryId, request.wavBase64);
+      audioFilename = stored.filename;
+    } catch (error) {
+      console.warn('[openwhisp] Failed to persist audio file:', error instanceof Error ? error.message : error);
     }
 
-    return result;
+    const { entry: pendingEntry, entries: pendingHistory } = await addHistoryEntry({
+      id: entryId,
+      rawText: '',
+      finalText: '',
+      transcriptionSource: null,
+      styleMode: settings.styleMode,
+      enhancementLevel: settings.enhancementLevel,
+      appName: request.targetFocus?.appName,
+      audioFilename,
+      status: 'audio-only',
+    });
+    dependencies.broadcast('history:updated', pendingHistory);
+
+    try {
+      const result = await processDictationAudio({
+        wavBase64: request.wavBase64,
+        settings,
+        dictionary: await loadDictionary(),
+        corrections: await loadCorrections(),
+        appRules: await loadAppRules(),
+        targetFocus: request.targetFocus,
+        setStatus: dependencies.setStatus,
+        getStatus: dependencies.getStatus,
+      });
+
+      const { entries: updated } = await updateHistoryEntry(pendingEntry.id, {
+        rawText: result.rawText,
+        finalText: result.finalText,
+        transcriptionSource: result.transcriptionSource,
+        styleMode: result.styleMode,
+        enhancementLevel: result.enhancementLevel,
+        appName: result.focusInfo?.appName ?? pendingEntry.appName,
+        status: 'success',
+        errorMessage: undefined,
+      });
+      dependencies.broadcast('history:updated', updated);
+
+      return result;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Dictation failed.';
+      const { entries: failedHistory } = await updateHistoryEntry(pendingEntry.id, {
+        status: 'transcription-failed',
+        errorMessage: message,
+      });
+      dependencies.broadcast('history:updated', failedHistory);
+      throw error;
+    }
   });
 
   ipcMain.handle('history:remove', async (_event, id: unknown) => {
     if (typeof id !== 'string') throw new Error('Expected string for history entry id.');
+    const entries = await loadHistory();
+    const target = entries.find((entry) => entry.id === id);
+    if (target?.audioFilename) {
+      await deleteAudioRecording(dependencies.getSettings(), target.audioFilename);
+    }
     return removeHistoryEntry(id);
   });
 
-  ipcMain.handle('history:clear', async () => clearHistory());
+  ipcMain.handle('history:clear', async () => {
+    const entries = await loadHistory();
+    for (const entry of entries) {
+      if (entry.audioFilename) {
+        await deleteAudioRecording(dependencies.getSettings(), entry.audioFilename);
+      }
+    }
+    return clearHistory();
+  });
+
+  ipcMain.handle('history:cleanup', async () => {
+    const entries = await loadHistory();
+    const sweep = await sweepAudioStore(dependencies.getSettings(), entries);
+    if (sweep.expiredEntryIds.length > 0) {
+      const updated = await clearAudioReferences(sweep.expiredEntryIds);
+      dependencies.broadcast('history:updated', updated);
+      return updated;
+    }
+    return entries;
+  });
+
+  ipcMain.handle('history:revealAudio', async (_event, id: unknown) => {
+    if (typeof id !== 'string') throw new Error('Expected string for history entry id.');
+    const entries = await loadHistory();
+    const target = entries.find((entry) => entry.id === id);
+    if (!target?.audioFilename) {
+      throw new Error('No audio file is associated with this entry.');
+    }
+    const absolutePath = resolveAudioPath(dependencies.getSettings(), target.audioFilename);
+    await shell.showItemInFolder(absolutePath);
+  });
+
+  ipcMain.handle('dictation:retranscribe', async (_event, id: unknown, mode: unknown) => {
+    if (typeof id !== 'string') throw new Error('Expected string for history entry id.');
+    if (mode !== 'transcribe-only' && mode !== 'transcribe-and-stylize') {
+      throw new Error('Invalid retranscription mode.');
+    }
+    const entries = await loadHistory();
+    const target = entries.find((entry) => entry.id === id);
+    if (!target) throw new Error('History entry not found.');
+
+    const updated = await retranscribeEntry({
+      entry: target,
+      mode: mode as RetranscribeMode,
+      settings: dependencies.getSettings(),
+      dictionary: await loadDictionary(),
+      corrections: await loadCorrections(),
+      appRules: await loadAppRules(),
+      setStatus: dependencies.setStatus,
+    });
+    dependencies.broadcast('history:updated', updated);
+    return updated;
+  });
 
   ipcMain.on('dictation:status', (_event, status: AppStatus) => {
     dependencies.setStatus(status);
