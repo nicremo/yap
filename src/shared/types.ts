@@ -105,15 +105,27 @@ export interface BootstrapState {
   status: AppStatus;
 }
 
+export type DictationStatus = 'success' | 'transcription-failed' | 'audio-only';
+export type RetranscribeMode = 'transcribe-only' | 'transcribe-and-stylize';
+
 export interface HistoryEntry {
   id: string;
   rawText: string;
   finalText: string;
-  transcriptionSource: 'cloud' | 'local';
+  transcriptionSource: 'cloud' | 'local' | null;
   styleMode: StyleMode;
   enhancementLevel: EnhancementLevel;
   appName?: string;
   createdAt: string;
+  audioFilename: string | null;
+  audioExpiresAt: string | null;
+  status: DictationStatus;
+  errorMessage?: string;
+}
+
+export interface RetranscribeResult {
+  entry: HistoryEntry;
+  history: HistoryEntry[];
 }
 
 export interface ProcessAudioResult {
