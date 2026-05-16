@@ -1,6 +1,6 @@
 import { clipboard } from 'electron';
 
-import type { AppRule, AppSettings, AppStatus, CorrectionEntry, DictionaryEntry, FocusInfo, ProcessAudioResult } from '../shared/types';
+import type { AppRule, AppSettings, AppStatus, CorrectionEntry, DictionaryEntry, EnhancementLevel, FocusInfo, ProcessAudioResult, StyleMode } from '../shared/types';
 import { getApiKey, isApiKeySet } from './api-key';
 import { resolveStyleForApp } from './app-rules';
 import { CloudTranscriptionError, transcribeWithCloud } from './cloud-transcription';
@@ -22,7 +22,7 @@ interface ProcessDictationOptions {
   getStatus: () => AppStatus;
 }
 
-interface TranscriptionResult {
+export interface TranscriptionResult {
   text: string;
   source: 'cloud' | 'local';
 }
@@ -303,4 +303,96 @@ export async function processDictationAudio({
 
 export function getInitialStatus(): AppStatus {
   return createIdleStatus();
+}
+
+export interface TranscribeAudioOptions {
+  wavBase64: string;
+  settings: AppSettings;
+  dictionary: DictionaryEntry[];
+  corrections: CorrectionEntry[];
+  setStatus?: (status: AppStatus) => void;
+}
+
+export async function runTranscription(options: TranscribeAudioOptions): Promise<TranscriptionResult> {
+  const whisperPrompt = buildWhisperPrompt(options.dictionary, options.corrections);
+  const noop = () => {};
+  return transcribe(options.wavBase64, options.settings, options.setStatus ?? noop, whisperPrompt);
+}
+
+export interface RewriteAudioOptions {
+  rawText: string;
+  settings: AppSettings;
+  styleMode: StyleMode;
+  enhancementLevel: EnhancementLevel;
+  dictionary: DictionaryEntry[];
+  corrections: CorrectionEntry[];
+  setStatus?: (status: AppStatus) => void;
+}
+
+export async function runRewrite(options: RewriteAudioOptions): Promise<{ finalText: string; usedFallback: boolean }> {
+  const noop = () => {};
+  const setStatus = options.setStatus ?? noop;
+  const dictionaryContext = buildDictionaryContext(options.dictionary, options.corrections);
+  const enhancementPrompt = getEnhancementPrompt(
+    options.styleMode,
+    options.enhancementLevel,
+    dictionaryContext,
+    options.settings.cloudLanguage,
+  );
+
+  let finalText = options.rawText;
+  let usedFallback = false;
+
+  if (options.settings.rewriteMode === 'cloud' && isApiKeySet(options.settings)) {
+    setStatus({
+      phase: 'rewriting',
+      title: 'Polishing',
+      detail: `${options.settings.cloudRewriteModel} is polishing your text via cloud.`,
+      preview: options.rawText,
+      rawText: options.rawText,
+    });
+
+    const apiKey = getApiKey(options.settings);
+    if (apiKey) {
+      try {
+        finalText = await rewriteWithCloud(
+          options.settings.cloudApiBaseUrl,
+          apiKey,
+          options.settings.cloudRewriteModel,
+          enhancementPrompt,
+          options.rawText,
+        );
+        return { finalText, usedFallback: false };
+      } catch (cloudError) {
+        console.warn('[openwhisp] Cloud rewrite failed, falling back to Ollama:', cloudError instanceof Error ? cloudError.message : cloudError);
+      }
+    }
+  }
+
+  try {
+    setStatus({
+      phase: 'rewriting',
+      title: 'Polishing',
+      detail: `${options.settings.textModel} is applying the selected rewrite level.`,
+      preview: options.rawText,
+      rawText: options.rawText,
+    });
+    finalText = await rewriteWithOllama(
+      options.settings.ollamaBaseUrl,
+      options.settings.textModel,
+      enhancementPrompt,
+      options.rawText,
+    );
+  } catch (error) {
+    usedFallback = true;
+    setStatus({
+      phase: 'error',
+      title: 'Rewrite unavailable',
+      detail: error instanceof Error ? error.message : 'Could not rewrite.',
+      preview: options.rawText,
+      rawText: options.rawText,
+    });
+  }
+
+  return { finalText, usedFallback };
 }
