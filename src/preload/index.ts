@@ -10,6 +10,7 @@ import type {
   FocusInfo,
   HistoryEntry,
   HotkeyEvent,
+  RetranscribeMode,
   UpdateSettingsInput,
 } from '../shared/types';
 
@@ -49,6 +50,12 @@ const api = {
     ipcRenderer.invoke('history:remove', id) as Promise<HistoryEntry[]>,
   clearHistory: () =>
     ipcRenderer.invoke('history:clear') as Promise<HistoryEntry[]>,
+  retranscribe: (id: string, mode: RetranscribeMode) =>
+    ipcRenderer.invoke('dictation:retranscribe', id, mode) as Promise<HistoryEntry[]>,
+  revealAudio: (id: string) =>
+    ipcRenderer.invoke('history:revealAudio', id) as Promise<void>,
+  cleanupAudio: () =>
+    ipcRenderer.invoke('history:cleanup') as Promise<HistoryEntry[]>,
   captureFocusTarget: () =>
     ipcRenderer.invoke('dictation:captureTarget') as Promise<FocusInfo>,
   processAudio: (request: DictationRequest) =>
