@@ -70,8 +70,10 @@ export async function retranscribeEntry(options: RetranscribeOptions): Promise<H
       return entries;
     }
 
+    // History entries do not store bundleIdentifier, so app-rule lookup is skipped:
+    // retranscription falls back to the user's current default style + enhancement.
     const resolved = resolveStyleForApp(
-      entry.appName ? { canPaste: false, appName: entry.appName } : undefined,
+      undefined,
       appRules,
       settings.styleMode,
       settings.enhancementLevel,
