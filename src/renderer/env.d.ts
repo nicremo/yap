@@ -10,6 +10,7 @@ import type {
   FocusInfo,
   HistoryEntry,
   HotkeyEvent,
+  RetranscribeMode,
   UpdateSettingsInput,
 } from '../shared/types';
 
@@ -35,6 +36,9 @@ declare global {
       updateAppRule: (appIdentifier: string, styleMode: string, enhancementLevel: string) => Promise<AppRule[]>;
       removeHistoryEntry: (id: string) => Promise<HistoryEntry[]>;
       clearHistory: () => Promise<HistoryEntry[]>;
+      retranscribe: (id: string, mode: RetranscribeMode) => Promise<HistoryEntry[]>;
+      revealAudio: (id: string) => Promise<void>;
+      cleanupAudio: () => Promise<void>;
       captureFocusTarget: () => Promise<FocusInfo>;
       processAudio: (request: DictationRequest) => Promise<{
         rawText: string;

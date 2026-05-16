@@ -1055,6 +1055,16 @@ button { cursor: pointer; }
   text-transform: capitalize;
 }
 
+.history-meta-tag-ok { background: rgba(70, 168, 100, 0.18); color: #2f8b50; }
+.history-meta-tag-warn { background: rgba(204, 84, 84, 0.18); color: #b3433f; }
+.history-meta-tag-pending { background: rgba(214, 158, 46, 0.18); color: #a36a13; }
+.history-meta-tag-muted { background: rgba(120, 120, 130, 0.18); color: #6c6c75; }
+
+.history-entry-flagged { border-color: rgba(204, 84, 84, 0.35); }
+
+.history-error-banner { border-color: rgba(204, 84, 84, 0.5); }
+.history-error-banner p { margin: 0; color: #b3433f; }
+
 .history-chevron {
   flex-shrink: 0;
   color: var(--text-3);

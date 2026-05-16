@@ -4,7 +4,7 @@ import { Home01Icon, PaintBrush01Icon, CubeIcon, Settings01Icon, BookOpen01Icon,
 
 import { AudioRecorder } from './audio-recorder';
 import logoUrl from './logo.png';
-import type { AppRule, AppStatus, BootstrapState, CorrectionEntry, DictionaryEntry, EnhancementLevel, FocusInfo, StyleMode } from '../shared/types';
+import type { AppRule, AppStatus, BootstrapState, CorrectionEntry, DictationStatus, DictionaryEntry, EnhancementLevel, FocusInfo, HistoryEntry, RetranscribeMode, StyleMode } from '../shared/types';
 import { CLOUD_MODELS, RECOMMENDED_TEXT_MODEL, RECOMMENDED_WHISPER_LABEL } from '../shared/recommendations';
 import { buildHotkeyLabel, FN_HOTKEY, FN_KEY_CODE, MODIFIER_FLAGS, MODIFIER_ONLY_KEYCODES, RIGHT_ALT_HOTKEY } from '../shared/hotkeys';
 import type { CloudTranscriptionModel, HotkeyConfig } from '../shared/types';
@@ -1062,6 +1062,26 @@ function DictionaryPage({ bootstrap, onRefresh }: { bootstrap: BootstrapState; o
 
 /* ── History ──────────────────────────────────── */
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function formatAudioCountdown(expiresAtIso: string | null, fallbackCreatedAt: string): string {
+  const expires = expiresAtIso
+    ? new Date(expiresAtIso).getTime()
+    : new Date(fallbackCreatedAt).getTime() + 7 * DAY_MS;
+  const remaining = expires - Date.now();
+  if (remaining <= 0) return 'expired';
+  const days = Math.floor(remaining / DAY_MS);
+  if (days >= 1) return `${days}d left`;
+  const hours = Math.max(1, Math.round(remaining / (60 * 60 * 1000)));
+  return `${hours}h left`;
+}
+
+function describeStatus(status: DictationStatus): { label: string; tone: 'ok' | 'warn' | 'pending' } {
+  if (status === 'success') return { label: 'transcribed', tone: 'ok' };
+  if (status === 'transcription-failed') return { label: 'failed', tone: 'warn' };
+  return { label: 'audio only', tone: 'pending' };
+}
+
 function formatHistoryDate(iso: string): string {
   const date = new Date(iso);
   const now = new Date();
@@ -1078,6 +1098,8 @@ function formatHistoryDate(iso: string): string {
 
 function HistoryPage({ bootstrap, onRefresh }: { bootstrap: BootstrapState; onRefresh: () => Promise<BootstrapState> }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [busyEntryId, setBusyEntryId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const history = bootstrap.history;
 
   const handleRemove = async (id: string) => {
@@ -1091,15 +1113,44 @@ function HistoryPage({ bootstrap, onRefresh }: { bootstrap: BootstrapState; onRe
   };
 
   const handleCopy = (text: string) => {
+    if (!text) return;
     void navigator.clipboard.writeText(text);
+  };
+
+  const handleRetranscribe = async (entry: HistoryEntry, mode: RetranscribeMode) => {
+    setActionError(null);
+    setBusyEntryId(entry.id);
+    try {
+      await window.openWhisp.retranscribe(entry.id, mode);
+      await onRefresh();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Retranscription failed.');
+    } finally {
+      setBusyEntryId(null);
+    }
+  };
+
+  const handleRevealAudio = async (entry: HistoryEntry) => {
+    setActionError(null);
+    try {
+      await window.openWhisp.revealAudio(entry.id);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Could not open the audio file.');
+    }
   };
 
   return (
     <div className="page">
       <div className="page-header">
         <h2 className="page-title serif">History</h2>
-        <p className="page-desc">Every dictation is saved here automatically.</p>
+        <p className="page-desc">Every dictation is saved here. Audio recordings are kept for 7 days, then auto-deleted.</p>
       </div>
+
+      {actionError && (
+        <div className="card history-error-banner">
+          <p>{actionError}</p>
+        </div>
+      )}
 
       <div className="card">
         <div className="card-head">
@@ -1115,16 +1166,33 @@ function HistoryPage({ bootstrap, onRefresh }: { bootstrap: BootstrapState; onRe
 
         {history.map((entry) => {
           const isExpanded = expandedId === entry.id;
-          const hasRaw = entry.rawText !== entry.finalText;
+          const isBusy = busyEntryId === entry.id;
+          const hasRaw = entry.rawText && entry.rawText !== entry.finalText;
+          const statusInfo = describeStatus(entry.status);
+          const audioAvailable = Boolean(entry.audioFilename);
+          const audioLabel = audioAvailable
+            ? `audio ${formatAudioCountdown(entry.audioExpiresAt, entry.createdAt)}`
+            : 'audio expired';
+          const headline =
+            entry.finalText ||
+            entry.rawText ||
+            (entry.status === 'transcription-failed'
+              ? entry.errorMessage ?? 'Transcription failed.'
+              : 'Audio recorded. Click Retranscribe to extract text.');
           return (
-            <div key={entry.id} className={`history-entry${isExpanded ? ' history-entry-expanded' : ''}`}>
+            <div
+              key={entry.id}
+              className={`history-entry${isExpanded ? ' history-entry-expanded' : ''}${entry.status !== 'success' ? ' history-entry-flagged' : ''}`}
+            >
               <div className="history-entry-header" onClick={() => setExpandedId(isExpanded ? null : entry.id)}>
                 <div className="history-entry-main">
-                  <p className="history-entry-text">{entry.finalText}</p>
+                  <p className="history-entry-text">{headline}</p>
                   <div className="history-entry-meta">
                     <span className="history-meta-time">{formatHistoryDate(entry.createdAt)}</span>
                     {entry.appName && <span className="history-meta-tag">{entry.appName}</span>}
-                    <span className="history-meta-tag">{entry.transcriptionSource}</span>
+                    {entry.transcriptionSource && <span className="history-meta-tag">{entry.transcriptionSource}</span>}
+                    <span className={`history-meta-tag history-meta-tag-${statusInfo.tone}`}>{statusInfo.label}</span>
+                    <span className={`history-meta-tag history-meta-tag-${audioAvailable ? 'ok' : 'muted'}`}>{audioLabel}</span>
                   </div>
                 </div>
                 <svg className={`history-chevron${isExpanded ? ' history-chevron-open' : ''}`} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1140,13 +1208,50 @@ function HistoryPage({ bootstrap, onRefresh }: { bootstrap: BootstrapState; onRe
                       <p className="history-raw-text">{entry.rawText}</p>
                     </div>
                   )}
+                  {entry.errorMessage && (
+                    <div className="history-detail-row">
+                      <span className="history-detail-label">Error</span>
+                      <span className="history-detail-value">{entry.errorMessage}</span>
+                    </div>
+                  )}
                   <div className="history-detail-row">
                     <span className="history-detail-label">Style</span>
                     <span className="history-detail-value">{entry.styleMode} / {entry.enhancementLevel}</span>
                   </div>
                   <div className="history-entry-actions">
-                    <button className="btn btn-sm btn-primary" onClick={() => handleCopy(entry.finalText)}>Copy</button>
-                    {hasRaw && <button className="btn btn-sm btn-secondary" onClick={() => handleCopy(entry.rawText)}>Copy raw</button>}
+                    <button
+                      className="btn btn-sm btn-primary"
+                      disabled={!entry.finalText}
+                      onClick={() => handleCopy(entry.finalText)}
+                    >
+                      Copy
+                    </button>
+                    {hasRaw && (
+                      <button className="btn btn-sm btn-secondary" onClick={() => handleCopy(entry.rawText)}>
+                        Copy raw
+                      </button>
+                    )}
+                    <button
+                      className="btn btn-sm btn-secondary"
+                      disabled={!audioAvailable || isBusy}
+                      onClick={() => void handleRetranscribe(entry, 'transcribe-only')}
+                    >
+                      {isBusy ? 'Working…' : 'Retranscribe audio'}
+                    </button>
+                    <button
+                      className="btn btn-sm btn-secondary"
+                      disabled={!audioAvailable || isBusy}
+                      onClick={() => void handleRetranscribe(entry, 'transcribe-and-stylize')}
+                    >
+                      {isBusy ? 'Working…' : 'Retranscribe + Stylize'}
+                    </button>
+                    <button
+                      className="btn btn-sm btn-muted"
+                      disabled={!audioAvailable}
+                      onClick={() => void handleRevealAudio(entry)}
+                    >
+                      Reveal audio
+                    </button>
                     <button className="btn btn-sm btn-muted" onClick={() => void handleRemove(entry.id)}>Remove</button>
                   </div>
                 </div>
