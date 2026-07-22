@@ -4,6 +4,7 @@ import type {
   AppRule,
   AppStatus,
   BootstrapState,
+  CloudRewriteProvider,
   CorrectionEntry,
   DictionaryEntry,
   DictationRequest,
@@ -26,7 +27,8 @@ declare global {
       refreshOllama: () => Promise<BootstrapState>;
       pullRecommendedModel: () => Promise<BootstrapState>;
       testApiKey: (apiKey: string, baseUrl?: string) => Promise<{ valid: boolean; error?: string }>;
-      clearApiKey: () => Promise<BootstrapState>;
+      testOpenrouterKey: (apiKey: string) => Promise<{ valid: boolean; error?: string }>;
+      clearApiKey: (provider?: CloudRewriteProvider) => Promise<BootstrapState>;
       addDictionaryWord: (word: string) => Promise<DictionaryEntry[]>;
       removeDictionaryWord: (word: string) => Promise<DictionaryEntry[]>;
       addCorrection: (from: string, to: string) => Promise<CorrectionEntry[]>;
