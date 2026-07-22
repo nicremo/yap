@@ -4,6 +4,7 @@ import type {
   AppRule,
   AppStatus,
   BootstrapState,
+  CloudRewriteProvider,
   CorrectionEntry,
   DictionaryEntry,
   DictationRequest,
@@ -30,8 +31,10 @@ const api = {
     ipcRenderer.invoke('models:pullRecommended') as Promise<BootstrapState>,
   testApiKey: (apiKey: string, baseUrl?: string) =>
     ipcRenderer.invoke('openai:testKey', apiKey, baseUrl) as Promise<{ valid: boolean; error?: string }>,
-  clearApiKey: () =>
-    ipcRenderer.invoke('openai:clearKey') as Promise<BootstrapState>,
+  testOpenrouterKey: (apiKey: string) =>
+    ipcRenderer.invoke('openrouter:testKey', apiKey) as Promise<{ valid: boolean; error?: string }>,
+  clearApiKey: (provider?: CloudRewriteProvider) =>
+    ipcRenderer.invoke('openai:clearKey', provider) as Promise<BootstrapState>,
   addDictionaryWord: (word: string) =>
     ipcRenderer.invoke('dictionary:add', word) as Promise<DictionaryEntry[]>,
   removeDictionaryWord: (word: string) =>

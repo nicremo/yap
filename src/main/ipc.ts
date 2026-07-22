@@ -30,6 +30,7 @@ import {
   writeAudioRecording,
 } from './audio-store';
 import { retranscribeEntry } from './retranscribe';
+import { testOpenrouterConnection } from './rewrite-provider';
 import { applyLaunchAtLogin } from './login-item';
 import { pullOllamaModel, listOllamaModels, isOllamaReachable, ensureOllamaRunning } from './ollama';
 import { getFocusInfo } from './native-helper';
@@ -187,10 +188,15 @@ export function registerIpcHandlers(dependencies: IpcDependencies): void {
     testCloudConnection(apiKey, baseUrl ?? dependencies.getSettings().cloudApiBaseUrl),
   );
 
-  ipcMain.handle('openai:clearKey', async () => {
-    const nextSettings = await persistSettings(dependencies.getSettings(), {
-      openaiApiKey: '',
-    });
+  ipcMain.handle('openrouter:testKey', async (_event, apiKey: string) =>
+    testOpenrouterConnection(apiKey),
+  );
+
+  ipcMain.handle('openai:clearKey', async (_event, provider?: 'groq' | 'openrouter') => {
+    const nextSettings = await persistSettings(
+      dependencies.getSettings(),
+      provider === 'openrouter' ? { openrouterApiKey: '' } : { openaiApiKey: '' },
+    );
     dependencies.setSettings(nextSettings);
     return buildBootstrapState();
   });
