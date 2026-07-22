@@ -43,12 +43,18 @@ function cleanRewriteOutput(content: string | undefined, rawText: string): strin
   return stripped;
 }
 
+export interface CloudRewriteOptions {
+  extraHeaders?: Record<string, string>;
+  providerOptions?: { sort: 'throughput' };
+}
+
 export async function rewriteWithCloud(
   baseUrl: string,
   apiKey: string,
   model: string,
   systemPrompt: string,
   rawText: string,
+  options: CloudRewriteOptions = {},
 ): Promise<string> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REWRITE_TIMEOUT_MS);
@@ -59,11 +65,13 @@ export async function rewriteWithCloud(
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`,
+        ...options.extraHeaders,
       },
       body: JSON.stringify({
         model,
         temperature: 0,
         max_tokens: 2048,
+        ...(options.providerOptions ? { provider: options.providerOptions } : {}),
         messages: [
           { role: 'system', content: systemPrompt },
           {
