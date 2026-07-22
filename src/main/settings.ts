@@ -35,7 +35,7 @@ export async function updateSettings(
   current: AppSettings,
   updates: UpdateSettingsInput,
 ): Promise<AppSettings> {
-  const { openaiApiKey, ...settingUpdates } = updates;
+  const { openaiApiKey, openrouterApiKey, ...settingUpdates } = updates;
 
   const nextSettings: AppSettings = {
     ...current,
@@ -45,6 +45,12 @@ export async function updateSettings(
   if (openaiApiKey !== undefined) {
     nextSettings.openaiApiKeyEncrypted = openaiApiKey.length > 0
       ? encryptApiKey(openaiApiKey)
+      : '';
+  }
+
+  if (openrouterApiKey !== undefined) {
+    nextSettings.openrouterApiKeyEncrypted = openrouterApiKey.length > 0
+      ? encryptApiKey(openrouterApiKey)
       : '';
   }
 

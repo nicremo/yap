@@ -5,6 +5,7 @@ import type { AppSettings, EnhancementLevel } from '../shared/types';
 import { DEFAULT_HOTKEY, DEFAULT_HOTKEY_WINDOWS } from '../shared/hotkeys';
 import {
   RECOMMENDED_CLOUD_MODEL,
+  RECOMMENDED_OPENROUTER_MODEL,
   RECOMMENDED_TEXT_MODEL,
   RECOMMENDED_WHISPER_LABEL,
   RECOMMENDED_WHISPER_MODEL,
@@ -32,6 +33,10 @@ export function createDefaultSettings(): AppSettings {
     textModel: RECOMMENDED_TEXT_MODEL,
     rewriteMode: 'cloud',
     cloudRewriteModel: 'openai/gpt-oss-20b',
+    cloudRewriteProvider: 'groq',
+    openrouterApiKeyEncrypted: '',
+    openrouterModel: RECOMMENDED_OPENROUTER_MODEL,
+    openrouterSpeedRouting: true,
     styleMode: 'conversation',
     enhancementLevel: 'medium',
     transcriptionMode: 'auto',

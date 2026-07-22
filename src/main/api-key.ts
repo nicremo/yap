@@ -38,3 +38,19 @@ export function getApiKey(settings: AppSettings): string | null {
     return null;
   }
 }
+
+export function isOpenrouterApiKeySet(settings: AppSettings): boolean {
+  return settings.openrouterApiKeyEncrypted.length > 0;
+}
+
+export function getOpenrouterApiKey(settings: AppSettings): string | null {
+  if (!isOpenrouterApiKeySet(settings)) {
+    return null;
+  }
+
+  try {
+    return decryptApiKey(settings.openrouterApiKeyEncrypted);
+  } catch {
+    return null;
+  }
+}

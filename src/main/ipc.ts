@@ -10,7 +10,7 @@ import type {
   UpdateSettingsInput,
 } from '../shared/types';
 import { RECOMMENDED_TEXT_MODEL } from '../shared/recommendations';
-import { isApiKeySet } from './api-key';
+import { isApiKeySet, isOpenrouterApiKeySet } from './api-key';
 import { testCloudConnection } from './cloud-transcription';
 import { loadAppRules, addAppRule, removeAppRule, updateAppRule } from './app-rules';
 import { loadDictionary, addDictionaryEntry, removeDictionaryEntry, loadCorrections, addCorrection, removeCorrection } from './dictionary';
@@ -75,6 +75,7 @@ export function registerIpcHandlers(dependencies: IpcDependencies): void {
       speechModelReady: await directoryHasEntries(storage.models),
       helperReady: dependencies.getHelperReady(),
       openaiApiKeySet: isApiKeySet(settings),
+      openrouterApiKeySet: isOpenrouterApiKeySet(settings),
       dictionary: await loadDictionary(),
       corrections: await loadCorrections(),
       appRules: await loadAppRules(),

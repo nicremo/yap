@@ -2,6 +2,7 @@ export type EnhancementLevel = 'none' | 'soft' | 'medium' | 'high';
 export type StyleMode = 'conversation' | 'vibe-coding';
 export type TranscriptionMode = 'auto' | 'cloud' | 'local';
 export type RewriteMode = 'cloud' | 'local';
+export type CloudRewriteProvider = 'groq' | 'openrouter';
 export type CloudTranscriptionModel = 'gpt-4o-mini-transcribe' | 'gpt-4o-transcribe' | 'whisper-1' | 'whisper-large-v3' | 'whisper-large-v3-turbo' | 'distil-whisper-large-v3-en';
 
 export type OverlayPhase =
@@ -45,6 +46,10 @@ export interface AppSettings {
   textModel: string;
   rewriteMode: RewriteMode;
   cloudRewriteModel: string;
+  cloudRewriteProvider: CloudRewriteProvider;
+  openrouterApiKeyEncrypted: string;
+  openrouterModel: string;
+  openrouterSpeedRouting: boolean;
   styleMode: StyleMode;
   enhancementLevel: EnhancementLevel;
   transcriptionMode: TranscriptionMode;
@@ -98,6 +103,7 @@ export interface BootstrapState {
   speechModelReady: boolean;
   helperReady: boolean;
   openaiApiKeySet: boolean;
+  openrouterApiKeySet: boolean;
   dictionary: DictionaryEntry[];
   corrections: CorrectionEntry[];
   appRules: AppRule[];
@@ -153,6 +159,10 @@ export interface UpdateSettingsInput {
   textModel?: string;
   rewriteMode?: RewriteMode;
   cloudRewriteModel?: string;
+  cloudRewriteProvider?: CloudRewriteProvider;
+  openrouterApiKey?: string;
+  openrouterModel?: string;
+  openrouterSpeedRouting?: boolean;
   ollamaBaseUrl?: string;
   storageDirectory?: string;
   hotkey?: HotkeyConfig;

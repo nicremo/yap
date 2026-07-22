@@ -13,3 +13,12 @@ export const CLOUD_MODELS = [
   { id: 'whisper-1' as const, label: 'Whisper 1', price: '$0.006/min' },
   { id: 'distil-whisper-large-v3-en' as const, label: 'Distil Whisper v3 (EN only)', price: '$0.0001/min' },
 ] satisfies ReadonlyArray<{ id: CloudTranscriptionModel; label: string; price: string }>;
+
+export const RECOMMENDED_OPENROUTER_MODEL = 'google/gemini-3.5-flash-lite';
+
+export const OPENROUTER_REWRITE_MODELS = [
+  { id: 'google/gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash Lite', price: '$0.30/$2.50 per M' },
+  { id: 'google/gemini-3.6-flash', label: 'Gemini 3.6 Flash', price: '$1.50/$7.50 per M' },
+  { id: 'qwen/qwen3.6-flash', label: 'Qwen 3.6 Flash', price: '$0.19/$1.13 per M' },
+  { id: 'stepfun/step-3.7-flash', label: 'Step 3.7 Flash', price: '$0.20/$1.15 per M' },
+] satisfies ReadonlyArray<{ id: string; label: string; price: string }>;
