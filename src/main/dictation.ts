@@ -6,6 +6,7 @@ import { resolveStyleForApp } from './app-rules';
 import { CloudTranscriptionError, transcribeWithCloud } from './cloud-transcription';
 import { buildDictionaryContext, buildWhisperPrompt } from './dictionary';
 import { rewriteWithCloud } from './cloud-rewrite';
+import { resolveRewriteTarget } from './rewrite-provider';
 import { getEnhancementPrompt } from './prompts';
 import { rewriteWithOllama } from './ollama';
 import { getFocusInfo, triggerPaste } from './native-helper';
@@ -178,27 +179,35 @@ export async function processDictationAudio({
   let finalText = rawText;
   let usedRewriteFallback = false;
 
-  if (settings.rewriteMode === 'cloud' && isApiKeySet(settings)) {
+  const rewriteTarget = settings.rewriteMode === 'cloud' ? resolveRewriteTarget(settings) : null;
+  let rewriteFailureDetail: string | undefined;
+
+  if (rewriteTarget) {
     setStatus({
       phase: 'rewriting',
       title: 'Polishing',
-      detail: `${settings.cloudRewriteModel} is polishing your text via cloud.`,
+      detail: `${rewriteTarget.model} is polishing your text via cloud.`,
       preview: rawText,
       rawText,
     });
 
-    const apiKey = getApiKey(settings);
-    if (apiKey) {
-      try {
-        finalText = await rewriteWithCloud(
-          settings.cloudApiBaseUrl,
-          apiKey,
-          settings.cloudRewriteModel,
-          enhancementPrompt,
-          rawText,
-        );
-      } catch (cloudError) {
-        console.warn('[openwhisp] Cloud rewrite failed, falling back to Ollama:', cloudError instanceof Error ? cloudError.message : cloudError);
+    try {
+      finalText = await rewriteWithCloud(
+        rewriteTarget.baseUrl,
+        rewriteTarget.apiKey,
+        rewriteTarget.model,
+        enhancementPrompt,
+        rawText,
+        { extraHeaders: rewriteTarget.extraHeaders, providerOptions: rewriteTarget.providerOptions },
+      );
+    } catch (cloudError) {
+      const message = cloudError instanceof Error ? cloudError.message : String(cloudError);
+      if (settings.cloudRewriteProvider === 'openrouter') {
+        console.warn('[openwhisp] OpenRouter rewrite failed, keeping raw text:', message);
+        usedRewriteFallback = true;
+        rewriteFailureDetail = 'OpenRouter rewrite failed. The raw transcription was used instead.';
+      } else {
+        console.warn('[openwhisp] Cloud rewrite failed, falling back to Ollama:', message);
         try {
           setStatus({
             phase: 'rewriting',
@@ -263,13 +272,17 @@ export async function processDictationAudio({
   }
 
   const doneTitle = pasted ? 'Pasted' : 'Done';
-  const doneDetail = usedRewriteFallback
+  const doneDetail = rewriteFailureDetail
     ? pasted
-      ? 'The raw transcription was pasted because the rewrite model was unavailable.'
-      : 'The raw transcription was saved to history because the rewrite model was unavailable.'
-    : pasted
-      ? 'The refined text was pasted into the active app.'
-      : 'The refined text was saved to history.';
+      ? `${rewriteFailureDetail} The raw text was pasted.`
+      : `${rewriteFailureDetail} The raw text was saved to history.`
+    : usedRewriteFallback
+      ? pasted
+        ? 'The raw transcription was pasted because the rewrite model was unavailable.'
+        : 'The raw transcription was saved to history because the rewrite model was unavailable.'
+      : pasted
+        ? 'The refined text was pasted into the active app.'
+        : 'The refined text was saved to history.';
 
   const doneStatus: AppStatus = {
     phase: 'done',
@@ -343,29 +356,36 @@ export async function runRewrite(options: RewriteAudioOptions): Promise<{ finalT
   let finalText = options.rawText;
   let usedFallback = false;
 
-  if (options.settings.rewriteMode === 'cloud' && isApiKeySet(options.settings)) {
+  const rewriteTarget = options.settings.rewriteMode === 'cloud'
+    ? resolveRewriteTarget(options.settings)
+    : null;
+
+  if (rewriteTarget) {
     setStatus({
       phase: 'rewriting',
       title: 'Polishing',
-      detail: `${options.settings.cloudRewriteModel} is polishing your text via cloud.`,
+      detail: `${rewriteTarget.model} is polishing your text via cloud.`,
       preview: options.rawText,
       rawText: options.rawText,
     });
 
-    const apiKey = getApiKey(options.settings);
-    if (apiKey) {
-      try {
-        finalText = await rewriteWithCloud(
-          options.settings.cloudApiBaseUrl,
-          apiKey,
-          options.settings.cloudRewriteModel,
-          enhancementPrompt,
-          options.rawText,
-        );
-        return { finalText, usedFallback: false };
-      } catch (cloudError) {
-        console.warn('[openwhisp] Cloud rewrite failed, falling back to Ollama:', cloudError instanceof Error ? cloudError.message : cloudError);
+    try {
+      finalText = await rewriteWithCloud(
+        rewriteTarget.baseUrl,
+        rewriteTarget.apiKey,
+        rewriteTarget.model,
+        enhancementPrompt,
+        options.rawText,
+        { extraHeaders: rewriteTarget.extraHeaders, providerOptions: rewriteTarget.providerOptions },
+      );
+      return { finalText, usedFallback: false };
+    } catch (cloudError) {
+      const message = cloudError instanceof Error ? cloudError.message : String(cloudError);
+      if (options.settings.cloudRewriteProvider === 'openrouter') {
+        console.warn('[openwhisp] OpenRouter rewrite failed, keeping raw text:', message);
+        return { finalText: options.rawText, usedFallback: true };
       }
+      console.warn('[openwhisp] Cloud rewrite failed, falling back to Ollama:', message);
     }
   }
 
