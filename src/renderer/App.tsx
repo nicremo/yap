@@ -5,7 +5,7 @@ import { Home01Icon, PaintBrush01Icon, CubeIcon, Settings01Icon, BookOpen01Icon,
 import { AudioRecorder } from './audio-recorder';
 import logoUrl from './logo.png';
 import type { AppRule, AppStatus, BootstrapState, CorrectionEntry, DictationStatus, DictionaryEntry, EnhancementLevel, FocusInfo, HistoryEntry, RetranscribeMode, StyleMode } from '../shared/types';
-import { CLOUD_MODELS, RECOMMENDED_TEXT_MODEL, RECOMMENDED_WHISPER_LABEL } from '../shared/recommendations';
+import { CLOUD_MODELS, OPENROUTER_REWRITE_MODELS, RECOMMENDED_TEXT_MODEL, RECOMMENDED_WHISPER_LABEL } from '../shared/recommendations';
 import { buildHotkeyLabel, FN_HOTKEY, FN_KEY_CODE, MODIFIER_FLAGS, MODIFIER_ONLY_KEYCODES, RIGHT_ALT_HOTKEY } from '../shared/hotkeys';
 import type { CloudTranscriptionModel, HotkeyConfig } from '../shared/types';
 
@@ -832,6 +832,84 @@ function TranscriptionCard({ bootstrap, onAction }: { bootstrap: BootstrapState;
   );
 }
 
+function OpenRouterRewriteSettings({ bootstrap, onAction }: { bootstrap: BootstrapState; onAction: (l: string, a: () => Promise<BootstrapState>) => Promise<void> }) {
+  const [apiKey, setApiKey] = useState('');
+  const [keyStatus, setKeyStatus] = useState<'idle' | 'testing' | 'valid' | 'invalid'>('idle');
+  const [keyError, setKeyError] = useState('');
+
+  const handleTestKey = async () => {
+    if (!apiKey) return;
+    setKeyStatus('testing');
+    const result = await window.openWhisp.testOpenrouterKey(apiKey);
+    if (result.valid) {
+      setKeyStatus('valid');
+      setKeyError('');
+      void onAction('settings', () => window.openWhisp.updateSettings({ openrouterApiKey: apiKey }));
+    } else {
+      setKeyStatus('invalid');
+      setKeyError(result.error ?? 'Validation failed.');
+    }
+  };
+
+  const handleClearKey = () => {
+    setApiKey('');
+    setKeyStatus('idle');
+    setKeyError('');
+    void onAction('settings', async () => window.openWhisp.clearApiKey('openrouter'));
+  };
+
+  return (
+    <>
+      <div className="setting-row" style={{ marginTop: 12 }}>
+        <label className="setting-label" htmlFor="openrouter-model">Model</label>
+        <select id="openrouter-model" className="setting-select" value={bootstrap.settings.openrouterModel} onChange={(e) => void onAction('settings', () => window.openWhisp.updateSettings({ openrouterModel: e.target.value }))}>
+          {OPENROUTER_REWRITE_MODELS.map((m) => (
+            <option key={m.id} value={m.id}>{m.label} ({m.price})</option>
+          ))}
+        </select>
+      </div>
+      <div className="setting-row" style={{ marginTop: 12 }}>
+        <label className="setting-label" htmlFor="openrouter-key">API Key</label>
+        {bootstrap.openrouterApiKeySet ? (
+          <div className="api-key-field">
+            <span className="badge badge-ready"><CheckIcon size={12} /> Saved</span>
+            <button className="btn btn-sm btn-ghost" onClick={handleClearKey}>Clear</button>
+          </div>
+        ) : (
+          <div className="api-key-field">
+            <input
+              id="openrouter-key"
+              type="password"
+              className="setting-input"
+              placeholder="sk-or-..."
+              value={apiKey}
+              onChange={(e) => { setApiKey(e.target.value); setKeyStatus('idle'); }}
+            />
+            <button
+              className="btn btn-sm btn-secondary"
+              disabled={!apiKey || keyStatus === 'testing'}
+              onClick={() => void handleTestKey()}
+            >
+              {keyStatus === 'testing' ? 'Testing...' : 'Save'}
+            </button>
+          </div>
+        )}
+      </div>
+      {keyStatus === 'valid' && <span className="api-key-status api-key-ok">Valid API key</span>}
+      {keyStatus === 'invalid' && <span className="api-key-status api-key-err">{keyError}</span>}
+      {!bootstrap.openrouterApiKeySet && (
+        <button className="btn btn-link btn-muted" style={{ marginTop: 4, fontSize: 12 }} onClick={() => void window.openWhisp.openExternal('https://openrouter.ai/keys')}>Get an OpenRouter API key</button>
+      )}
+      <ToggleRow
+        title="Prefer fastest provider"
+        description="Route requests to the provider with the highest throughput. May cost slightly more."
+        checked={bootstrap.settings.openrouterSpeedRouting}
+        onChange={(v) => void onAction('settings', () => window.openWhisp.updateSettings({ openrouterSpeedRouting: v }))}
+      />
+    </>
+  );
+}
+
 function ModelsPage({ bootstrap, busyAction, onAction }: { bootstrap: BootstrapState; busyAction: string | null; onAction: (l: string, a: () => Promise<BootstrapState>) => Promise<void> }) {
   const [ollamaUrl, setOllamaUrl] = useState(bootstrap.settings.ollamaBaseUrl);
   useEffect(() => { setOllamaUrl(bootstrap.settings.ollamaBaseUrl); }, [bootstrap.settings.ollamaBaseUrl]);
@@ -877,19 +955,36 @@ function ModelsPage({ bootstrap, busyAction, onAction }: { bootstrap: BootstrapS
           </div>
         </div>
         <div className="setting-hint">
-          {bootstrap.settings.rewriteMode === 'cloud' ? 'Fast rewrite via Groq cloud API. Falls back to Ollama when offline.' : 'Local rewrite via Ollama. No data leaves your device.'}
+          {bootstrap.settings.rewriteMode === 'cloud'
+            ? bootstrap.settings.cloudRewriteProvider === 'openrouter'
+              ? 'Fast rewrite via OpenRouter. No local fallback: raw text is pasted if the request fails.'
+              : 'Fast rewrite via Groq cloud API. Falls back to Ollama when offline.'
+            : 'Local rewrite via Ollama. No data leaves your device.'}
         </div>
         {bootstrap.settings.rewriteMode === 'cloud' && (
-          <div className="setting-row" style={{ marginTop: 12 }}>
-            <label className="setting-label" htmlFor="cloud-rewrite-model">Cloud model</label>
-            <select id="cloud-rewrite-model" className="setting-select" value={bootstrap.settings.cloudRewriteModel} onChange={(e) => void onAction('settings', () => window.openWhisp.updateSettings({ cloudRewriteModel: e.target.value }))}>
-              <option value="openai/gpt-oss-20b">GPT-OSS 20B (1000 t/s)</option>
-              <option value="openai/gpt-oss-120b">GPT-OSS 120B (500 t/s)</option>
-              <option value="qwen/qwen3-32b">Qwen3 32B (400 t/s)</option>
-              <option value="llama-3.3-70b-versatile">Llama 3.3 70B (280 t/s)</option>
-              <option value="llama-3.1-8b-instant">Llama 3.1 8B (560 t/s)</option>
-            </select>
-          </div>
+          <>
+            <div className="setting-row" style={{ marginTop: 12 }}>
+              <label className="setting-label">Provider</label>
+              <div className="source-selector">
+                <button className={`source-btn${bootstrap.settings.cloudRewriteProvider === 'groq' ? ' source-btn-active' : ''}`} onClick={() => void onAction('settings', () => window.openWhisp.updateSettings({ cloudRewriteProvider: 'groq' }))}>Groq</button>
+                <button className={`source-btn${bootstrap.settings.cloudRewriteProvider === 'openrouter' ? ' source-btn-active' : ''}`} onClick={() => void onAction('settings', () => window.openWhisp.updateSettings({ cloudRewriteProvider: 'openrouter' }))}>OpenRouter</button>
+              </div>
+            </div>
+            {bootstrap.settings.cloudRewriteProvider === 'groq' ? (
+              <div className="setting-row" style={{ marginTop: 12 }}>
+                <label className="setting-label" htmlFor="cloud-rewrite-model">Cloud model</label>
+                <select id="cloud-rewrite-model" className="setting-select" value={bootstrap.settings.cloudRewriteModel} onChange={(e) => void onAction('settings', () => window.openWhisp.updateSettings({ cloudRewriteModel: e.target.value }))}>
+                  <option value="openai/gpt-oss-20b">GPT-OSS 20B (1000 t/s)</option>
+                  <option value="openai/gpt-oss-120b">GPT-OSS 120B (500 t/s)</option>
+                  <option value="qwen/qwen3-32b">Qwen3 32B (400 t/s)</option>
+                  <option value="llama-3.3-70b-versatile">Llama 3.3 70B (280 t/s)</option>
+                  <option value="llama-3.1-8b-instant">Llama 3.1 8B (560 t/s)</option>
+                </select>
+              </div>
+            ) : (
+              <OpenRouterRewriteSettings bootstrap={bootstrap} onAction={onAction} />
+            )}
+          </>
         )}
         {bootstrap.settings.rewriteMode === 'local' && (
           <>
