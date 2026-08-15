@@ -186,6 +186,16 @@ npm run package
 
 Builds the Electron app, compiles the Swift helper, and packages everything into a `.dmg` and `.zip` in the `release/` directory.
 
+The build is unsigned by default, so it works without an Apple Developer
+account. macOS will refuse to open an unsigned build until you clear the
+quarantine flag, see the Install section above.
+
+To produce a signed build, point electron-builder at your own certificate:
+
+```bash
+CSC_NAME="Your Name (TEAMID)" npm run package:mac
+```
+
 ## Credits
 
 yap is a rebranded fork of [OpenWhisp](https://github.com/giusmarci/openwhisp)

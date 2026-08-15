@@ -143,17 +143,12 @@ export async function processDictationAudio({
   const whisperPrompt = buildWhisperPrompt(dictionary, corrections);
   const dictionaryContext = buildDictionaryContext(dictionary, corrections);
 
-  const matched = resolveStyleForApp(
-        targetFocus,
-        appRules,
-        settings.styleMode,
-        settings.enhancementLevel,
-      );
-
-  const resolved = {
-    ...matched,
-    enhancementLevel: matched.enhancementLevel,
-  };
+  const resolved = resolveStyleForApp(
+    targetFocus,
+    appRules,
+    settings.styleMode,
+    settings.enhancementLevel,
+  );
 
   console.log('[yap:dictation] start', {
     mode: settings.transcriptionMode,

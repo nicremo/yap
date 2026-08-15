@@ -1,4 +1,4 @@
-import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { access, copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 /* The rebrand changed the bundle identifier, which moves
@@ -22,23 +22,27 @@ const CLEARED_SETTINGS_KEYS = [
   'fireworksApiKeyEncrypted',
 ] as const;
 
-async function readIfPresent(filePath: string): Promise<string | null> {
+async function exists(filePath: string): Promise<boolean> {
   try {
-    return await readFile(filePath, 'utf8');
+    await access(filePath);
+    return true;
   } catch {
-    return null;
+    return false;
   }
 }
 
-async function copySettingsWithoutKeys(source: string, destination: string): Promise<void> {
+/** @returns whether the settings were actually written. */
+async function copySettingsWithoutKeys(source: string, destination: string): Promise<boolean> {
   const raw = await readFile(source, 'utf8');
 
   let parsed: Record<string, unknown>;
   try {
     parsed = JSON.parse(raw) as Record<string, unknown>;
   } catch {
-    // A settings file we cannot parse is not worth migrating.
-    return;
+    // A settings file we cannot parse is not worth migrating. Reporting it as
+    // migrated anyway would log a carry-over that never happened, while
+    // loadSettings quietly falls back to defaults.
+    return false;
   }
 
   for (const key of CLEARED_SETTINGS_KEYS) {
@@ -46,6 +50,7 @@ async function copySettingsWithoutKeys(source: string, destination: string): Pro
   }
 
   await writeFile(destination, `${JSON.stringify(parsed, null, 2)}\n`, 'utf8');
+  return true;
 }
 
 /**
@@ -59,10 +64,10 @@ export async function migrateLegacyUserData(
   legacyDirectory: string,
   targetDirectory: string,
 ): Promise<string[]> {
-  if (await readIfPresent(path.join(targetDirectory, 'settings.json'))) {
+  if (await exists(path.join(targetDirectory, 'settings.json'))) {
     return [];
   }
-  if (!(await readIfPresent(path.join(legacyDirectory, 'settings.json')))) {
+  if (!(await exists(path.join(legacyDirectory, 'settings.json')))) {
     return [];
   }
 
@@ -73,12 +78,14 @@ export async function migrateLegacyUserData(
     const source = path.join(legacyDirectory, name);
     const destination = path.join(targetDirectory, name);
 
-    if (!(await readIfPresent(source))) {
+    if (!(await exists(source))) {
       continue;
     }
 
     if (name === 'settings.json') {
-      await copySettingsWithoutKeys(source, destination);
+      if (!(await copySettingsWithoutKeys(source, destination))) {
+        continue;
+      }
     } else {
       await copyFile(source, destination);
     }

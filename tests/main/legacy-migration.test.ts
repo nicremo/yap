@@ -57,6 +57,23 @@ describe('migrateLegacyUserData', () => {
     expect(await migrateLegacyUserData(legacy, target)).toEqual(['settings.json', 'app-rules.json']);
   });
 
+  it('does not claim to have migrated settings it could not parse', async () => {
+    const root = await tempDir();
+    const legacy = path.join(root, 'openwhisp');
+    const target = path.join(root, 'yap');
+    await mkdir(legacy, { recursive: true });
+    // Truncated file, as left behind by an app killed mid-write.
+    await writeFile(path.join(legacy, 'settings.json'), '{"styleMode": "conv');
+    await writeFile(path.join(legacy, 'history.json'), '[]');
+
+    const copied = await migrateLegacyUserData(legacy, target);
+
+    // history.json is a plain copy and survives; settings.json must not be
+    // reported as migrated, or the log claims a carry-over that never happened
+    // and the user silently loses their settings.
+    expect(copied).toEqual(['history.json']);
+  });
+
   it('never carries the encrypted API key across', async () => {
     const root = await tempDir();
     const legacy = path.join(root, 'openwhisp');

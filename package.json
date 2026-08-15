@@ -2,6 +2,12 @@
   "name": "yap",
   "version": "0.9.0",
   "license": "MIT",
+  "author": "Fabian Bitzer (https://github.com/nicremo)",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nicremo/yap.git"
+  },
+  "homepage": "https://github.com/nicremo/yap",
   "private": true,
   "type": "module",
   "description": "Mac-first local dictation with lightweight Whisper transcription and Ollama rewriting.",
@@ -41,8 +47,7 @@
     },
     "mac": {
       "category": "public.app-category.productivity",
-      "identity": "Fabian Bitzer (5DKU7FFK4X)",
-      "notarize": true,
+      "notarize": false,
       "target": [
         "dmg",
         "zip"
