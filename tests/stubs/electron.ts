@@ -10,7 +10,7 @@ export const safeStorage = {
 };
 
 export const app = {
-  getPath: (name: string) => `/tmp/openwhisp-test/${name}`,
+  getPath: (name: string) => `/tmp/yap-test/${name}`,
 };
 
 export const dialog = {

@@ -91,4 +91,4 @@ const api = {
   },
 };
 
-contextBridge.exposeInMainWorld('openWhisp', api);
+contextBridge.exposeInMainWorld('yap', api);

@@ -18,7 +18,7 @@ device_pattern='com\.apple\.audio\.(BuiltInMicrophoneDevice|BuiltInSpeakerDevice
 
 held="$(printf '%s\n' "$assertions" | grep -E "$device_pattern" || true)"
 
-echo "OpenWhisp processes: $(pgrep -f 'OpenWhisp' | wc -l | tr -d ' ')"
+echo "Yap processes: $(pgrep -f '/Yap.app/' | wc -l | tr -d ' ')"
 echo
 
 if [[ -z "$held" ]]; then

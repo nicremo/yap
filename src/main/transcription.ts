@@ -54,7 +54,7 @@ function decodePcm16Wave(buffer: Buffer): Float32Array {
     );
 
   if (readTag(0) !== 'RIFF' || readTag(8) !== 'WAVE') {
-    throw new Error('OpenWhisp received an invalid WAV recording.');
+    throw new Error('Yap received an invalid WAV recording.');
   }
 
   let offset = 12;
@@ -85,7 +85,7 @@ function decodePcm16Wave(buffer: Buffer): Float32Array {
   }
 
   if (audioFormat !== 1 || channels !== 1 || bitsPerSample !== 16 || dataOffset === 0) {
-    throw new Error('OpenWhisp expected a mono 16-bit PCM WAV recording.');
+    throw new Error('Yap expected a mono 16-bit PCM WAV recording.');
   }
 
   const sampleCount = dataSize / 2;

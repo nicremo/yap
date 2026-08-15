@@ -3,7 +3,7 @@ import log from 'electron-log/main.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// Persist logs to `{userData}/logs/main.log` (Windows: %APPDATA%\OpenWhisp\logs\main.log).
+// Persist logs to `{userData}/logs/main.log` (Windows: %APPDATA%\Yap\logs\main.log).
 // Enable IPC bridge so renderer-side electron-log imports share the same sink,
 // and route every existing `console.*` call through the file transport.
 log.initialize();
@@ -22,6 +22,7 @@ import {
   stopFnListener,
 } from './native-helper';
 import { getPermissionState } from './permissions';
+import { migrateLegacyUserData } from './legacy-migration';
 import { loadSettings } from './settings';
 import { ensureStorage } from './storage';
 import { disposeAutoUpdater, initializeAutoUpdater } from './updater';
@@ -54,10 +55,10 @@ async function runAudioCleanup(): Promise<void> {
       broadcast('history:updated', updated);
     }
     if (sweep.expiredEntryIds.length > 0 || sweep.orphanFiles.length > 0) {
-      console.log('[openwhisp] audio cleanup', sweep);
+      console.log('[yap] audio cleanup', sweep);
     }
   } catch (error) {
-    console.warn('[openwhisp] audio cleanup failed:', error instanceof Error ? error.message : error);
+    console.warn('[yap] audio cleanup failed:', error instanceof Error ? error.message : error);
   }
 }
 
@@ -107,7 +108,7 @@ async function ensureOverlayWindow(): Promise<BrowserWindow | null> {
     try {
       existing.destroy();
     } catch (error) {
-      console.warn('[openwhisp] Failed to destroy stale overlay window:', error);
+      console.warn('[yap] Failed to destroy stale overlay window:', error);
     }
   }
   overlayWindow = null;
@@ -124,7 +125,7 @@ async function ensureOverlayWindow(): Promise<BrowserWindow | null> {
     }
     overlayRebuildTimer = setTimeout(() => {
       overlayRebuildTimer = null;
-      console.log('[openwhisp] overlay rebuilding after render-process-gone');
+      console.log('[yap] overlay rebuilding after render-process-gone');
       void showOverlay();
     }, 2_000);
   });
@@ -189,21 +190,21 @@ function attachWindowDiagnostics(
   onGone?: () => void,
 ): void {
   window.webContents.on('did-finish-load', () => {
-    console.log(`[openwhisp] ${label} did-finish-load`);
+    console.log(`[yap] ${label} did-finish-load`);
   });
 
   window.webContents.on(
     'did-fail-load',
     (_event, errorCode, errorDescription, validatedURL) => {
       console.error(
-        `[openwhisp] ${label} did-fail-load`,
+        `[yap] ${label} did-fail-load`,
         JSON.stringify({ errorCode, errorDescription, validatedURL }),
       );
     },
   );
 
   window.webContents.on('render-process-gone', (_event, details) => {
-    console.error(`[openwhisp] ${label} render-process-gone`, JSON.stringify(details));
+    console.error(`[yap] ${label} render-process-gone`, JSON.stringify(details));
     // Clear the stale reference so the next showOverlay() rebuilds the window.
     onGone?.();
   });
@@ -213,7 +214,7 @@ function attachWindowDiagnostics(
   });
 
   window.on('unresponsive', () => {
-    console.error(`[openwhisp] ${label} unresponsive`);
+    console.error(`[yap] ${label} unresponsive`);
   });
 }
 
@@ -281,13 +282,24 @@ async function restartHotkeyListener(): Promise<void> {
 }
 
 async function bootstrap(): Promise<void> {
-  console.log('[openwhisp] boot', {
+  console.log('[yap] boot', {
     version: app.getVersion(),
     platform: process.platform,
     arch: process.arch,
     electron: process.versions.electron,
     logPath: log.transports.file.getFile().path,
   });
+
+  // Carry data over from an install that predates the rename. Must run before
+  // the first settings read, otherwise defaults get written and the migration
+  // sees a target that already has state.
+  const migrated = await migrateLegacyUserData(
+    path.join(app.getPath('appData'), 'openwhisp'),
+    app.getPath('userData'),
+  );
+  if (migrated.length > 0) {
+    console.log('[yap] migrated from the previous install:', migrated.join(', '));
+  }
 
   settings = await loadSettings();
   await ensureStorage(settings);
@@ -340,10 +352,10 @@ function createTray(): void {
   const icon = nativeImage.createFromPath(getTrayIconPath());
   icon.setTemplateImage(true);
   tray = new Tray(icon);
-  tray.setToolTip('Openwhisp');
+  tray.setToolTip('Yap');
 
   const contextMenu = Menu.buildFromTemplate([
-    { label: 'Show Openwhisp', click: () => showMainWindow() },
+    { label: 'Show Yap', click: () => showMainWindow() },
     { type: 'separator' },
     { label: 'Quit', click: () => { isQuitting = true; app.quit(); } },
   ]);
@@ -356,7 +368,7 @@ app.whenReady().then(bootstrap);
 
 app.on('web-contents-created', (_event, contents) => {
   contents.on('console-message', (_consoleEvent, level, message) => {
-    console.log(`[openwhisp:renderer:${level}] ${message}`);
+    console.log(`[yap:renderer:${level}] ${message}`);
   });
 });
 

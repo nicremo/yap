@@ -35,7 +35,7 @@ export function initializeAutoUpdater(): void {
   }
 
   if (!app.isPackaged) {
-    log.info('[openwhisp:updater] skipped (development build)');
+    log.info('[yap:updater] skipped (development build)');
     return;
   }
 
@@ -43,7 +43,7 @@ export function initializeAutoUpdater(): void {
   // valid Apple Developer ID certificate. Until that pipeline lands we skip
   // the updater on macOS to avoid throwing noisy errors at users.
   if (process.platform === 'darwin') {
-    log.info('[openwhisp:updater] skipped on macOS until code signing is wired up');
+    log.info('[yap:updater] skipped on macOS until code signing is wired up');
     return;
   }
 
@@ -58,12 +58,12 @@ export function initializeAutoUpdater(): void {
 
   autoUpdater.on('checking-for-update', () => {
     state = { kind: 'checking' };
-    log.info('[openwhisp:updater] checking-for-update');
+    log.info('[yap:updater] checking-for-update');
   });
 
   autoUpdater.on('update-available', (info: UpdateInfo) => {
     state = { kind: 'available', info };
-    log.info('[openwhisp:updater] update-available', {
+    log.info('[yap:updater] update-available', {
       version: info.version,
       releaseDate: info.releaseDate,
     });
@@ -71,7 +71,7 @@ export function initializeAutoUpdater(): void {
 
   autoUpdater.on('update-not-available', (info: UpdateInfo) => {
     state = { kind: 'idle' };
-    log.info('[openwhisp:updater] up-to-date', { version: info.version });
+    log.info('[yap:updater] up-to-date', { version: info.version });
   });
 
   autoUpdater.on('download-progress', (progress: ProgressInfo) => {
@@ -81,7 +81,7 @@ export function initializeAutoUpdater(): void {
     }
     const info = state.kind === 'available' || state.kind === 'downloading' ? state.info : undefined;
     state = info ? { kind: 'downloading', info, percent } : state;
-    log.info('[openwhisp:updater] download-progress', {
+    log.info('[yap:updater] download-progress', {
       percent,
       bytesPerSecond: Math.round(progress.bytesPerSecond),
       transferred: progress.transferred,
@@ -91,13 +91,13 @@ export function initializeAutoUpdater(): void {
 
   autoUpdater.on('update-downloaded', (info: UpdateInfo) => {
     state = { kind: 'downloaded', info };
-    log.info('[openwhisp:updater] update-downloaded', { version: info.version });
+    log.info('[yap:updater] update-downloaded', { version: info.version });
     notifyUpdateReady(info.version);
   });
 
   autoUpdater.on('error', (error: Error) => {
     state = { kind: 'error', message: error.message };
-    log.error('[openwhisp:updater] error', error);
+    log.error('[yap:updater] error', error);
   });
 
   // First check is delayed so launch I/O finishes before the updater hits
@@ -112,7 +112,7 @@ export function initializeAutoUpdater(): void {
   }, PERIODIC_CHECK_INTERVAL_MS);
 
   initialized = true;
-  log.info('[openwhisp:updater] initialized', {
+  log.info('[yap:updater] initialized', {
     maxLogSize: MAX_LOG_SIZE,
     firstCheckDelayMs: FIRST_CHECK_DELAY_MS,
     periodicIntervalMs: PERIODIC_CHECK_INTERVAL_MS,
@@ -133,12 +133,12 @@ export async function checkForUpdatesManually(): Promise<UpdaterState> {
 
 async function runCheck(trigger: 'startup' | 'interval' | 'manual'): Promise<void> {
   try {
-    log.info('[openwhisp:updater] check triggered', { trigger });
+    log.info('[yap:updater] check triggered', { trigger });
     await autoUpdater.checkForUpdates();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     state = { kind: 'error', message };
-    log.error('[openwhisp:updater] check failed', { trigger, message });
+    log.error('[yap:updater] check failed', { trigger, message });
   }
 }
 
@@ -148,8 +148,8 @@ function notifyUpdateReady(version: string): void {
   }
 
   const notification = new Notification({
-    title: 'OpenWhisp update ready',
-    body: `Version ${version} will be installed the next time you quit OpenWhisp.`,
+    title: 'Yap update ready',
+    body: `Version ${version} will be installed the next time you quit Yap.`,
     silent: false,
   });
 

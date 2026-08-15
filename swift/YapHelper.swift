@@ -282,7 +282,7 @@ private func hotkeyCallback(
 
 func listenForHotkey() -> Int32 {
     guard inputMonitoringGranted() else {
-        emitJSON(EventMessage(type: "error", message: "Input Monitoring is not enabled for OpenWhisp."))
+        emitJSON(EventMessage(type: "error", message: "Input Monitoring is not enabled for Yap."))
         return 1
     }
 
@@ -305,7 +305,7 @@ func listenForHotkey() -> Int32 {
         callback: hotkeyCallback,
         userInfo: nil
     ) else {
-        emitJSON(EventMessage(type: "error", message: "OpenWhisp could not create the global hotkey listener."))
+        emitJSON(EventMessage(type: "error", message: "Yap could not create the global hotkey listener."))
         return 1
     }
 

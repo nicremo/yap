@@ -141,7 +141,7 @@ export function buildWhisperPrompt(
   for (const word of unique) {
     const addition = parts.length > 0 ? word.length + 2 : word.length;
     if (length + addition > WHISPER_PROMPT_MAX_CHARS) {
-      console.warn(`[openwhisp] Whisper prompt truncated at ${parts.length}/${unique.length} words (224 token limit)`);
+      console.warn(`[yap] Whisper prompt truncated at ${parts.length}/${unique.length} words (224 token limit)`);
       break;
     }
     parts.push(word);

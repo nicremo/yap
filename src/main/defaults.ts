@@ -12,7 +12,7 @@ import {
   RECOMMENDED_WHISPER_MODEL,
 } from '../shared/recommendations';
 
-export const APP_NAME = 'OpenWhisp';
+export const APP_NAME = 'Yap';
 
 export const ENHANCEMENT_LABELS: Record<EnhancementLevel, string> = {
   none: 'No filter',

@@ -1,23 +1,12 @@
-# OpenWhisp Enhanced
+# yap
 
-![OpenWhisp](assets/cover.png)
+![yap](assets/cover.png)
 
-**Free WisprFlow alternative.** Hold **Fn**, speak, release. Your words are transcribed via cloud AI, polished by a local LLM, and pasted right where you need them. German-optimized, works with any language.
+**Open source dictation for macOS.** Hold a key, speak, release. Your words are
+transcribed, polished by an LLM, and pasted right where your cursor is. No
+subscription, no account, bring your own keys.
 
-> Enhanced fork of [OpenWhisp](https://github.com/giusmarci/openwhisp) by [Raelume](https://raelume.ai). Adds cloud transcription, smaller/faster models, and multi-language support.
-
-## What's different from the original?
-
-| Feature | Original OpenWhisp | Enhanced |
-|---|---|---|
-| **Transcription** | Local only (Whisper Base, 150 MB) | Cloud via Groq (Whisper Large v3) + local fallback |
-| **Accuracy** | Basic | Significantly better (Large v3 vs Base) |
-| **Text model** | gemma4:e4b (9.6 GB) | qwen3.5:2b (2.7 GB), 3.5x smaller |
-| **Language** | English-focused | German-optimized (configurable to any language) |
-| **Cloud cost** | None (all local) | Free (Groq Free Tier: 2 hours of audio per day) |
-| **RAM usage** | ~12 GB (Whisper + Gemma 4) | ~3 GB (only Ollama LLM, transcription runs in the cloud) |
-| **API key security** | N/A | Encrypted via macOS Keychain |
-| **Offline mode** | Yes | Yes (automatic fallback to local Whisper) |
+Works in any app. Runs fully local if you want it to.
 
 ## How it works
 
@@ -38,7 +27,7 @@ Audio -> Groq Whisper Large v3 (cloud, free)
       Polished text -> Clipboard -> Auto-paste
 ```
 
-No internet? No problem. OpenWhisp automatically falls back to local Whisper.
+No internet? No problem. yap automatically falls back to local Whisper.
 
 ## Features
 
@@ -83,21 +72,21 @@ ollama pull qwen3.5:2b
 
 ### 3. Download the app
 
-Grab the latest `.dmg` from [Releases](https://github.com/nicremo/openwhisp-enhanced/releases), open it and drag OpenWhisp to your Applications folder.
+Grab the latest `.dmg` from [Releases](https://github.com/nicremo/yap/releases), open it and drag yap to your Applications folder.
 
 Since the app is not signed with an Apple Developer certificate, macOS will block it on first launch. Run this once in Terminal to allow it:
 
 ```bash
-xattr -cr /Applications/OpenWhisp.app
+xattr -cr /Applications/Yap.app
 ```
 
-Then open OpenWhisp normally. You only need to do this once.
+Then open yap normally. You only need to do this once.
 
 ### 3b. Or build from source
 
 ```bash
-git clone https://github.com/nicremo/openwhisp-enhanced.git
-cd openwhisp-enhanced
+git clone https://github.com/nicremo/yap.git
+cd yap
 npm install
 npm run build:native
 npm run dev
@@ -186,7 +175,7 @@ src/
   preload/                  # Electron preload bridge
   shared/                   # Shared types and constants
 swift/
-  OpenWhispHelper.swift     # Native macOS helper
+  YapHelper.swift           # Native macOS helper
 ```
 
 ## Building for distribution
@@ -199,9 +188,13 @@ Builds the Electron app, compiles the Swift helper, and packages everything into
 
 ## Credits
 
-- Original [OpenWhisp](https://github.com/giusmarci/openwhisp) by [GiusMarci](https://x.com/GiusMarci) / [Raelume](https://raelume.ai)
-- Enhanced version by [Fabian](https://github.com/nicremo)
+yap is a rebranded fork of [OpenWhisp](https://github.com/giusmarci/openwhisp)
+by [Gius.Marci](https://x.com/GiusMarci) of [Raelume](https://raelume.ai). The
+interaction model and the visual design are theirs, and the credit for both
+belongs to them. The original has not been updated since April 2026, so this
+fork carries it forward with cloud transcription, additional rewrite providers
+and a different backend.
 
 ## License
 
-MIT (same as the original)
+MIT, same as the original. See [LICENSE](LICENSE).

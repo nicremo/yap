@@ -48,7 +48,7 @@ export async function retranscribeEntry(options: RetranscribeOptions): Promise<H
         status: 'transcription-failed',
         errorMessage: 'No speech detected in the recording.',
       });
-      setStatus({ phase: 'error', title: 'Nothing heard', detail: 'OpenWhisp did not detect enough speech to transcribe.' });
+      setStatus({ phase: 'error', title: 'Nothing heard', detail: 'Yap did not detect enough speech to transcribe.' });
       return entries;
     }
 

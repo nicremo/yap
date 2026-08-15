@@ -9,14 +9,14 @@ const outputDir = path.join(projectRoot, 'build', 'native');
 mkdirSync(outputDir, { recursive: true });
 
 if (process.platform === 'darwin') {
-  const src = path.join(projectRoot, 'swift', 'OpenWhispHelper.swift');
-  const out = path.join(outputDir, 'openwhisp-helper');
+  const src = path.join(projectRoot, 'swift', 'YapHelper.swift');
+  const out = path.join(outputDir, 'yap-helper');
   console.log('[build] Compiling Swift helper for macOS...');
   execFileSync('swiftc', [src, '-o', out], { stdio: 'inherit' });
   console.log('[build] Swift helper compiled.');
 } else if (process.platform === 'win32') {
-  const src = path.join(projectRoot, 'windows', 'OpenWhispHelper.cpp');
-  const out = path.join(outputDir, 'openwhisp-helper.exe');
+  const src = path.join(projectRoot, 'windows', 'YapHelper.cpp');
+  const out = path.join(outputDir, 'yap-helper.exe');
   console.log('[build] Compiling C++ helper for Windows...');
   try {
     execFileSync('cl.exe', ['/O2', '/W3', src, '/link', 'user32.lib', 'kernel32.lib', `/out:${out}`], { stdio: 'inherit' });

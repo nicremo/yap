@@ -1,7 +1,7 @@
 node_modules
 dist
 release
-build/native/openwhisp-helper
+build/native/yap-helper
 *.log
 .env
 .env.*
@@ -10,3 +10,6 @@ build/native/openwhisp-helper
 *.dmg
 *.zip
 .firecrawl/
+
+# Local design-tool config
+.impeccable/

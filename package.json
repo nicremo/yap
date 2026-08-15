@@ -1,6 +1,7 @@
 {
-  "name": "openwhisp",
+  "name": "yap",
   "version": "0.9.0",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "description": "Mac-first local dictation with lightweight Whisper transcription and Ollama rewriting.",
@@ -11,15 +12,15 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "build:native": "node scripts/build-helper-platform.js",
-    "build:native:mac": "swiftc swift/OpenWhispHelper.swift -o build/native/openwhisp-helper",
-    "build:native:win": "cd windows && cl.exe /O2 /W3 OpenWhispHelper.cpp /link user32.lib kernel32.lib /out:..\\build\\native\\openwhisp-helper.exe",
+    "build:native:mac": "swiftc swift/YapHelper.swift -o build/native/yap-helper",
+    "build:native:win": "cd windows && cl.exe /O2 /W3 YapHelper.cpp /link user32.lib kernel32.lib /out:..\\build\\native\\yap-helper.exe",
     "package": "npm run build && npm run build:native && electron-builder",
     "package:mac": "npm run build && npm run build:native && electron-builder --mac",
     "package:win": "npm run build && npm run build:native && electron-builder --win"
   },
   "build": {
-    "appId": "ai.openwhisp.desktop",
-    "productName": "OpenWhisp",
+    "appId": "ai.yap.desktop",
+    "productName": "Yap",
     "files": [
       "dist/**/*",
       "package.json"
@@ -49,7 +50,7 @@
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
       "extendInfo": {
-        "NSMicrophoneUsageDescription": "OpenWhisp needs microphone access to transcribe your speech locally."
+        "NSMicrophoneUsageDescription": "Yap needs microphone access to transcribe your speech locally."
       }
     },
     "win": {
@@ -62,12 +63,12 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "artifactName": "OpenWhisp-${version}-setup.${ext}"
+      "artifactName": "Yap-${version}-setup.${ext}"
     },
     "publish": {
       "provider": "github",
       "owner": "nicremo",
-      "repo": "openwhisp-enhanced"
+      "repo": "yap"
     }
   },
   "dependencies": {

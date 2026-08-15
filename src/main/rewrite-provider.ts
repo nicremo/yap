@@ -16,8 +16,8 @@ export interface RewriteTarget {
 /* Frozen because every target now shares this one object instead of getting a
    fresh literal, and nothing may mutate a target's headers. */
 const OPENROUTER_HEADERS: Record<string, string> = Object.freeze({
-  'HTTP-Referer': 'https://github.com/nicremo/openwhisp-enhanced',
-  'X-Title': 'OpenWhisp',
+  'HTTP-Referer': 'https://github.com/nicremo/yap',
+  'X-Title': 'Yap',
 });
 
 const PROVIDER_LABELS: Record<CloudRewriteProvider, string> = {

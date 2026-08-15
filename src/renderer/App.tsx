@@ -152,17 +152,17 @@ export function App() {
   useEffect(() => {
     let mounted = true;
     const load = async () => {
-      const next = await window.openWhisp.bootstrap();
+      const next = await window.yap.bootstrap();
       if (!mounted) return;
       setBootstrap(next);
       setStatus(next.status);
     };
     void load();
-    const stopStatus = window.openWhisp.onStatus((s) => { if (mounted) setStatus(s); });
+    const stopStatus = window.yap.onStatus((s) => { if (mounted) setStatus(s); });
     const DOUBLE_CLICK_MS = 300;
     const keyHeldRef = { current: false };
     const stopHotkey = OVERLAY_VIEW
-      ? window.openWhisp.onHotkey((e) => {
+      ? window.yap.onHotkey((e) => {
           if (e.type === 'down') {
             keyHeldRef.current = true;
 
@@ -200,7 +200,7 @@ export function App() {
           }
         })
       : () => undefined;
-    const stopHistory = window.openWhisp.onHistoryUpdated((history) => {
+    const stopHistory = window.yap.onHistoryUpdated((history) => {
       if (!mounted) return;
       setBootstrap((prev) => prev ? { ...prev, history } : prev);
     });
@@ -230,14 +230,14 @@ export function App() {
   }, [status.phase]);
 
   const refreshBootstrap = async () => {
-    const next = await window.openWhisp.bootstrap();
+    const next = await window.yap.bootstrap();
     bootstrapRef.current = next;
     setBootstrap(next);
     setStatus(next.status);
     return next;
   };
 
-  const pushStatus = (s: AppStatus) => { setStatus(s); window.openWhisp.pushStatus(s); };
+  const pushStatus = (s: AppStatus) => { setStatus(s); window.yap.pushStatus(s); };
 
   const runAction = async (label: string, action: () => Promise<BootstrapState>) => {
     try {
@@ -264,12 +264,12 @@ export function App() {
 
     if (current.permissions.microphone !== 'granted') {
       pushStatus({ phase: 'error', title: 'Microphone needed', detail: 'Grant microphone access in setup.' });
-      await window.openWhisp.showMainWindow();
+      await window.yap.showMainWindow();
       return;
     }
     if (!current.permissions.inputMonitoring || !current.permissions.postEvents || !current.permissions.accessibility) {
       pushStatus({ phase: 'error', title: 'System access needed', detail: 'Enable permissions in setup.' });
-      await window.openWhisp.showMainWindow();
+      await window.yap.showMainWindow();
       return;
     }
     const canTranscribe =
@@ -277,18 +277,18 @@ export function App() {
       current.speechModelReady;
     if (!canTranscribe) {
       pushStatus({ phase: 'error', title: 'No transcription engine', detail: 'Set up an OpenAI API key or download the local speech model.' });
-      await window.openWhisp.showMainWindow();
+      await window.yap.showMainWindow();
       return;
     }
     const needsOllama = current.settings.enhancementLevel !== 'none' && current.settings.rewriteMode === 'local';
     if (needsOllama && (!current.ollamaReachable || !modelInstalled)) {
       pushStatus({ phase: 'error', title: 'Text model unavailable', detail: 'Start Ollama, install the rewrite model, or switch to Cloud rewrite.' });
-      await window.openWhisp.showMainWindow();
+      await window.yap.showMainWindow();
       return;
     }
 
     try {
-      targetFocusRef.current = await window.openWhisp.captureFocusTarget();
+      targetFocusRef.current = await window.yap.captureFocusTarget();
       recordingRef.current = true;
       await recorderRef.current?.start();
       pushStatus({ phase: 'listening', title: 'Listening', detail: 'Speak while holding Fn.' });
@@ -306,7 +306,7 @@ export function App() {
     try {
       const wavBase64 = await recorderRef.current?.stop();
       if (!wavBase64) throw new Error('No recording was captured.');
-      const result = await window.openWhisp.processAudio({
+      const result = await window.yap.processAudio({
         wavBase64,
         targetFocus: targetFocusRef.current ?? undefined,
       });
@@ -331,10 +331,10 @@ export function App() {
 
   if (OVERLAY_VIEW) return <OverlayBar status={status} audioLevel={audioLevel} handsfree={isHandsfree} />;
   if (!bootstrap) {
-    return <main className="app-shell loading-shell"><div className="loading-spinner" /><span className="loading-text">Loading Openwhisp</span></main>;
+    return <main className="app-shell loading-shell"><div className="loading-spinner" /><span className="loading-text">Loading Yap</span></main>;
   }
   if (!bootstrap.settings.setupComplete) {
-    return <SetupWizard bootstrap={bootstrap} busyAction={busyAction} onAction={runAction} onRefresh={refreshBootstrap} onComplete={() => void runAction('setup', () => window.openWhisp.updateSettings({ setupComplete: true }))} />;
+    return <SetupWizard bootstrap={bootstrap} busyAction={busyAction} onAction={runAction} onRefresh={refreshBootstrap} onComplete={() => void runAction('setup', () => window.yap.updateSettings({ setupComplete: true }))} />;
   }
 
   return <MainView bootstrap={bootstrap} status={status} busyAction={busyAction} onAction={runAction} onRefresh={refreshBootstrap} />;
@@ -368,7 +368,7 @@ function SetupWizard({ bootstrap, busyAction, onAction, onRefresh, onComplete }:
         {step === 'welcome' && (
           <div className="setup-step setup-step-center">
             <div className="fn-key"><span>fn</span></div>
-            <h1 className="setup-title serif">Welcome to Openwhisp</h1>
+            <h1 className="setup-title serif">Welcome to Yap</h1>
             <p className="setup-desc">Hold a key, speak, release. Your voice is transcribed, polished, and pasted. Free and open source.</p>
             <div className="setup-nav"><div /><button className="btn btn-primary" onClick={next}>Get Started</button></div>
           </div>
@@ -380,7 +380,7 @@ function SetupWizard({ bootstrap, busyAction, onAction, onRefresh, onComplete }:
           <div className="setup-step setup-step-center">
             <div className="ready-icon"><CheckIcon size={32} /></div>
             <h1 className="setup-title serif">You're All Set</h1>
-            <p className="setup-desc">Hold your dictation key to speak. Release it and Openwhisp handles the rest.</p>
+            <p className="setup-desc">Hold your dictation key to speak. Release it and Yap handles the rest.</p>
             <div className="setup-nav"><button className="btn btn-ghost" onClick={back}>Back</button><button className="btn btn-primary" onClick={onComplete}>Start Dictating</button></div>
           </div>
         )}
@@ -406,7 +406,7 @@ function OllamaStep({ bootstrap, onRefresh, onNext, onBack }: { bootstrap: Boots
           <div className="s-card-bottom">
             <p className="s-card-hint">{hasCloudRewrite ? 'Optional: install Ollama for local text enhancement, or skip to use cloud rewriting.' : 'Install and start Ollama to continue.'}</p>
             <div className="btn-group">
-              <button className="btn btn-secondary" onClick={() => void window.openWhisp.openExternal('https://ollama.com/download/mac')}>Install Ollama</button>
+              <button className="btn btn-secondary" onClick={() => void window.yap.openExternal('https://ollama.com/download/mac')}>Install Ollama</button>
               <button className="btn btn-secondary" onClick={() => void retry()} disabled={checking}>{checking ? 'Checking...' : 'Retry'}</button>
             </div>
           </div>
@@ -432,11 +432,11 @@ function TranscriptionStep({ bootstrap, busyAction, onAction, onRefresh, onNext,
   const handleTestAndSave = async () => {
     if (!apiKey) return;
     setKeyStatus('testing');
-    const result = await window.openWhisp.testApiKey(apiKey);
+    const result = await window.yap.testApiKey(apiKey);
     if (result.valid) {
       setKeyStatus('valid');
       setKeyError('');
-      await onAction('settings', () => window.openWhisp.updateSettings({ openaiApiKey: apiKey }));
+      await onAction('settings', () => window.yap.updateSettings({ openaiApiKey: apiKey }));
       await onRefresh();
     } else {
       setKeyStatus('invalid');
@@ -449,7 +449,7 @@ function TranscriptionStep({ bootstrap, busyAction, onAction, onRefresh, onNext,
   return (
     <div className="setup-step">
       <h1 className="setup-title serif">Transcription Engine</h1>
-      <p className="setup-desc">Choose how Openwhisp turns your voice into text. Set up one or both.</p>
+      <p className="setup-desc">Choose how Yap turns your voice into text. Set up one or both.</p>
 
       <div className="s-card">
         <div className="s-card-label">Cloud via Groq (Recommended, Free)</div>
@@ -480,7 +480,7 @@ function TranscriptionStep({ bootstrap, busyAction, onAction, onRefresh, onNext,
             </div>
             {keyStatus === 'valid' && <span className="api-key-status api-key-ok">Valid API key</span>}
             {keyStatus === 'invalid' && <span className="api-key-status api-key-err">{keyError}</span>}
-            <button className="btn btn-link btn-muted" style={{ marginTop: 4, fontSize: 12 }} onClick={() => void window.openWhisp.openExternal('https://console.groq.com/keys')}>Get a free Groq API key</button>
+            <button className="btn btn-link btn-muted" style={{ marginTop: 4, fontSize: 12 }} onClick={() => void window.yap.openExternal('https://console.groq.com/keys')}>Get a free Groq API key</button>
           </div>
         )}
       </div>
@@ -491,7 +491,7 @@ function TranscriptionStep({ bootstrap, busyAction, onAction, onRefresh, onNext,
           <div className="s-card-info"><strong>{RECOMMENDED_WHISPER_LABEL}</strong><span>Privacy-first, runs on your device, no internet needed</span></div>
           {bootstrap.speechModelReady
             ? <span className="badge badge-ready"><CheckIcon size={12} /> Ready</span>
-            : <button className="btn btn-sm btn-primary" disabled={busyAction === 'speech'} onClick={() => void onAction('speech', () => window.openWhisp.prepareSpeechModel())}>{busyAction === 'speech' ? 'Downloading...' : 'Download'}</button>
+            : <button className="btn btn-sm btn-primary" disabled={busyAction === 'speech'} onClick={() => void onAction('speech', () => window.yap.prepareSpeechModel())}>{busyAction === 'speech' ? 'Downloading...' : 'Download'}</button>
           }
         </div>
       </div>
@@ -507,16 +507,16 @@ function PermissionsStep({ bootstrap, busyAction, onAction, onNext, onBack }: { 
   return (
     <div className="setup-step">
       <h1 className="setup-title serif">Allow Access</h1>
-      <p className="setup-desc">Openwhisp needs permissions to listen, transcribe, and paste.</p>
+      <p className="setup-desc">Yap needs permissions to listen, transcribe, and paste.</p>
       <div className="s-card">
         <div className="s-card-row">
           <div className="s-card-info"><strong>Microphone</strong><span>Captures your voice</span></div>
-          {micOk ? <span className="badge badge-ready"><CheckIcon size={12} /> Granted</span> : <button className="btn btn-sm btn-primary" disabled={busyAction === 'mic'} onClick={() => void onAction('mic', () => window.openWhisp.requestMicrophoneAccess())}>{busyAction === 'mic' ? 'Requesting...' : 'Allow'}</button>}
+          {micOk ? <span className="badge badge-ready"><CheckIcon size={12} /> Granted</span> : <button className="btn btn-sm btn-primary" disabled={busyAction === 'mic'} onClick={() => void onAction('mic', () => window.yap.requestMicrophoneAccess())}>{busyAction === 'mic' ? 'Requesting...' : 'Allow'}</button>}
         </div>
         <div className="s-card-divider" />
         <div className="s-card-row">
           <div className="s-card-info"><strong>System Access</strong><span>{IS_WINDOWS ? 'Hotkey and auto-paste' : 'Fn key and auto-paste'}</span></div>
-          {sysOk ? <span className="badge badge-ready"><CheckIcon size={12} /> Granted</span> : <button className="btn btn-sm btn-primary" disabled={busyAction === 'system'} onClick={() => void onAction('system', () => window.openWhisp.requestSystemAccess())}>{busyAction === 'system' ? 'Opening...' : 'Allow'}</button>}
+          {sysOk ? <span className="badge badge-ready"><CheckIcon size={12} /> Granted</span> : <button className="btn btn-sm btn-primary" disabled={busyAction === 'system'} onClick={() => void onAction('system', () => window.yap.requestSystemAccess())}>{busyAction === 'system' ? 'Opening...' : 'Allow'}</button>}
         </div>
       </div>
       {!sysOk && !IS_WINDOWS && <p className="setup-hint">macOS will prompt you in System Settings. You may need to restart the app.</p>}
@@ -543,7 +543,7 @@ function MainView({ bootstrap, status, busyAction, onAction, onRefresh }: {
       <aside className="sidebar">
         <div className="sidebar-brand">
           <img src={logoUrl} alt="" className="sidebar-logo" />
-          <h1 className="serif">Openwhisp</h1>
+          <h1 className="serif">Yap</h1>
         </div>
         <nav className="sidebar-nav">
           <button className={`nav-item${page === 'home' ? ' nav-item-active' : ''}`} onClick={() => setPage('home')}>
@@ -566,14 +566,14 @@ function MainView({ bootstrap, status, busyAction, onAction, onRefresh }: {
           </button>
         </nav>
         <div className="sidebar-footer">
-          <button className="btn btn-link btn-muted" onClick={() => void onAction('setup', () => window.openWhisp.updateSettings({ setupComplete: false }))}>Reset Setup</button>
+          <button className="btn btn-link btn-muted" onClick={() => void onAction('setup', () => window.yap.updateSettings({ setupComplete: false }))}>Reset Setup</button>
           <div className="sidebar-credits">
             <span className="credit-muted">Original by</span>
-            <button className="credit-link" onClick={() => void window.openWhisp.openExternal('https://x.com/GiusMarci')}>@GiusMarci</button>
+            <button className="credit-link" onClick={() => void window.yap.openExternal('https://x.com/GiusMarci')}>@GiusMarci</button>
           </div>
           <div className="sidebar-credits">
             <span className="credit-muted">Enhanced by</span>
-            <button className="credit-link" onClick={() => void window.openWhisp.openExternal('https://github.com/nicremo')}>Fabian Bitz</button>
+            <button className="credit-link" onClick={() => void window.yap.openExternal('https://github.com/nicremo')}>Fabian Bitz</button>
           </div>
         </div>
       </aside>
@@ -652,13 +652,13 @@ function StylePage({ bootstrap, onAction, onRefresh }: { bootstrap: BootstrapSta
   useEffect(() => { setRules(bootstrap.appRules); }, [bootstrap.appRules]);
 
   const handleRemoveRule = async (appId: string) => {
-    const updated = await window.openWhisp.removeAppRule(appId);
+    const updated = await window.yap.removeAppRule(appId);
     setRules(updated);
     void onRefresh();
   };
 
   const handleUpdateRule = async (appId: string, style: string, level: string) => {
-    const updated = await window.openWhisp.updateAppRule(appId, style, level);
+    const updated = await window.yap.updateAppRule(appId, style, level);
     setRules(updated);
     void onRefresh();
   };
@@ -688,7 +688,7 @@ function StylePage({ bootstrap, onAction, onRefresh }: { bootstrap: BootstrapSta
           <button
             key={tab.value}
             className={`style-tab${bootstrap.settings.styleMode === tab.value ? ' style-tab-active' : ''}`}
-            onClick={() => void onAction('settings', () => window.openWhisp.updateSettings({ styleMode: tab.value }))}
+            onClick={() => void onAction('settings', () => window.yap.updateSettings({ styleMode: tab.value }))}
           >
             {tab.label}
           </button>
@@ -705,7 +705,7 @@ function StylePage({ bootstrap, onAction, onRefresh }: { bootstrap: BootstrapSta
             <button
               key={option}
               className={`voice-btn${voice === option ? ' voice-btn-active' : ''}`}
-              onClick={() => void onAction('settings', () => window.openWhisp.updateSettings({ customPlusVoice: option }))}
+              onClick={() => void onAction('settings', () => window.yap.updateSettings({ customPlusVoice: option }))}
             >
               {option === 'conversation' ? 'Conversation voice' : 'Developer voice'}
             </button>
@@ -720,7 +720,7 @@ function StylePage({ bootstrap, onAction, onRefresh }: { bootstrap: BootstrapSta
             <button
               key={level.value}
               className={`enhance-card${active ? ' enhance-card-active' : ''}`}
-              onClick={() => void onAction('settings', () => window.openWhisp.updateSettings({ enhancementLevel: level.value }))}
+              onClick={() => void onAction('settings', () => window.yap.updateSettings({ enhancementLevel: level.value }))}
             >
               <div className="enhance-card-top">
                 <strong className="serif">{level.label}</strong>
@@ -790,11 +790,11 @@ function TranscriptionCard({ bootstrap, onAction }: { bootstrap: BootstrapState;
   const handleTestKey = async () => {
     if (!apiKey) return;
     setKeyStatus('testing');
-    const result = await window.openWhisp.testApiKey(apiKey, baseUrl);
+    const result = await window.yap.testApiKey(apiKey, baseUrl);
     if (result.valid) {
       setKeyStatus('valid');
       setKeyError('');
-      void onAction('settings', () => window.openWhisp.updateSettings({ openaiApiKey: apiKey }));
+      void onAction('settings', () => window.yap.updateSettings({ openaiApiKey: apiKey }));
     } else {
       setKeyStatus('invalid');
       setKeyError(result.error ?? 'Validation failed.');
@@ -805,7 +805,7 @@ function TranscriptionCard({ bootstrap, onAction }: { bootstrap: BootstrapState;
     setApiKey('');
     setKeyStatus('idle');
     setKeyError('');
-    void onAction('settings', async () => window.openWhisp.clearApiKey());
+    void onAction('settings', async () => window.yap.clearApiKey());
   };
 
   return (
@@ -818,7 +818,7 @@ function TranscriptionCard({ bootstrap, onAction }: { bootstrap: BootstrapState;
             <button
               key={value}
               className={`source-btn${mode === value ? ' source-btn-active' : ''}`}
-              onClick={() => void onAction('settings', () => window.openWhisp.updateSettings({ transcriptionMode: value }))}
+              onClick={() => void onAction('settings', () => window.yap.updateSettings({ transcriptionMode: value }))}
             >
               {value === 'auto' ? 'Auto' : value === 'cloud' ? 'Cloud' : 'Local'}
             </button>
@@ -862,7 +862,7 @@ function TranscriptionCard({ bootstrap, onAction }: { bootstrap: BootstrapState;
           {keyStatus === 'valid' && <span className="api-key-status api-key-ok">Valid API key</span>}
           {keyStatus === 'invalid' && <span className="api-key-status api-key-err">{keyError}</span>}
           {!bootstrap.openaiApiKeySet && (
-            <button className="btn btn-link btn-muted" style={{ marginTop: 4, fontSize: 12 }} onClick={() => void window.openWhisp.openExternal('https://platform.openai.com/api-keys')}>Get an API key</button>
+            <button className="btn btn-link btn-muted" style={{ marginTop: 4, fontSize: 12 }} onClick={() => void window.yap.openExternal('https://platform.openai.com/api-keys')}>Get an API key</button>
           )}
           <div className="setting-row" style={{ marginTop: 12 }}>
             <label className="setting-label" htmlFor="cloud-language">Language</label>
@@ -870,7 +870,7 @@ function TranscriptionCard({ bootstrap, onAction }: { bootstrap: BootstrapState;
               id="cloud-language"
               className="setting-select"
               value={bootstrap.settings.cloudLanguage}
-              onChange={(e) => void onAction('settings', () => window.openWhisp.updateSettings({ cloudLanguage: e.target.value }))}
+              onChange={(e) => void onAction('settings', () => window.yap.updateSettings({ cloudLanguage: e.target.value }))}
             >
               <option value="">Auto-detect</option>
               <option value="de">Deutsch</option>
@@ -893,7 +893,7 @@ function TranscriptionCard({ bootstrap, onAction }: { bootstrap: BootstrapState;
               className="setting-input"
               value={baseUrl}
               onChange={(e) => setBaseUrl(e.target.value)}
-              onBlur={() => void onAction('settings', () => window.openWhisp.updateSettings({ cloudApiBaseUrl: baseUrl }))}
+              onBlur={() => void onAction('settings', () => window.yap.updateSettings({ cloudApiBaseUrl: baseUrl }))}
               placeholder="https://api.openai.com"
             />
           </div>
@@ -903,7 +903,7 @@ function TranscriptionCard({ bootstrap, onAction }: { bootstrap: BootstrapState;
               id="cloud-model"
               className="setting-select"
               value={bootstrap.settings.cloudModel}
-              onChange={(e) => void onAction('settings', () => window.openWhisp.updateSettings({ cloudModel: e.target.value as CloudTranscriptionModel }))}
+              onChange={(e) => void onAction('settings', () => window.yap.updateSettings({ cloudModel: e.target.value as CloudTranscriptionModel }))}
             >
               {CLOUD_MODELS.map((m) => (
                 <option key={m.id} value={m.id}>{m.label} ({m.price})</option>
@@ -924,11 +924,11 @@ function OpenRouterRewriteSettings({ bootstrap, onAction }: { bootstrap: Bootstr
   const handleTestKey = async () => {
     if (!apiKey) return;
     setKeyStatus('testing');
-    const result = await window.openWhisp.testOpenrouterKey(apiKey);
+    const result = await window.yap.testOpenrouterKey(apiKey);
     if (result.valid) {
       setKeyStatus('valid');
       setKeyError('');
-      void onAction('settings', () => window.openWhisp.updateSettings({ openrouterApiKey: apiKey }));
+      void onAction('settings', () => window.yap.updateSettings({ openrouterApiKey: apiKey }));
     } else {
       setKeyStatus('invalid');
       setKeyError(result.error ?? 'Validation failed.');
@@ -939,14 +939,14 @@ function OpenRouterRewriteSettings({ bootstrap, onAction }: { bootstrap: Bootstr
     setApiKey('');
     setKeyStatus('idle');
     setKeyError('');
-    void onAction('settings', async () => window.openWhisp.clearApiKey('openrouter'));
+    void onAction('settings', async () => window.yap.clearApiKey('openrouter'));
   };
 
   return (
     <>
       <div className="setting-row" style={{ marginTop: 12 }}>
         <label className="setting-label" htmlFor="openrouter-model">Model</label>
-        <select id="openrouter-model" className="setting-select" value={bootstrap.settings.openrouterModel} onChange={(e) => void onAction('settings', () => window.openWhisp.updateSettings({ openrouterModel: e.target.value }))}>
+        <select id="openrouter-model" className="setting-select" value={bootstrap.settings.openrouterModel} onChange={(e) => void onAction('settings', () => window.yap.updateSettings({ openrouterModel: e.target.value }))}>
           {OPENROUTER_REWRITE_MODELS.map((m) => (
             <option key={m.id} value={m.id}>{m.label} ({m.price})</option>
           ))}
@@ -982,13 +982,13 @@ function OpenRouterRewriteSettings({ bootstrap, onAction }: { bootstrap: Bootstr
       {keyStatus === 'valid' && <span className="api-key-status api-key-ok">Valid API key</span>}
       {keyStatus === 'invalid' && <span className="api-key-status api-key-err">{keyError}</span>}
       {!bootstrap.openrouterApiKeySet && (
-        <button className="btn btn-link btn-muted" style={{ marginTop: 4, fontSize: 12 }} onClick={() => void window.openWhisp.openExternal('https://openrouter.ai/keys')}>Get an OpenRouter API key</button>
+        <button className="btn btn-link btn-muted" style={{ marginTop: 4, fontSize: 12 }} onClick={() => void window.yap.openExternal('https://openrouter.ai/keys')}>Get an OpenRouter API key</button>
       )}
       <ToggleRow
         title="Prefer fastest provider"
         description="Route requests to the provider with the highest throughput. May cost slightly more."
         checked={bootstrap.settings.openrouterSpeedRouting}
-        onChange={(v) => void onAction('settings', () => window.openWhisp.updateSettings({ openrouterSpeedRouting: v }))}
+        onChange={(v) => void onAction('settings', () => window.yap.updateSettings({ openrouterSpeedRouting: v }))}
       />
     </>
   );
@@ -1002,11 +1002,11 @@ function FireworksRewriteSettings({ bootstrap, onAction }: { bootstrap: Bootstra
   const handleTestKey = async () => {
     if (!apiKey) return;
     setKeyStatus('testing');
-    const result = await window.openWhisp.testFireworksKey(apiKey);
+    const result = await window.yap.testFireworksKey(apiKey);
     if (result.valid) {
       setKeyStatus('valid');
       setKeyError('');
-      void onAction('settings', () => window.openWhisp.updateSettings({ fireworksApiKey: apiKey }));
+      void onAction('settings', () => window.yap.updateSettings({ fireworksApiKey: apiKey }));
     } else {
       setKeyStatus('invalid');
       setKeyError(result.error ?? 'Validation failed.');
@@ -1017,14 +1017,14 @@ function FireworksRewriteSettings({ bootstrap, onAction }: { bootstrap: Bootstra
     setApiKey('');
     setKeyStatus('idle');
     setKeyError('');
-    void onAction('settings', async () => window.openWhisp.clearApiKey('fireworks'));
+    void onAction('settings', async () => window.yap.clearApiKey('fireworks'));
   };
 
   return (
     <>
       <div className="setting-row" style={{ marginTop: 12 }}>
         <label className="setting-label" htmlFor="fireworks-model">Model</label>
-        <select id="fireworks-model" className="setting-select" value={bootstrap.settings.fireworksModel} onChange={(e) => void onAction('settings', () => window.openWhisp.updateSettings({ fireworksModel: e.target.value }))}>
+        <select id="fireworks-model" className="setting-select" value={bootstrap.settings.fireworksModel} onChange={(e) => void onAction('settings', () => window.yap.updateSettings({ fireworksModel: e.target.value }))}>
           {FIREWORKS_REWRITE_MODELS.map((m) => (
             <option key={m.id} value={m.id}>{m.label} ({m.price})</option>
           ))}
@@ -1060,7 +1060,7 @@ function FireworksRewriteSettings({ bootstrap, onAction }: { bootstrap: Bootstra
       {keyStatus === 'valid' && <span className="api-key-status api-key-ok">Valid API key</span>}
       {keyStatus === 'invalid' && <span className="api-key-status api-key-err">{keyError}</span>}
       {!bootstrap.fireworksApiKeySet && (
-        <button className="btn btn-link btn-muted" style={{ marginTop: 4, fontSize: 12 }} onClick={() => void window.openWhisp.openExternal('https://app.fireworks.ai/settings/users/api-keys')}>Get a Fireworks API key</button>
+        <button className="btn btn-link btn-muted" style={{ marginTop: 4, fontSize: 12 }} onClick={() => void window.yap.openExternal('https://app.fireworks.ai/settings/users/api-keys')}>Get a Fireworks API key</button>
       )}
     </>
   );
@@ -1093,7 +1093,7 @@ function ModelsPage({ bootstrap, busyAction, onAction }: { bootstrap: BootstrapS
           </div>
           {bootstrap.speechModelReady
             ? <span className="badge badge-ready"><CheckIcon size={12} /> Ready</span>
-            : <button className="btn btn-sm btn-primary" disabled={busyAction === 'speech'} onClick={() => void onAction('speech', () => window.openWhisp.prepareSpeechModel())}>{busyAction === 'speech' ? 'Downloading...' : 'Download'}</button>
+            : <button className="btn btn-sm btn-primary" disabled={busyAction === 'speech'} onClick={() => void onAction('speech', () => window.yap.prepareSpeechModel())}>{busyAction === 'speech' ? 'Downloading...' : 'Download'}</button>
           }
         </div>
       </div>
@@ -1101,13 +1101,13 @@ function ModelsPage({ bootstrap, busyAction, onAction }: { bootstrap: BootstrapS
       <div className="card">
         <div className="card-head">
           <h3>Text Enhancement</h3>
-          <button className="btn btn-link" onClick={() => void onAction('refresh', () => window.openWhisp.refreshOllama())}>Refresh</button>
+          <button className="btn btn-link" onClick={() => void onAction('refresh', () => window.yap.refreshOllama())}>Refresh</button>
         </div>
         <div className="setting-row">
           <label className="setting-label">Rewrite via</label>
           <div className="source-selector">
-            <button className={`source-btn${bootstrap.settings.rewriteMode === 'cloud' ? ' source-btn-active' : ''}`} onClick={() => void onAction('settings', () => window.openWhisp.updateSettings({ rewriteMode: 'cloud' }))}>Cloud</button>
-            <button className={`source-btn${bootstrap.settings.rewriteMode === 'local' ? ' source-btn-active' : ''}`} onClick={() => void onAction('settings', () => window.openWhisp.updateSettings({ rewriteMode: 'local' }))}>Local</button>
+            <button className={`source-btn${bootstrap.settings.rewriteMode === 'cloud' ? ' source-btn-active' : ''}`} onClick={() => void onAction('settings', () => window.yap.updateSettings({ rewriteMode: 'cloud' }))}>Cloud</button>
+            <button className={`source-btn${bootstrap.settings.rewriteMode === 'local' ? ' source-btn-active' : ''}`} onClick={() => void onAction('settings', () => window.yap.updateSettings({ rewriteMode: 'local' }))}>Local</button>
           </div>
         </div>
         <div className="setting-hint">
@@ -1124,15 +1124,15 @@ function ModelsPage({ bootstrap, busyAction, onAction }: { bootstrap: BootstrapS
             <div className="setting-row" style={{ marginTop: 12 }}>
               <label className="setting-label">Provider</label>
               <div className="source-selector">
-                <button className={`source-btn${bootstrap.settings.cloudRewriteProvider === 'groq' ? ' source-btn-active' : ''}`} onClick={() => void onAction('settings', () => window.openWhisp.updateSettings({ cloudRewriteProvider: 'groq' }))}>Groq</button>
-                <button className={`source-btn${bootstrap.settings.cloudRewriteProvider === 'openrouter' ? ' source-btn-active' : ''}`} onClick={() => void onAction('settings', () => window.openWhisp.updateSettings({ cloudRewriteProvider: 'openrouter' }))}>OpenRouter</button>
-                <button className={`source-btn${bootstrap.settings.cloudRewriteProvider === 'fireworks' ? ' source-btn-active' : ''}`} onClick={() => void onAction('settings', () => window.openWhisp.updateSettings({ cloudRewriteProvider: 'fireworks' }))}>Fireworks</button>
+                <button className={`source-btn${bootstrap.settings.cloudRewriteProvider === 'groq' ? ' source-btn-active' : ''}`} onClick={() => void onAction('settings', () => window.yap.updateSettings({ cloudRewriteProvider: 'groq' }))}>Groq</button>
+                <button className={`source-btn${bootstrap.settings.cloudRewriteProvider === 'openrouter' ? ' source-btn-active' : ''}`} onClick={() => void onAction('settings', () => window.yap.updateSettings({ cloudRewriteProvider: 'openrouter' }))}>OpenRouter</button>
+                <button className={`source-btn${bootstrap.settings.cloudRewriteProvider === 'fireworks' ? ' source-btn-active' : ''}`} onClick={() => void onAction('settings', () => window.yap.updateSettings({ cloudRewriteProvider: 'fireworks' }))}>Fireworks</button>
               </div>
             </div>
             {bootstrap.settings.cloudRewriteProvider === 'groq' ? (
               <div className="setting-row" style={{ marginTop: 12 }}>
                 <label className="setting-label" htmlFor="cloud-rewrite-model">Cloud model</label>
-                <select id="cloud-rewrite-model" className="setting-select" value={bootstrap.settings.cloudRewriteModel} onChange={(e) => void onAction('settings', () => window.openWhisp.updateSettings({ cloudRewriteModel: e.target.value }))}>
+                <select id="cloud-rewrite-model" className="setting-select" value={bootstrap.settings.cloudRewriteModel} onChange={(e) => void onAction('settings', () => window.yap.updateSettings({ cloudRewriteModel: e.target.value }))}>
                   <option value="openai/gpt-oss-20b">GPT-OSS 20B (1000 t/s)</option>
                   <option value="openai/gpt-oss-120b">GPT-OSS 120B (500 t/s)</option>
                   <option value="qwen/qwen3-32b">Qwen3 32B (400 t/s)</option>
@@ -1151,7 +1151,7 @@ function ModelsPage({ bootstrap, busyAction, onAction }: { bootstrap: BootstrapS
           <>
             <div className="setting-row" style={{ marginTop: 12 }}>
               <label className="setting-label" htmlFor="model-select">Ollama model</label>
-              <select id="model-select" className="setting-select" value={bootstrap.settings.textModel} onChange={(e) => void onAction('settings', () => window.openWhisp.updateSettings({ textModel: e.target.value }))}>
+              <select id="model-select" className="setting-select" value={bootstrap.settings.textModel} onChange={(e) => void onAction('settings', () => window.yap.updateSettings({ textModel: e.target.value }))}>
                 {bootstrap.ollamaModels.length === 0
                   ? <option value={bootstrap.settings.textModel}>{bootstrap.settings.textModel}</option>
                   : bootstrap.ollamaModels.map((m) => <option key={m.name} value={m.name}>{m.name} ({formatBytes(m.size)})</option>)
@@ -1159,7 +1159,7 @@ function ModelsPage({ bootstrap, busyAction, onAction }: { bootstrap: BootstrapS
               </select>
             </div>
             {!bootstrap.recommendedModelInstalled && bootstrap.ollamaReachable && (
-              <button className="btn btn-sm btn-primary" style={{ marginTop: 10 }} disabled={busyAction === 'model'} onClick={() => void onAction('model', () => window.openWhisp.pullRecommendedModel())}>
+              <button className="btn btn-sm btn-primary" style={{ marginTop: 10 }} disabled={busyAction === 'model'} onClick={() => void onAction('model', () => window.yap.pullRecommendedModel())}>
                 {busyAction === 'model' ? 'Downloading...' : `Download ${RECOMMENDED_TEXT_MODEL}`}
               </button>
             )}
@@ -1172,7 +1172,7 @@ function ModelsPage({ bootstrap, busyAction, onAction }: { bootstrap: BootstrapS
         <div className="setting-row">
           <label className="setting-label" htmlFor="ollama-url">Server URL</label>
           <div className="url-field">
-            <input id="ollama-url" className="setting-input" value={ollamaUrl} onChange={(e) => setOllamaUrl(e.target.value)} onBlur={() => void onAction('settings', () => window.openWhisp.updateSettings({ ollamaBaseUrl: ollamaUrl }))} />
+            <input id="ollama-url" className="setting-input" value={ollamaUrl} onChange={(e) => setOllamaUrl(e.target.value)} onBlur={() => void onAction('settings', () => window.yap.updateSettings({ ollamaBaseUrl: ollamaUrl }))} />
             <span className={`url-badge${bootstrap.ollamaReachable ? ' url-badge-ok' : ' url-badge-off'}`}>{bootstrap.ollamaReachable ? 'Connected' : 'Offline'}</span>
           </div>
         </div>
@@ -1197,14 +1197,14 @@ function DictionaryPage({ bootstrap, onRefresh }: { bootstrap: BootstrapState; o
   const handleAddWord = async () => {
     const trimmed = newWord.trim();
     if (!trimmed) return;
-    const updated = await window.openWhisp.addDictionaryWord(trimmed);
+    const updated = await window.yap.addDictionaryWord(trimmed);
     setWords(updated);
     setNewWord('');
     void onRefresh();
   };
 
   const handleRemoveWord = async (word: string) => {
-    const updated = await window.openWhisp.removeDictionaryWord(word);
+    const updated = await window.yap.removeDictionaryWord(word);
     setWords(updated);
     void onRefresh();
   };
@@ -1213,7 +1213,7 @@ function DictionaryPage({ bootstrap, onRefresh }: { bootstrap: BootstrapState; o
     const from = corrFrom.trim();
     const to = corrTo.trim();
     if (!from || !to) return;
-    const updated = await window.openWhisp.addCorrection(from, to);
+    const updated = await window.yap.addCorrection(from, to);
     setCorrections(updated);
     setCorrFrom('');
     setCorrTo('');
@@ -1221,7 +1221,7 @@ function DictionaryPage({ bootstrap, onRefresh }: { bootstrap: BootstrapState; o
   };
 
   const handleRemoveCorrection = async (from: string) => {
-    const updated = await window.openWhisp.removeCorrection(from);
+    const updated = await window.yap.removeCorrection(from);
     setCorrections(updated);
     void onRefresh();
   };
@@ -1230,7 +1230,7 @@ function DictionaryPage({ bootstrap, onRefresh }: { bootstrap: BootstrapState; o
     <div className="page">
       <div className="page-header">
         <h2 className="page-title serif">Dictionary</h2>
-        <p className="page-desc">Teach OpenWhisp your vocabulary. Words get spelled correctly, misspellings get auto-corrected.</p>
+        <p className="page-desc">Teach Yap your vocabulary. Words get spelled correctly, misspellings get auto-corrected.</p>
       </div>
 
       <div className="card">
@@ -1359,12 +1359,12 @@ function HistoryPage({ bootstrap, onRefresh }: { bootstrap: BootstrapState; onRe
   const history = bootstrap.history;
 
   const handleRemove = async (id: string) => {
-    await window.openWhisp.removeHistoryEntry(id);
+    await window.yap.removeHistoryEntry(id);
     await onRefresh();
   };
 
   const handleClear = async () => {
-    await window.openWhisp.clearHistory();
+    await window.yap.clearHistory();
     await onRefresh();
   };
 
@@ -1377,7 +1377,7 @@ function HistoryPage({ bootstrap, onRefresh }: { bootstrap: BootstrapState; onRe
     setActionError(null);
     setBusyEntryId(entry.id);
     try {
-      await window.openWhisp.retranscribe(entry.id, mode);
+      await window.yap.retranscribe(entry.id, mode);
       await onRefresh();
     } catch (error) {
       setActionError(error instanceof Error ? error.message : 'Retranscription failed.');
@@ -1389,7 +1389,7 @@ function HistoryPage({ bootstrap, onRefresh }: { bootstrap: BootstrapState; onRe
   const handleRevealAudio = async (entry: HistoryEntry) => {
     setActionError(null);
     try {
-      await window.openWhisp.revealAudio(entry.id);
+      await window.yap.revealAudio(entry.id);
     } catch (error) {
       setActionError(error instanceof Error ? error.message : 'Could not open the audio file.');
     }
@@ -1676,35 +1676,35 @@ function PreferencesPage({ bootstrap, onAction }: { bootstrap: BootstrapState; o
     <div className="page">
       <div className="page-header">
         <h2 className="page-title serif">Preferences</h2>
-        <p className="page-desc">Customize how Openwhisp works.</p>
+        <p className="page-desc">Customize how Yap works.</p>
       </div>
 
       <div className="card">
         <div className="card-head"><h3>Dictation shortcut</h3></div>
         <HotkeyRecorder
           current={bootstrap.settings.hotkey}
-          onSave={(config) => void onAction('settings', () => window.openWhisp.updateSettings({ hotkey: config }))}
+          onSave={(config) => void onAction('settings', () => window.yap.updateSettings({ hotkey: config }))}
         />
       </div>
 
       <div className="card">
         <div className="card-head"><h3>Behavior</h3></div>
-        <ToggleRow title="Auto-paste" description="Paste into the active app after rewriting" checked={bootstrap.settings.autoPaste} onChange={(v) => void onAction('settings', () => window.openWhisp.updateSettings({ autoPaste: v }))} />
-        <ToggleRow title="Copy to clipboard" description="Copy the result to your clipboard after each dictation" checked={bootstrap.settings.copyToClipboard} onChange={(v) => void onAction('settings', () => window.openWhisp.updateSettings({ copyToClipboard: v }))} />
-        <ToggleRow title="Show overlay" description="Show the dictation badge on screen" checked={bootstrap.settings.showOverlay} onChange={(v) => void onAction('settings', () => window.openWhisp.updateSettings({ showOverlay: v }))} />
-        <ToggleRow title="Launch at login" description="Start Openwhisp when you log in" checked={bootstrap.settings.launchAtLogin} onChange={(v) => void onAction('settings', () => window.openWhisp.updateSettings({ launchAtLogin: v }))} />
+        <ToggleRow title="Auto-paste" description="Paste into the active app after rewriting" checked={bootstrap.settings.autoPaste} onChange={(v) => void onAction('settings', () => window.yap.updateSettings({ autoPaste: v }))} />
+        <ToggleRow title="Copy to clipboard" description="Copy the result to your clipboard after each dictation" checked={bootstrap.settings.copyToClipboard} onChange={(v) => void onAction('settings', () => window.yap.updateSettings({ copyToClipboard: v }))} />
+        <ToggleRow title="Show overlay" description="Show the dictation badge on screen" checked={bootstrap.settings.showOverlay} onChange={(v) => void onAction('settings', () => window.yap.updateSettings({ showOverlay: v }))} />
+        <ToggleRow title="Launch at login" description="Start Yap when you log in" checked={bootstrap.settings.launchAtLogin} onChange={(v) => void onAction('settings', () => window.yap.updateSettings({ launchAtLogin: v }))} />
       </div>
 
       <div className="card">
         <div className="card-head">
           <h3>Permissions</h3>
-          <button className="btn btn-link" onClick={() => void onAction('refresh', () => window.openWhisp.bootstrap())}>Refresh</button>
+          <button className="btn btn-link" onClick={() => void onAction('refresh', () => window.yap.bootstrap())}>Refresh</button>
         </div>
         <div className="perm-grid">
           <div className="perm-row">
             <span className="perm-name">Microphone</span>
             <span className={`perm-status${micOk ? ' perm-ok' : ' perm-missing'}`}>{micOk ? 'Granted' : 'Not granted'}</span>
-            {!micOk && <button className="btn btn-sm btn-primary" onClick={() => void onAction('mic', () => window.openWhisp.requestMicrophoneAccess())}>Allow</button>}
+            {!micOk && <button className="btn btn-sm btn-primary" onClick={() => void onAction('mic', () => window.yap.requestMicrophoneAccess())}>Allow</button>}
           </div>
           {!IS_WINDOWS && (
             <>
@@ -1720,8 +1720,8 @@ function PreferencesPage({ bootstrap, onAction }: { bootstrap: BootstrapState; o
                 <span className="perm-name">Paste Events</span>
                 <span className={`perm-status${p.postEvents ? ' perm-ok' : ' perm-missing'}`}>{p.postEvents ? 'Granted' : 'Not granted'}</span>
               </div>
-              {!sysOk && <button className="btn btn-sm btn-secondary" style={{ marginTop: 8 }} onClick={() => void onAction('system', () => window.openWhisp.requestSystemAccess())}>Grant Permissions</button>}
-              <button className="btn btn-link btn-muted" style={{ marginTop: 8 }} onClick={() => void window.openWhisp.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy')}>Manage in System Settings</button>
+              {!sysOk && <button className="btn btn-sm btn-secondary" style={{ marginTop: 8 }} onClick={() => void onAction('system', () => window.yap.requestSystemAccess())}>Grant Permissions</button>}
+              <button className="btn btn-link btn-muted" style={{ marginTop: 8 }} onClick={() => void window.yap.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy')}>Manage in System Settings</button>
             </>
           )}
         </div>
@@ -1731,8 +1731,8 @@ function PreferencesPage({ bootstrap, onAction }: { bootstrap: BootstrapState; o
         <div className="card-head">
           <h3>Storage</h3>
           <div className="btn-group-compact">
-            <button className="btn btn-link" onClick={() => void onAction('storage', () => window.openWhisp.chooseStorage())}>Change</button>
-            <button className="btn btn-link" onClick={() => void window.openWhisp.revealStorage()}>Open</button>
+            <button className="btn btn-link" onClick={() => void onAction('storage', () => window.yap.chooseStorage())}>Change</button>
+            <button className="btn btn-link" onClick={() => void window.yap.revealStorage()}>Open</button>
           </div>
         </div>
         <span className="storage-path">{bootstrap.settings.storageDirectory}</span>

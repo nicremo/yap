@@ -41,7 +41,7 @@ function getMicrophoneStatus(): PermissionsState['microphone'] {
 export async function getPermissionState(): Promise<PermissionsState> {
   const nativePermissions = await getNativePermissionState();
   const microphone = getMicrophoneStatus();
-  console.log('[openwhisp] mic status:', microphone, '| native:', JSON.stringify(nativePermissions));
+  console.log('[yap] mic status:', microphone, '| native:', JSON.stringify(nativePermissions));
 
   return {
     microphone,

@@ -10,7 +10,7 @@ import { app } from 'electron';
 import type { FocusInfo, HotkeyConfig, HotkeyEvent, PermissionsState } from '../shared/types';
 import { pathExists } from './storage';
 
-// Abstract key codes expected by the Windows helper (must match OpenWhispHelper.cpp)
+// Abstract key codes expected by the Windows helper (must match YapHelper.cpp)
 const AK = {
   LEFT_META: 1, RIGHT_META: 2,
   LEFT_ALT: 3, RIGHT_ALT: 4,
@@ -76,15 +76,15 @@ const projectRoot = path.resolve(fileURLToPath(new URL('../../', import.meta.url
 const isWindows = process.platform === 'win32';
 const helperExt = isWindows ? '.exe' : '';
 const helperSourcePath = isWindows
-  ? path.join(projectRoot, 'windows', 'OpenWhispHelper.cpp')
-  : path.join(projectRoot, 'swift', 'OpenWhispHelper.swift');
+  ? path.join(projectRoot, 'windows', 'YapHelper.cpp')
+  : path.join(projectRoot, 'swift', 'YapHelper.swift');
 
 type ListenerProcess = ChildProcessByStdio<null, Readable, Readable>;
 
 let listenerProcess: ListenerProcess | null = null;
 
 function getHelperBinaryPath(): string {
-  const name = `openwhisp-helper${helperExt}`;
+  const name = `yap-helper${helperExt}`;
   return app.isPackaged
     ? path.join(process.resourcesPath, 'native', name)
     : path.join(projectRoot, 'build', 'native', name);
@@ -128,7 +128,7 @@ export async function ensureNativeHelper(): Promise<boolean> {
 async function runHelperJson<T>(args: string[]): Promise<T> {
   const helperReady = await ensureNativeHelper();
   if (!helperReady) {
-    throw new Error('The native OpenWhisp helper is not available.');
+    throw new Error('The native Yap helper is not available.');
   }
 
   return new Promise<T>((resolve, reject) => {

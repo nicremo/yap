@@ -17,7 +17,7 @@ import type {
 
 declare global {
   interface Window {
-    openWhisp: {
+    yap: {
       bootstrap: () => Promise<BootstrapState>;
       updateSettings: (updates: UpdateSettingsInput) => Promise<BootstrapState>;
       chooseStorage: () => Promise<BootstrapState>;

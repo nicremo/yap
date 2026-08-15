@@ -190,7 +190,7 @@ export class AudioRecorder {
 
     const elapsed = Date.now() - openedAt;
     if (elapsed > SLOW_OPEN_WARNING_MS) {
-      console.warn(`[openwhisp] microphone took ${elapsed}ms to open`);
+      console.warn(`[yap] microphone took ${elapsed}ms to open`);
     }
 
     try {

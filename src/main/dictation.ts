@@ -105,7 +105,7 @@ async function transcribe(
       return { text, source: 'cloud' };
     } catch (error) {
       if (error instanceof CloudTranscriptionError && error.isRetryable) {
-        console.warn('[openwhisp] Cloud transcription failed, falling back to local Whisper:', error.message);
+        console.warn('[yap] Cloud transcription failed, falling back to local Whisper:', error.message);
         setStatus({
           phase: 'transcribing',
           title: 'Transcribing locally',
@@ -155,7 +155,7 @@ export async function processDictationAudio({
     enhancementLevel: matched.enhancementLevel,
   };
 
-  console.log('[openwhisp:dictation] start', {
+  console.log('[yap:dictation] start', {
     mode: settings.transcriptionMode,
     cloudModel: settings.cloudModel,
     language: settings.cloudLanguage,
@@ -169,13 +169,13 @@ export async function processDictationAudio({
 
   const { text: rawText, source: transcriptionSource } = await transcribe(wavBase64, settings, setStatus, whisperPrompt);
 
-  console.log('[openwhisp:dictation] raw', { source: transcriptionSource, text: rawText });
+  console.log('[yap:dictation] raw', { source: transcriptionSource, text: rawText });
 
   if (!rawText) {
     setStatus({
       phase: 'error',
       title: 'Nothing heard',
-      detail: 'OpenWhisp did not detect enough speech to transcribe.',
+      detail: 'Yap did not detect enough speech to transcribe.',
     });
     throw new Error('No speech was detected in the recording.');
   }
@@ -222,11 +222,11 @@ export async function processDictationAudio({
     } catch (cloudError) {
       const message = cloudError instanceof Error ? cloudError.message : String(cloudError);
       if (!fallbackPolicy.retryLocallyAfterCloudFailure) {
-        console.warn(`[openwhisp] ${fallbackPolicy.providerLabel} rewrite failed, keeping raw text:`, message);
+        console.warn(`[yap] ${fallbackPolicy.providerLabel} rewrite failed, keeping raw text:`, message);
         usedRewriteFallback = true;
         rewriteFailureDetail = `${fallbackPolicy.providerLabel} rewrite failed. The raw transcription was used instead.`;
       } else {
-        console.warn('[openwhisp] Cloud rewrite failed, falling back to Ollama:', message);
+        console.warn('[yap] Cloud rewrite failed, falling back to Ollama:', message);
         try {
           setStatus({
             phase: 'rewriting',
@@ -276,7 +276,7 @@ export async function processDictationAudio({
     }
   }
 
-  console.log('[openwhisp:dictation] final', { rewriteFallback: usedRewriteFallback, text: finalText });
+  console.log('[yap:dictation] final', { rewriteFallback: usedRewriteFallback, text: finalText });
 
   let pasted = false;
   let focusInfo = targetFocus;
@@ -425,14 +425,14 @@ export async function runRewrite(options: RewriteAudioOptions): Promise<{ finalT
     } catch (cloudError) {
       const message = cloudError instanceof Error ? cloudError.message : String(cloudError);
       if (!fallbackPolicy.retryLocallyAfterCloudFailure) {
-        console.warn(`[openwhisp] ${fallbackPolicy.providerLabel} rewrite failed, keeping raw text:`, message);
+        console.warn(`[yap] ${fallbackPolicy.providerLabel} rewrite failed, keeping raw text:`, message);
         return {
           finalText: options.rawText,
           usedFallback: true,
           notice: `${fallbackPolicy.providerLabel} rewrite failed. The raw transcription was kept.`,
         };
       }
-      console.warn('[openwhisp] Cloud rewrite failed, falling back to Ollama:', message);
+      console.warn('[yap] Cloud rewrite failed, falling back to Ollama:', message);
     }
   }
 

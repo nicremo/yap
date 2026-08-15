@@ -6,7 +6,7 @@ exports.default = async function afterSign(context) {
     context.appOutDir,
     `${context.packager.appInfo.productFilename}.app`,
   );
-  const helperPath = path.join(appPath, 'Contents/Resources/native/openwhisp-helper');
+  const helperPath = path.join(appPath, 'Contents/Resources/native/yap-helper');
   const entitlements = path.resolve('build/entitlements.mac.plist');
 
   const identity = context.packager.platformSpecificBuildOptions.identity

@@ -264,7 +264,7 @@ export function registerIpcHandlers(dependencies: IpcDependencies): void {
       const stored = await writeAudioRecording(settings, entryId, request.wavBase64);
       audioFilename = stored.filename;
     } catch (error) {
-      console.warn('[openwhisp] Failed to persist audio file:', error instanceof Error ? error.message : error);
+      console.warn('[yap] Failed to persist audio file:', error instanceof Error ? error.message : error);
     }
 
     const { entry: pendingEntry, entries: pendingHistory } = await addHistoryEntry({

@@ -44,7 +44,7 @@ function toOllamaError(baseUrl: string, error: unknown, timeoutMs?: number): Err
     }
   }
 
-  return error instanceof Error ? error : new Error('OpenWhisp could not reach Ollama.');
+  return error instanceof Error ? error : new Error('Yap could not reach Ollama.');
 }
 
 async function fetchWithTimeout(
@@ -146,7 +146,7 @@ export async function listOllamaModels(baseUrl: string): Promise<OllamaModelInfo
       OLLAMA_DISCOVERY_TIMEOUT_MS,
     );
     if (!response.ok) {
-      throw new Error('OpenWhisp could not read the local Ollama models.');
+      throw new Error('Yap could not read the local Ollama models.');
     }
 
     const payload = (await response.json()) as OllamaTagsResponse;
@@ -185,7 +185,7 @@ export async function pullOllamaModel(
     );
 
     if (!response.ok || !response.body) {
-      throw new Error('OpenWhisp could not download the Ollama model.');
+      throw new Error('Yap could not download the Ollama model.');
     }
 
     const reader = response.body.getReader();
@@ -261,7 +261,7 @@ export async function rewriteWithOllama(request: OllamaRewriteRequest): Promise<
     );
 
     if (!response.ok) {
-      throw new Error('OpenWhisp could not reach Ollama for the rewrite pass.');
+      throw new Error('Yap could not reach Ollama for the rewrite pass.');
     }
 
     const payload = (await response.json()) as {

@@ -2,4 +2,4 @@
 set -eu
 
 mkdir -p build/native
-swiftc swift/OpenWhispHelper.swift -o build/native/openwhisp-helper
+swiftc swift/YapHelper.swift -o build/native/yap-helper
