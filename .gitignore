@@ -13,3 +13,6 @@ build/native/yap-helper
 
 # Local design-tool config
 .impeccable/
+
+# Intermediate icon build product
+build/icons/icon.iconset/

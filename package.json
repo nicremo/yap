@@ -10,7 +10,7 @@
   "homepage": "https://github.com/nicremo/yap",
   "private": true,
   "type": "module",
-  "description": "Mac-first local dictation with lightweight Whisper transcription and Ollama rewriting.",
+  "description": "Free, open source dictation for macOS. Hold a key, speak, release. Transcription runs on Groq's free tier so nothing heavy runs on your Mac, with a local Whisper fallback when offline.",
   "main": "dist/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
@@ -56,7 +56,8 @@
       "entitlementsInherit": "build/entitlements.mac.plist",
       "extendInfo": {
         "NSMicrophoneUsageDescription": "Yap needs microphone access to transcribe your speech locally."
-      }
+      },
+      "icon": "build/icons/icon.icns"
     },
     "win": {
       "target": [

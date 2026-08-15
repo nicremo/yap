@@ -3,16 +3,48 @@
 ![yap](assets/cover.png)
 
 **Open source dictation for macOS.** Hold a key, speak, release. Your words are
-transcribed, polished by an LLM, and pasted right where your cursor is. No
-subscription, no account, bring your own keys.
+transcribed, polished, and pasted right where your cursor is. No subscription,
+no account, no telemetry.
 
-Works in any app. Runs fully local if you want it to.
+Works in any app.
+
+## Why this fork exists
+
+The original [OpenWhisp](https://github.com/giusmarci/openwhisp) was built
+local-first: Whisper and a 9.6 GB language model both running on your machine.
+That is a fine principle and it still works here, but in practice it meant
+about 12 GB of RAM, a warm laptop, and a wait between releasing the key and
+seeing your text.
+
+yap moves the transcription to [Groq](https://console.groq.com) instead. Groq
+runs Whisper Large v3 on their own inference hardware and their free tier is
+generous enough for everyday dictation, so:
+
+- **Nothing heavy runs on your machine.** No 12 GB model resident in RAM, no
+  fans spinning up, no battery drain while you dictate.
+- **It is fast.** Groq returns a transcript of a normal sentence in well under
+  a second, which is the difference between dictation feeling instant and
+  feeling like a round trip.
+- **It is more accurate.** Whisper Large v3 instead of the small local Base
+  model, which matters a lot for names, jargon and any language that is not
+  English.
+- **It costs nothing.** The free tier covers roughly two hours of audio a day.
+  There is no paid plan you get nudged towards, and no account beyond a free
+  API key.
+
+The local path is still there and still complete. Turn off your internet and
+yap falls back to local Whisper automatically, so you are never stuck. You can
+also run entirely local by choice, exactly like the original.
+
+The rewrite step that cleans up your text can run either way too: locally
+through Ollama with a small 2.7 GB model, or in the cloud through Groq,
+OpenRouter or Fireworks.
 
 ## How it works
 
-1. **Hold Fn** to start recording
+1. **Hold your key** to start recording
 2. **Speak** naturally
-3. **Release Fn** and the pipeline kicks in:
+3. **Release** and the pipeline kicks in:
 
 ```
 Audio -> Groq Whisper Large v3 (cloud, free)
@@ -27,12 +59,13 @@ Audio -> Groq Whisper Large v3 (cloud, free)
       Polished text -> Clipboard -> Auto-paste
 ```
 
-No internet? No problem. yap automatically falls back to local Whisper.
+No internet? No problem. yap falls back to local Whisper automatically.
 
 ## Features
 
-- **Cloud + Local Hybrid**: Groq for best accuracy, local Whisper as offline fallback
-- **Tiny LLM**: qwen3.5:2b (2.7 GB) instead of 9.6 GB, runs on any Mac
+- **Cloud + Local Hybrid**: Groq for speed and accuracy, local Whisper as offline fallback
+- **Free**: Groq's free tier covers about two hours of audio per day
+- **Tiny local LLM**: qwen3.5:2b (2.7 GB) instead of 9.6 GB, runs on any Mac
 - **3 Transcription Modes**: Auto (cloud + fallback), Cloud-only, Local-only
 - **Styles**: Conversation, Vibe Coding and Custom + modes
 - **4 Enhancement Levels**: No Filter, Soft, Medium, High
@@ -100,7 +133,7 @@ The setup wizard walks you through:
 2. **Ollama**: Verify the connection
 3. **Permissions**: Microphone, Accessibility, Input Monitoring
 
-After setup: hold **Fn**, speak, release. Done.
+After setup: hold your key, speak, release. Done.
 
 ## Changing the language
 
@@ -147,7 +180,7 @@ Any Ollama model works. Recommendations by size:
 - **Groq API** (or any OpenAI-compatible provider) for cloud transcription
 - **@huggingface/transformers** for local Whisper inference (offline fallback)
 - **Ollama** for local LLM text enhancement
-- **Swift** native macOS helper for Fn key listening, focus detection, and paste simulation
+- **Swift** native macOS helper for hotkey listening, focus detection, and paste simulation
 - **electron-vite** for build tooling
 - **Electron safeStorage** for encrypted API key storage via macOS Keychain
 
