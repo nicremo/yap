@@ -232,15 +232,15 @@ private func hotkeyCallback(
 
     if type == .flagsChanged {
         if modifierKeyCodes.contains(targetKeyCode) && targetModifiers == 0 {
-            // Single modifier key mode (e.g. right Option alone)
+            // Single modifier key mode, e.g. right Option on its own.
             guard keyCode == targetKeyCode else {
                 return Unmanaged.passUnretained(event)
             }
             let keyFlag = flagForKeyCode(targetKeyCode)
-            let isDown = (rawFlags & keyFlag) != 0
-            if isDown != hotkeyIsDown {
-                hotkeyIsDown = isDown
-                emitJSON(EventMessage(type: isDown ? "fnDown" : "fnUp", message: nil))
+            let keyIsDown = (rawFlags & keyFlag) != 0
+            if keyIsDown != hotkeyIsDown {
+                hotkeyIsDown = keyIsDown
+                emitJSON(EventMessage(type: keyIsDown ? "fnDown" : "fnUp", message: nil))
             }
         } else if modifierKeyCodes.contains(targetKeyCode) && targetModifiers != 0 {
             // Modifier combo mode (e.g. Cmd+Option = press Option while Cmd is held)

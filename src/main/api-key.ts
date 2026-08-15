@@ -39,6 +39,22 @@ export function getApiKey(settings: AppSettings): string | null {
   }
 }
 
+export function isFireworksApiKeySet(settings: AppSettings): boolean {
+  return settings.fireworksApiKeyEncrypted.length > 0;
+}
+
+export function getFireworksApiKey(settings: AppSettings): string | null {
+  if (!isFireworksApiKeySet(settings)) {
+    return null;
+  }
+
+  try {
+    return decryptApiKey(settings.fireworksApiKeyEncrypted);
+  } catch {
+    return null;
+  }
+}
+
 export function isOpenrouterApiKeySet(settings: AppSettings): boolean {
   return settings.openrouterApiKeyEncrypted.length > 0;
 }

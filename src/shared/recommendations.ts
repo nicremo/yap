@@ -16,9 +16,16 @@ export const CLOUD_MODELS = [
 
 export const RECOMMENDED_OPENROUTER_MODEL = 'google/gemini-3.5-flash-lite';
 
+export const RECOMMENDED_FIREWORKS_MODEL = 'accounts/fireworks/routers/glm-5p2-fast';
+
 export const OPENROUTER_REWRITE_MODELS = [
   { id: 'google/gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash Lite', price: '$0.30/$2.50 per M' },
   { id: 'google/gemini-3.6-flash', label: 'Gemini 3.6 Flash', price: '$1.50/$7.50 per M' },
   { id: 'qwen/qwen3.6-flash', label: 'Qwen 3.6 Flash', price: '$0.19/$1.13 per M' },
   { id: 'stepfun/step-3.7-flash', label: 'Step 3.7 Flash', price: '$0.20/$1.15 per M' },
+] satisfies ReadonlyArray<{ id: string; label: string; price: string }>;
+
+export const FIREWORKS_REWRITE_MODELS = [
+  { id: 'accounts/fireworks/routers/glm-5p2-fast', label: 'GLM 5.2 Fast', price: '$2.10/$6.60 per M' },
+  { id: 'accounts/fireworks/models/glm-5p2', label: 'GLM 5.2 Standard', price: '$1.40/$4.40 per M' },
 ] satisfies ReadonlyArray<{ id: string; label: string; price: string }>;

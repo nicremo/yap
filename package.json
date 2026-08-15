@@ -1,6 +1,6 @@
 {
   "name": "openwhisp",
-  "version": "0.7.4",
+  "version": "0.9.0",
   "private": true,
   "type": "module",
   "description": "Mac-first local dictation with lightweight Whisper transcription and Ollama rewriting.",
@@ -9,6 +9,7 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "build:native": "node scripts/build-helper-platform.js",
     "build:native:mac": "swiftc swift/OpenWhispHelper.swift -o build/native/openwhisp-helper",
     "build:native:win": "cd windows && cl.exe /O2 /W3 OpenWhispHelper.cpp /link user32.lib kernel32.lib /out:..\\build\\native\\openwhisp-helper.exe",
@@ -87,6 +88,7 @@
     "electron-builder": "^26.8.1",
     "electron-vite": "^5.0.0",
     "typescript": "^6.0.2",
-    "vite": "^7.3.2"
+    "vite": "^7.3.2",
+    "vitest": "^4.1.10"
   }
 }

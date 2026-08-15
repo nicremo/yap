@@ -10,7 +10,7 @@ import type {
   UpdateSettingsInput,
 } from '../shared/types';
 import { RECOMMENDED_TEXT_MODEL } from '../shared/recommendations';
-import { isApiKeySet, isOpenrouterApiKeySet } from './api-key';
+import { isApiKeySet, isFireworksApiKeySet, isOpenrouterApiKeySet } from './api-key';
 import { testCloudConnection } from './cloud-transcription';
 import { loadAppRules, addAppRule, removeAppRule, updateAppRule } from './app-rules';
 import { loadDictionary, addDictionaryEntry, removeDictionaryEntry, loadCorrections, addCorrection, removeCorrection } from './dictionary';
@@ -30,7 +30,7 @@ import {
   writeAudioRecording,
 } from './audio-store';
 import { retranscribeEntry } from './retranscribe';
-import { testOpenrouterConnection } from './rewrite-provider';
+import { testFireworksConnection, testOpenrouterConnection } from './rewrite-provider';
 import { applyLaunchAtLogin } from './login-item';
 import { pullOllamaModel, listOllamaModels, isOllamaReachable, ensureOllamaRunning } from './ollama';
 import { getFocusInfo } from './native-helper';
@@ -77,6 +77,7 @@ export function registerIpcHandlers(dependencies: IpcDependencies): void {
       helperReady: dependencies.getHelperReady(),
       openaiApiKeySet: isApiKeySet(settings),
       openrouterApiKeySet: isOpenrouterApiKeySet(settings),
+      fireworksApiKeySet: isFireworksApiKeySet(settings),
       dictionary: await loadDictionary(),
       corrections: await loadCorrections(),
       appRules: await loadAppRules(),
@@ -192,10 +193,18 @@ export function registerIpcHandlers(dependencies: IpcDependencies): void {
     testOpenrouterConnection(apiKey),
   );
 
-  ipcMain.handle('openai:clearKey', async (_event, provider?: 'groq' | 'openrouter') => {
+  ipcMain.handle('fireworks:testKey', async (_event, apiKey: string) =>
+    testFireworksConnection(apiKey),
+  );
+
+  ipcMain.handle('openai:clearKey', async (_event, provider?: 'groq' | 'openrouter' | 'fireworks') => {
     const nextSettings = await persistSettings(
       dependencies.getSettings(),
-      provider === 'openrouter' ? { openrouterApiKey: '' } : { openaiApiKey: '' },
+      provider === 'openrouter'
+        ? { openrouterApiKey: '' }
+        : provider === 'fireworks'
+          ? { fireworksApiKey: '' }
+          : { openaiApiKey: '' },
     );
     dependencies.setSettings(nextSettings);
     return buildBootstrapState();

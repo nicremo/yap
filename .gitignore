@@ -9,3 +9,4 @@ build/native/openwhisp-helper
 .vite
 *.dmg
 *.zip
+.firecrawl/

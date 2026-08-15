@@ -1,8 +1,9 @@
 export type EnhancementLevel = 'none' | 'soft' | 'medium' | 'high';
-export type StyleMode = 'conversation' | 'vibe-coding';
+export type StyleMode = 'conversation' | 'vibe-coding' | 'custom-plus';
+export type CustomPlusVoice = 'conversation' | 'developer';
 export type TranscriptionMode = 'auto' | 'cloud' | 'local';
 export type RewriteMode = 'cloud' | 'local';
-export type CloudRewriteProvider = 'groq' | 'openrouter';
+export type CloudRewriteProvider = 'groq' | 'openrouter' | 'fireworks';
 export type CloudTranscriptionModel = 'gpt-4o-mini-transcribe' | 'gpt-4o-transcribe' | 'whisper-1' | 'whisper-large-v3' | 'whisper-large-v3-turbo' | 'distil-whisper-large-v3-en';
 
 export type OverlayPhase =
@@ -50,7 +51,10 @@ export interface AppSettings {
   openrouterApiKeyEncrypted: string;
   openrouterModel: string;
   openrouterSpeedRouting: boolean;
+  fireworksApiKeyEncrypted: string;
+  fireworksModel: string;
   styleMode: StyleMode;
+  customPlusVoice: CustomPlusVoice;
   enhancementLevel: EnhancementLevel;
   transcriptionMode: TranscriptionMode;
   cloudModel: CloudTranscriptionModel;
@@ -104,6 +108,7 @@ export interface BootstrapState {
   helperReady: boolean;
   openaiApiKeySet: boolean;
   openrouterApiKeySet: boolean;
+  fireworksApiKeySet: boolean;
   dictionary: DictionaryEntry[];
   corrections: CorrectionEntry[];
   appRules: AppRule[];
@@ -150,6 +155,7 @@ export interface HotkeyEvent {
 
 export interface UpdateSettingsInput {
   styleMode?: StyleMode;
+  customPlusVoice?: CustomPlusVoice;
   enhancementLevel?: EnhancementLevel;
   transcriptionMode?: TranscriptionMode;
   cloudModel?: CloudTranscriptionModel;
@@ -163,6 +169,8 @@ export interface UpdateSettingsInput {
   openrouterApiKey?: string;
   openrouterModel?: string;
   openrouterSpeedRouting?: boolean;
+  fireworksApiKey?: string;
+  fireworksModel?: string;
   ollamaBaseUrl?: string;
   storageDirectory?: string;
   hotkey?: HotkeyConfig;

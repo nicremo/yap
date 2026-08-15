@@ -28,6 +28,7 @@ declare global {
       pullRecommendedModel: () => Promise<BootstrapState>;
       testApiKey: (apiKey: string, baseUrl?: string) => Promise<{ valid: boolean; error?: string }>;
       testOpenrouterKey: (apiKey: string) => Promise<{ valid: boolean; error?: string }>;
+      testFireworksKey: (apiKey: string) => Promise<{ valid: boolean; error?: string }>;
       clearApiKey: (provider?: CloudRewriteProvider) => Promise<BootstrapState>;
       addDictionaryWord: (word: string) => Promise<DictionaryEntry[]>;
       removeDictionaryWord: (word: string) => Promise<DictionaryEntry[]>;

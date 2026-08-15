@@ -5,6 +5,7 @@ import type { AppSettings, EnhancementLevel } from '../shared/types';
 import { DEFAULT_HOTKEY, DEFAULT_HOTKEY_WINDOWS } from '../shared/hotkeys';
 import {
   RECOMMENDED_CLOUD_MODEL,
+  RECOMMENDED_FIREWORKS_MODEL,
   RECOMMENDED_OPENROUTER_MODEL,
   RECOMMENDED_TEXT_MODEL,
   RECOMMENDED_WHISPER_LABEL,
@@ -37,7 +38,10 @@ export function createDefaultSettings(): AppSettings {
     openrouterApiKeyEncrypted: '',
     openrouterModel: RECOMMENDED_OPENROUTER_MODEL,
     openrouterSpeedRouting: true,
+    fireworksApiKeyEncrypted: '',
+    fireworksModel: RECOMMENDED_FIREWORKS_MODEL,
     styleMode: 'conversation',
+    customPlusVoice: 'conversation',
     enhancementLevel: 'medium',
     transcriptionMode: 'auto',
     cloudModel: RECOMMENDED_CLOUD_MODEL,

@@ -4,8 +4,8 @@ import { Home01Icon, PaintBrush01Icon, CubeIcon, Settings01Icon, BookOpen01Icon,
 
 import { AudioRecorder } from './audio-recorder';
 import logoUrl from './logo.png';
-import type { AppRule, AppStatus, BootstrapState, CorrectionEntry, DictationStatus, DictionaryEntry, EnhancementLevel, FocusInfo, HistoryEntry, RetranscribeMode, StyleMode } from '../shared/types';
-import { CLOUD_MODELS, OPENROUTER_REWRITE_MODELS, RECOMMENDED_TEXT_MODEL, RECOMMENDED_WHISPER_LABEL } from '../shared/recommendations';
+import type { AppRule, AppStatus, BootstrapState, CorrectionEntry, CustomPlusVoice, DictationStatus, DictionaryEntry, EnhancementLevel, FocusInfo, HistoryEntry, RetranscribeMode, StyleMode } from '../shared/types';
+import { CLOUD_MODELS, FIREWORKS_REWRITE_MODELS, OPENROUTER_REWRITE_MODELS, RECOMMENDED_TEXT_MODEL, RECOMMENDED_WHISPER_LABEL } from '../shared/recommendations';
 import { buildHotkeyLabel, FN_HOTKEY, FN_KEY_CODE, MODIFIER_FLAGS, MODIFIER_ONLY_KEYCODES, RIGHT_ALT_HOTKEY } from '../shared/hotkeys';
 import type { CloudTranscriptionModel, HotkeyConfig } from '../shared/types';
 
@@ -22,11 +22,10 @@ interface LevelOption {
   intensity: number;
 }
 
-interface StyleOption {
+interface StyleTab {
   value: StyleMode;
   label: string;
   description: string;
-  levels: Record<EnhancementLevel, { example: string }>;
 }
 
 const LEVEL_OPTIONS: LevelOption[] = [
@@ -36,30 +35,71 @@ const LEVEL_OPTIONS: LevelOption[] = [
   { value: 'high', label: 'High', caption: 'Professional polish and expansion.', detail: 'Turns rough dictation into polished, professional writing.', intensity: 4 },
 ];
 
-const STYLE_OPTIONS: StyleOption[] = [
+const STYLE_TABS: StyleTab[] = [
   {
     value: 'conversation',
     label: 'Conversation',
     description: 'Natural conversation style. Perfect for messages, notes, and everyday writing.',
-    levels: {
-      none: { example: 'I went to the store and bought some stuff for the project.' },
-      soft: { example: 'I went to the store and picked up some things for the project.' },
-      medium: { example: 'I stopped by the store and picked up supplies for the project.' },
-      high: { example: 'I visited the store to procure the necessary supplies for our project.' },
-    },
   },
   {
     value: 'vibe-coding',
     label: 'Vibe Coding',
     description: 'Developer mode. Translates your speech into proper software engineering language.',
-    levels: {
-      none: { example: 'We need to refactor the auth thing because it\'s hitting the database too much.' },
-      soft: { example: 'We need to refactor the auth module because it\'s making too many database calls.' },
-      medium: { example: 'We need to refactor the authentication service to reduce excessive database queries.' },
-      high: { example: 'The authentication service requires refactoring to optimize query patterns and eliminate redundant database round-trips.' },
-    },
+  },
+  {
+    value: 'custom-plus',
+    label: 'Custom +',
+    description: 'The tuned prompt set: prompt-injection guard, German spelling, number and date rules, Markdown lists, and self-correction handling. Pick the voice below.',
   },
 ];
+
+const LEGACY_EXAMPLES: Record<'conversation' | 'vibe-coding', Record<EnhancementLevel, string>> = {
+  conversation: {
+    none: 'I went to the store and bought some stuff for the project.',
+    soft: 'I went to the store and picked up some things for the project.',
+    medium: 'I stopped by the store and picked up supplies for the project.',
+    high: 'I visited the store to procure the necessary supplies for our project.',
+  },
+  'vibe-coding': {
+    none: 'We need to refactor the auth thing because it\'s hitting the database too much.',
+    soft: 'We need to refactor the auth module because it\'s making too many database calls.',
+    medium: 'We need to refactor the authentication service to reduce excessive database queries.',
+    high: 'The authentication service requires refactoring to optimize query patterns and eliminate redundant database round-trips.',
+  },
+};
+
+/* Custom+ examples are German, because that is where the added rules show:
+   umlauts, commas, filler handling, and the sentence-start rule. */
+const PLUS_EXAMPLES: Record<CustomPlusVoice, Record<EnhancementLevel, string>> = {
+  conversation: {
+    none: 'Äh, wir deployen das am Freitag, ähm, nee, warte, am Donnerstag, und ich habe die API-Keys neu generiert.',
+    soft: 'Wir deployen das am Freitag, nee, warte, am Donnerstag, und ich habe die API-Keys neu generiert.',
+    medium: 'Wir deployen das am Donnerstag und die API-Keys habe ich neu generiert.',
+    high: 'Das Deployment läuft am Donnerstag, die API-Keys sind neu generiert.',
+  },
+  developer: {
+    none: 'Wir müssen die Auth-Sache refactoren, weil die zu viele DB-Calls macht, ähm, und user id soll user_id heißen.',
+    soft: 'Wir müssen die Auth-Sache refactoren, weil sie zu viele DB-Calls macht, und user id soll user_id heißen.',
+    medium: 'Das Auth-Modul muss refactored werden, weil es zu viele DB-Calls macht, und user id soll user_id heißen.',
+    high: 'Der Authentication-Service braucht ein Refactoring, um die Anzahl der DB-Calls zu reduzieren. Zusätzlich wird user id zu user_id umbenannt.',
+  },
+};
+
+const PLUS_LEVEL_CAPTIONS: Record<EnhancementLevel, string> = {
+  none: 'Spelling, commas, umlauts. Your words stay.',
+  soft: 'Plus hesitation sounds removed, meaning-carrying fillers kept.',
+  medium: 'Plus restructuring, self-corrections resolved, sentence starts varied.',
+  high: 'Full professional polish, fragments completed.',
+};
+
+/* Used wherever a style needs a name outside the tab strip: the home tile and
+   the history list, including for history entries recorded under a style that
+   is not currently selected. */
+const STYLE_LABELS: Record<StyleMode, string> = {
+  conversation: 'Conversation',
+  'vibe-coding': 'Vibe Coding',
+  'custom-plus': 'Custom +',
+};
 
 const GRID_COLS = 7;
 const GRID_ROWS = 3;
@@ -168,11 +208,21 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (OVERLAY_VIEW) {
-      const recorder = new AudioRecorder();
-      recorder.onLevel = (level) => setAudioLevel(level);
-      recorderRef.current = recorder;
-    }
+    if (!OVERLAY_VIEW) return;
+
+    const recorder = new AudioRecorder();
+    recorder.onLevel = (level) => setAudioLevel(level);
+    recorderRef.current = recorder;
+
+    // A reload or a window teardown must not leave the microphone open.
+    const releaseOnExit = () => { void recorder.dispose(); };
+    window.addEventListener('pagehide', releaseOnExit);
+
+    return () => {
+      window.removeEventListener('pagehide', releaseOnExit);
+      recorderRef.current = null;
+      void recorder.dispose();
+    };
   }, []);
 
   useEffect(() => {
@@ -244,6 +294,7 @@ export function App() {
       pushStatus({ phase: 'listening', title: 'Listening', detail: 'Speak while holding Fn.' });
     } catch (error) {
       recordingRef.current = false;
+      await recorderRef.current?.dispose();
       pushStatus({ phase: 'error', title: 'Microphone error', detail: error instanceof Error ? error.message : 'Microphone could not start.' });
     }
   };
@@ -255,7 +306,10 @@ export function App() {
     try {
       const wavBase64 = await recorderRef.current?.stop();
       if (!wavBase64) throw new Error('No recording was captured.');
-      const result = await window.openWhisp.processAudio({ wavBase64, targetFocus: targetFocusRef.current ?? undefined });
+      const result = await window.openWhisp.processAudio({
+        wavBase64,
+        targetFocus: targetFocusRef.current ?? undefined,
+      });
       pushStatus({
         phase: 'done',
         title: result.pasted ? 'Pasted' : 'Copied',
@@ -267,6 +321,9 @@ export function App() {
     } catch (error) {
       pushStatus({ phase: 'error', title: 'Dictation failed', detail: error instanceof Error ? error.message : 'Could not finish dictation.' });
     } finally {
+      // stop() already released the device on every path. This is the backstop
+      // that keeps a future error path from leaving the microphone open.
+      await recorderRef.current?.dispose();
       targetFocusRef.current = null;
       processingRef.current = false;
     }
@@ -537,7 +594,6 @@ function MainView({ bootstrap, status, busyAction, onAction, onRefresh }: {
 
 function HomePage({ status, bootstrap, setPage }: { status: AppStatus; bootstrap: BootstrapState; setPage: (p: Page) => void }) {
   const level = LEVEL_OPTIONS.find((l) => l.value === bootstrap.settings.enhancementLevel);
-  const style = STYLE_OPTIONS.find((s) => s.value === bootstrap.settings.styleMode);
   return (
     <div className="page">
       <div className="page-header">
@@ -569,7 +625,7 @@ function HomePage({ status, bootstrap, setPage }: { status: AppStatus; bootstrap
 
         <div className="home-stats">
           <button className="stat-card" onClick={() => setPage('style')}>
-            <span className="stat-value">{style?.label ?? 'Conversation'}</span>
+            <span className="stat-value">{STYLE_LABELS[bootstrap.settings.styleMode]}</span>
             <span className="stat-label">{level?.label ?? 'Medium'}</span>
           </button>
           <button className="stat-card" onClick={() => setPage('models')}>
@@ -589,7 +645,8 @@ function HomePage({ status, bootstrap, setPage }: { status: AppStatus; bootstrap
 /* ── Style ─────────────────────────────────────── */
 
 function StylePage({ bootstrap, onAction, onRefresh }: { bootstrap: BootstrapState; onAction: (l: string, a: () => Promise<BootstrapState>) => Promise<void>; onRefresh: () => Promise<BootstrapState> }) {
-  const activeStyle = STYLE_OPTIONS.find((s) => s.value === bootstrap.settings.styleMode) ?? STYLE_OPTIONS[0];
+  const activeTab = STYLE_TABS.find((tab) => tab.value === bootstrap.settings.styleMode) ?? STYLE_TABS[0];
+  const voice = bootstrap.settings.customPlusVoice;
   const [rules, setRules] = useState<AppRule[]>(bootstrap.appRules);
 
   useEffect(() => { setRules(bootstrap.appRules); }, [bootstrap.appRules]);
@@ -606,6 +663,19 @@ function StylePage({ bootstrap, onAction, onRefresh }: { bootstrap: BootstrapSta
     void onRefresh();
   };
 
+  const exampleFor = (level: EnhancementLevel): string => {
+    if (activeTab.value === 'custom-plus') return PLUS_EXAMPLES[voice][level];
+    return LEGACY_EXAMPLES[activeTab.value === 'vibe-coding' ? 'vibe-coding' : 'conversation'][level];
+  };
+
+  const captionFor = (level: LevelOption): string =>
+    activeTab.value === 'custom-plus' ? PLUS_LEVEL_CAPTIONS[level.value] : level.caption;
+
+  const bannerClass =
+    activeTab.value === 'vibe-coding' || (activeTab.value === 'custom-plus' && voice === 'developer')
+      ? ' style-banner-dev'
+      : '';
+
   return (
     <div className="page">
       <div className="page-header">
@@ -614,25 +684,38 @@ function StylePage({ bootstrap, onAction, onRefresh }: { bootstrap: BootstrapSta
       </div>
 
       <div className="style-tabs">
-        {STYLE_OPTIONS.map((s) => (
+        {STYLE_TABS.map((tab) => (
           <button
-            key={s.value}
-            className={`style-tab${bootstrap.settings.styleMode === s.value ? ' style-tab-active' : ''}`}
-            onClick={() => void onAction('settings', () => window.openWhisp.updateSettings({ styleMode: s.value }))}
+            key={tab.value}
+            className={`style-tab${bootstrap.settings.styleMode === tab.value ? ' style-tab-active' : ''}`}
+            onClick={() => void onAction('settings', () => window.openWhisp.updateSettings({ styleMode: tab.value }))}
           >
-            {s.label}
+            {tab.label}
           </button>
         ))}
       </div>
 
-      <div className={`style-banner${activeStyle.value === 'vibe-coding' ? ' style-banner-dev' : ''}`}>
-        <p>{activeStyle.description}</p>
+      <div className={`style-banner${bannerClass}`}>
+        <p>{activeTab.description}</p>
       </div>
+
+      {activeTab.value === 'custom-plus' && (
+        <div className="voice-toggle">
+          {(['conversation', 'developer'] as CustomPlusVoice[]).map((option) => (
+            <button
+              key={option}
+              className={`voice-btn${voice === option ? ' voice-btn-active' : ''}`}
+              onClick={() => void onAction('settings', () => window.openWhisp.updateSettings({ customPlusVoice: option }))}
+            >
+              {option === 'conversation' ? 'Conversation voice' : 'Developer voice'}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="enhance-grid">
         {LEVEL_OPTIONS.map((level) => {
           const active = bootstrap.settings.enhancementLevel === level.value;
-          const example = activeStyle.levels[level.value].example;
           return (
             <button
               key={level.value}
@@ -643,8 +726,8 @@ function StylePage({ bootstrap, onAction, onRefresh }: { bootstrap: BootstrapSta
                 <strong className="serif">{level.label}</strong>
                 {active && <span className="badge badge-ready">Active</span>}
               </div>
-              <p className="enhance-caption">{level.caption}</p>
-              <p className="enhance-example">"{example}"</p>
+              <p className="enhance-caption">{captionFor(level)}</p>
+              <p className="enhance-example">"{exampleFor(level.value)}"</p>
               <div className="intensity-bar">
                 {[1, 2, 3, 4].map((i) => (
                   <span key={i} className={`intensity-dot${i <= level.intensity ? ' intensity-dot-on' : ''}`} />
@@ -670,6 +753,7 @@ function StylePage({ bootstrap, onAction, onRefresh }: { bootstrap: BootstrapSta
                 >
                   <option value="conversation">Conversation</option>
                   <option value="vibe-coding">Vibe Coding</option>
+                  <option value="custom-plus">Custom +</option>
                 </select>
                 <select
                   className="app-rule-select"
@@ -910,6 +994,78 @@ function OpenRouterRewriteSettings({ bootstrap, onAction }: { bootstrap: Bootstr
   );
 }
 
+function FireworksRewriteSettings({ bootstrap, onAction }: { bootstrap: BootstrapState; onAction: (l: string, a: () => Promise<BootstrapState>) => Promise<void> }) {
+  const [apiKey, setApiKey] = useState('');
+  const [keyStatus, setKeyStatus] = useState<'idle' | 'testing' | 'valid' | 'invalid'>('idle');
+  const [keyError, setKeyError] = useState('');
+
+  const handleTestKey = async () => {
+    if (!apiKey) return;
+    setKeyStatus('testing');
+    const result = await window.openWhisp.testFireworksKey(apiKey);
+    if (result.valid) {
+      setKeyStatus('valid');
+      setKeyError('');
+      void onAction('settings', () => window.openWhisp.updateSettings({ fireworksApiKey: apiKey }));
+    } else {
+      setKeyStatus('invalid');
+      setKeyError(result.error ?? 'Validation failed.');
+    }
+  };
+
+  const handleClearKey = () => {
+    setApiKey('');
+    setKeyStatus('idle');
+    setKeyError('');
+    void onAction('settings', async () => window.openWhisp.clearApiKey('fireworks'));
+  };
+
+  return (
+    <>
+      <div className="setting-row" style={{ marginTop: 12 }}>
+        <label className="setting-label" htmlFor="fireworks-model">Model</label>
+        <select id="fireworks-model" className="setting-select" value={bootstrap.settings.fireworksModel} onChange={(e) => void onAction('settings', () => window.openWhisp.updateSettings({ fireworksModel: e.target.value }))}>
+          {FIREWORKS_REWRITE_MODELS.map((m) => (
+            <option key={m.id} value={m.id}>{m.label} ({m.price})</option>
+          ))}
+        </select>
+      </div>
+      <div className="setting-row" style={{ marginTop: 12 }}>
+        <label className="setting-label" htmlFor="fireworks-key">API Key</label>
+        {bootstrap.fireworksApiKeySet ? (
+          <div className="api-key-field">
+            <span className="badge badge-ready"><CheckIcon size={12} /> Saved</span>
+            <button className="btn btn-sm btn-ghost" onClick={handleClearKey}>Clear</button>
+          </div>
+        ) : (
+          <div className="api-key-field">
+            <input
+              id="fireworks-key"
+              type="password"
+              className="setting-input"
+              placeholder="fw_..."
+              value={apiKey}
+              onChange={(e) => { setApiKey(e.target.value); setKeyStatus('idle'); }}
+            />
+            <button
+              className="btn btn-sm btn-secondary"
+              disabled={!apiKey || keyStatus === 'testing'}
+              onClick={() => void handleTestKey()}
+            >
+              {keyStatus === 'testing' ? 'Testing...' : 'Save'}
+            </button>
+          </div>
+        )}
+      </div>
+      {keyStatus === 'valid' && <span className="api-key-status api-key-ok">Valid API key</span>}
+      {keyStatus === 'invalid' && <span className="api-key-status api-key-err">{keyError}</span>}
+      {!bootstrap.fireworksApiKeySet && (
+        <button className="btn btn-link btn-muted" style={{ marginTop: 4, fontSize: 12 }} onClick={() => void window.openWhisp.openExternal('https://app.fireworks.ai/settings/users/api-keys')}>Get a Fireworks API key</button>
+      )}
+    </>
+  );
+}
+
 function ModelsPage({ bootstrap, busyAction, onAction }: { bootstrap: BootstrapState; busyAction: string | null; onAction: (l: string, a: () => Promise<BootstrapState>) => Promise<void> }) {
   const [ollamaUrl, setOllamaUrl] = useState(bootstrap.settings.ollamaBaseUrl);
   useEffect(() => { setOllamaUrl(bootstrap.settings.ollamaBaseUrl); }, [bootstrap.settings.ollamaBaseUrl]);
@@ -958,7 +1114,9 @@ function ModelsPage({ bootstrap, busyAction, onAction }: { bootstrap: BootstrapS
           {bootstrap.settings.rewriteMode === 'cloud'
             ? bootstrap.settings.cloudRewriteProvider === 'openrouter'
               ? 'Fast rewrite via OpenRouter. No local fallback: raw text is pasted if the request fails.'
-              : 'Fast rewrite via Groq cloud API. Falls back to Ollama when offline.'
+              : bootstrap.settings.cloudRewriteProvider === 'fireworks'
+                ? 'Rewrite via Fireworks AI (GLM 5.2). No local fallback: raw text is pasted if the request fails.'
+                : 'Fast rewrite via Groq cloud API. Falls back to Ollama when offline.'
             : 'Local rewrite via Ollama. No data leaves your device.'}
         </div>
         {bootstrap.settings.rewriteMode === 'cloud' && (
@@ -968,6 +1126,7 @@ function ModelsPage({ bootstrap, busyAction, onAction }: { bootstrap: BootstrapS
               <div className="source-selector">
                 <button className={`source-btn${bootstrap.settings.cloudRewriteProvider === 'groq' ? ' source-btn-active' : ''}`} onClick={() => void onAction('settings', () => window.openWhisp.updateSettings({ cloudRewriteProvider: 'groq' }))}>Groq</button>
                 <button className={`source-btn${bootstrap.settings.cloudRewriteProvider === 'openrouter' ? ' source-btn-active' : ''}`} onClick={() => void onAction('settings', () => window.openWhisp.updateSettings({ cloudRewriteProvider: 'openrouter' }))}>OpenRouter</button>
+                <button className={`source-btn${bootstrap.settings.cloudRewriteProvider === 'fireworks' ? ' source-btn-active' : ''}`} onClick={() => void onAction('settings', () => window.openWhisp.updateSettings({ cloudRewriteProvider: 'fireworks' }))}>Fireworks</button>
               </div>
             </div>
             {bootstrap.settings.cloudRewriteProvider === 'groq' ? (
@@ -981,8 +1140,10 @@ function ModelsPage({ bootstrap, busyAction, onAction }: { bootstrap: BootstrapS
                   <option value="llama-3.1-8b-instant">Llama 3.1 8B (560 t/s)</option>
                 </select>
               </div>
-            ) : (
+            ) : bootstrap.settings.cloudRewriteProvider === 'openrouter' ? (
               <OpenRouterRewriteSettings bootstrap={bootstrap} onAction={onAction} />
+            ) : (
+              <FireworksRewriteSettings bootstrap={bootstrap} onAction={onAction} />
             )}
           </>
         )}
@@ -1313,7 +1474,10 @@ function HistoryPage({ bootstrap, onRefresh }: { bootstrap: BootstrapState; onRe
                   )}
                   <div className="history-detail-row">
                     <span className="history-detail-label">Style</span>
-                    <span className="history-detail-value">{entry.styleMode} / {entry.enhancementLevel}</span>
+                    <span className="history-detail-value">
+                      {STYLE_LABELS[entry.styleMode] ?? entry.styleMode}
+                      {` / ${entry.enhancementLevel}`}
+                    </span>
                   </div>
                   <div className="history-entry-actions">
                     <button

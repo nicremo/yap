@@ -474,6 +474,7 @@ button { cursor: pointer; }
 
 .style-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 0;
   border-bottom: 1px solid var(--border);
   margin-bottom: 20px;
@@ -522,6 +523,90 @@ button { cursor: pointer; }
 
 .style-banner-dev p {
   color: rgba(255, 255, 255, 0.7);
+}
+
+
+.voice-toggle {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.voice-btn {
+  padding: 7px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: none;
+  font-size: 13px;
+  color: var(--text-3);
+  transition: all 0.15s;
+  -webkit-app-region: no-drag;
+}
+
+.voice-btn:hover {
+  color: var(--text);
+}
+
+.voice-btn-active {
+  color: var(--text);
+  font-weight: 600;
+  border-color: var(--text);
+}
+
+.setting-warning {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #b3541e;
+}
+
+.context-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0;
+}
+
+.context-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.context-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.context-name {
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.context-meta {
+  font-size: 12px;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
+.context-total {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--text-2);
+  padding: 8px 0 12px;
+}
+
+.context-actions {
+  display: flex;
+  gap: 8px;
 }
 
 /* ────────────────────────────────────────────────

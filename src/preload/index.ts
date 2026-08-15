@@ -33,6 +33,8 @@ const api = {
     ipcRenderer.invoke('openai:testKey', apiKey, baseUrl) as Promise<{ valid: boolean; error?: string }>,
   testOpenrouterKey: (apiKey: string) =>
     ipcRenderer.invoke('openrouter:testKey', apiKey) as Promise<{ valid: boolean; error?: string }>,
+  testFireworksKey: (apiKey: string) =>
+    ipcRenderer.invoke('fireworks:testKey', apiKey) as Promise<{ valid: boolean; error?: string }>,
   clearApiKey: (provider?: CloudRewriteProvider) =>
     ipcRenderer.invoke('openai:clearKey', provider) as Promise<BootstrapState>,
   addDictionaryWord: (word: string) =>

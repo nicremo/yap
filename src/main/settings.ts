@@ -17,7 +17,8 @@ export async function loadSettings(): Promise<AppSettings> {
 
   try {
     const raw = await readFile(settingsPath, 'utf8');
-    return { ...createDefaultSettings(), ...(JSON.parse(raw) as Partial<AppSettings>) };
+    const parsed = JSON.parse(raw) as Partial<AppSettings>;
+    return { ...createDefaultSettings(), ...parsed };
   } catch {
     const defaults = createDefaultSettings();
     await saveSettings(defaults);
@@ -35,7 +36,7 @@ export async function updateSettings(
   current: AppSettings,
   updates: UpdateSettingsInput,
 ): Promise<AppSettings> {
-  const { openaiApiKey, openrouterApiKey, ...settingUpdates } = updates;
+  const { openaiApiKey, openrouterApiKey, fireworksApiKey, ...settingUpdates } = updates;
 
   const nextSettings: AppSettings = {
     ...current,
@@ -51,6 +52,12 @@ export async function updateSettings(
   if (openrouterApiKey !== undefined) {
     nextSettings.openrouterApiKeyEncrypted = openrouterApiKey.length > 0
       ? encryptApiKey(openrouterApiKey)
+      : '';
+  }
+
+  if (fireworksApiKey !== undefined) {
+    nextSettings.fireworksApiKeyEncrypted = fireworksApiKey.length > 0
+      ? encryptApiKey(fireworksApiKey)
       : '';
   }
 

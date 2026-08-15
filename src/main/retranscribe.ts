@@ -79,11 +79,13 @@ export async function retranscribeEntry(options: RetranscribeOptions): Promise<H
       settings.enhancementLevel,
     );
 
+    const recordedLevel = resolved.enhancementLevel;
+
     const rewrite = await runRewrite({
       rawText: transcription.text,
       settings,
       styleMode: resolved.styleMode,
-      enhancementLevel: resolved.enhancementLevel,
+      enhancementLevel: recordedLevel,
       dictionary,
       corrections,
       setStatus,
@@ -94,16 +96,18 @@ export async function retranscribeEntry(options: RetranscribeOptions): Promise<H
       finalText: rewrite.usedFallback ? transcription.text : rewrite.finalText,
       transcriptionSource: transcription.source,
       styleMode: resolved.styleMode,
-      enhancementLevel: resolved.enhancementLevel,
+      enhancementLevel: recordedLevel,
       status: 'success',
-      errorMessage: rewrite.usedFallback ? 'Rewrite model was unavailable. Raw transcription kept as final text.' : undefined,
+      errorMessage: rewrite.usedFallback
+        ? rewrite.notice ?? 'Rewrite model was unavailable. Raw transcription kept as final text.'
+        : undefined,
     });
 
     setStatus({
       phase: 'done',
       title: 'Retranscribed',
       detail: rewrite.usedFallback
-        ? 'Transcription updated. Rewrite was skipped because the model was unavailable.'
+        ? `Transcription updated. ${rewrite.notice ?? 'Rewrite was skipped because the model was unavailable.'}`
         : 'Transcription and rewrite updated.',
       preview: rewrite.finalText,
       rawText: transcription.text,

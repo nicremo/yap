@@ -45,7 +45,7 @@ No internet? No problem. OpenWhisp automatically falls back to local Whisper.
 - **Cloud + Local Hybrid**: Groq for best accuracy, local Whisper as offline fallback
 - **Tiny LLM**: qwen3.5:2b (2.7 GB) instead of 9.6 GB, runs on any Mac
 - **3 Transcription Modes**: Auto (cloud + fallback), Cloud-only, Local-only
-- **Styles**: Conversation and Vibe Coding modes
+- **Styles**: Conversation, Vibe Coding and Custom + modes
 - **4 Enhancement Levels**: No Filter, Soft, Medium, High
 - **Intent Resolution**: "Make it white... actually, black" resolves to final intent only
 - **Auto-Paste**: Text is pasted directly into the active app
@@ -172,7 +172,11 @@ src/
     dictation.ts            # Pipeline: transcribe -> rewrite -> paste
     transcription.ts        # Local Whisper inference (fallback)
     ollama.ts               # Ollama API client + auto-launch
-    prompts.ts              # Prompt matrix (style x enhancement level)
+    prompts/
+      legacy.ts             # Frozen prompts for Conversation and Vibe Coding
+      plus.ts               # Tuned prompts for Custom +
+      index.ts              # Family dispatch and rewrite user messages
+    rewrite-provider.ts     # Groq, OpenRouter, Fireworks target resolution
     settings.ts             # Settings persistence
     windows.ts              # Window management
   renderer/

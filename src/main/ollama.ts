@@ -226,22 +226,25 @@ export async function pullOllamaModel(
   }
 }
 
-export async function rewriteWithOllama(
-  baseUrl: string,
-  modelName: string,
-  systemPrompt: string,
-  rawText: string,
-): Promise<string> {
+export interface OllamaRewriteRequest {
+  baseUrl: string;
+  modelName: string;
+  systemPrompt: string;
+  userMessage: string;
+  rawText: string;
+}
+
+export async function rewriteWithOllama(request: OllamaRewriteRequest): Promise<string> {
   try {
     const response = await fetchWithTimeout(
-      buildUrl(baseUrl, '/api/chat'),
+      buildUrl(request.baseUrl, '/api/chat'),
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: modelName,
+          model: request.modelName,
           stream: false,
           think: false,
           keep_alive: '10m',
@@ -249,22 +252,8 @@ export async function rewriteWithOllama(
             temperature: 0,
           },
           messages: [
-            {
-              role: 'system',
-              content: systemPrompt,
-            },
-            {
-              role: 'user',
-              content: [
-                'Rewrite the dictated text below.',
-                'If the speaker corrected themselves or changed their mind, use only their final intent.',
-                'Reply with only the final rewritten text — no preface, explanation, labels, or quotation marks.',
-                '',
-                '<dictation>',
-                rawText,
-                '</dictation>',
-              ].join('\n'),
-            },
+            { role: 'system', content: request.systemPrompt },
+            { role: 'user', content: request.userMessage },
           ],
         }),
       },
@@ -281,9 +270,9 @@ export async function rewriteWithOllama(
       };
     };
 
-    return cleanRewriteOutput(payload.message?.content, rawText);
+    return cleanRewriteOutput(payload.message?.content, request.rawText);
   } catch (error) {
-    throw toOllamaError(baseUrl, error, OLLAMA_CHAT_TIMEOUT_MS);
+    throw toOllamaError(request.baseUrl, error, OLLAMA_CHAT_TIMEOUT_MS);
   }
 }
 

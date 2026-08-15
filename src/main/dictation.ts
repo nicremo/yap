@@ -6,8 +6,8 @@ import { resolveStyleForApp } from './app-rules';
 import { CloudTranscriptionError, transcribeWithCloud } from './cloud-transcription';
 import { buildDictionaryContext, buildWhisperPrompt } from './dictionary';
 import { rewriteWithCloud } from './cloud-rewrite';
-import { resolveRewriteTarget } from './rewrite-provider';
-import { getEnhancementPrompt } from './prompts';
+import { resolveRewriteFallback, resolveRewriteTarget } from './rewrite-provider';
+import { getEnhancementPrompt, getRewriteUserMessage } from './prompts';
 import { rewriteWithOllama } from './ollama';
 import { getFocusInfo, triggerPaste } from './native-helper';
 import { ensureStorage } from './storage';
@@ -143,12 +143,17 @@ export async function processDictationAudio({
   const whisperPrompt = buildWhisperPrompt(dictionary, corrections);
   const dictionaryContext = buildDictionaryContext(dictionary, corrections);
 
-  const resolved = resolveStyleForApp(
-    targetFocus,
-    appRules,
-    settings.styleMode,
-    settings.enhancementLevel,
-  );
+  const matched = resolveStyleForApp(
+        targetFocus,
+        appRules,
+        settings.styleMode,
+        settings.enhancementLevel,
+      );
+
+  const resolved = {
+    ...matched,
+    enhancementLevel: matched.enhancementLevel,
+  };
 
   console.log('[openwhisp:dictation] start', {
     mode: settings.transcriptionMode,
@@ -175,11 +180,22 @@ export async function processDictationAudio({
     throw new Error('No speech was detected in the recording.');
   }
 
-  const enhancementPrompt = getEnhancementPrompt(resolved.styleMode, resolved.enhancementLevel, dictionaryContext, settings.cloudLanguage);
+  const enhancementPrompt = getEnhancementPrompt({
+    style: resolved.styleMode,
+    level: resolved.enhancementLevel,
+    dictionaryContext,
+    language: settings.cloudLanguage,
+    customPlusVoice: settings.customPlusVoice,
+  });
+  const rewriteUserMessage = getRewriteUserMessage(resolved.styleMode, rawText);
   let finalText = rawText;
   let usedRewriteFallback = false;
 
   const rewriteTarget = settings.rewriteMode === 'cloud' ? resolveRewriteTarget(settings) : null;
+  const fallbackPolicy = resolveRewriteFallback({
+    provider: settings.cloudRewriteProvider,
+  });
+
   let rewriteFailureDetail: string | undefined;
 
   if (rewriteTarget) {
@@ -192,20 +208,23 @@ export async function processDictationAudio({
     });
 
     try {
-      finalText = await rewriteWithCloud(
-        rewriteTarget.baseUrl,
-        rewriteTarget.apiKey,
-        rewriteTarget.model,
-        enhancementPrompt,
+      finalText = await rewriteWithCloud({
+        baseUrl: rewriteTarget.baseUrl,
+        apiKey: rewriteTarget.apiKey,
+        model: rewriteTarget.model,
+        systemPrompt: enhancementPrompt,
+        userMessage: rewriteUserMessage,
         rawText,
-        { extraHeaders: rewriteTarget.extraHeaders, providerOptions: rewriteTarget.providerOptions },
-      );
+        extraHeaders: rewriteTarget.extraHeaders,
+        providerOptions: rewriteTarget.providerOptions,
+        timeoutMs: rewriteTarget.timeoutMs,
+      });
     } catch (cloudError) {
       const message = cloudError instanceof Error ? cloudError.message : String(cloudError);
-      if (settings.cloudRewriteProvider === 'openrouter') {
-        console.warn('[openwhisp] OpenRouter rewrite failed, keeping raw text:', message);
+      if (!fallbackPolicy.retryLocallyAfterCloudFailure) {
+        console.warn(`[openwhisp] ${fallbackPolicy.providerLabel} rewrite failed, keeping raw text:`, message);
         usedRewriteFallback = true;
-        rewriteFailureDetail = 'OpenRouter rewrite failed. The raw transcription was used instead.';
+        rewriteFailureDetail = `${fallbackPolicy.providerLabel} rewrite failed. The raw transcription was used instead.`;
       } else {
         console.warn('[openwhisp] Cloud rewrite failed, falling back to Ollama:', message);
         try {
@@ -216,7 +235,13 @@ export async function processDictationAudio({
             preview: rawText,
             rawText,
           });
-          finalText = await rewriteWithOllama(settings.ollamaBaseUrl, settings.textModel, enhancementPrompt, rawText);
+          finalText = await rewriteWithOllama({
+            baseUrl: settings.ollamaBaseUrl,
+            modelName: settings.textModel,
+            systemPrompt: enhancementPrompt,
+            userMessage: rewriteUserMessage,
+            rawText,
+          });
         } catch {
           usedRewriteFallback = true;
         }
@@ -232,7 +257,13 @@ export async function processDictationAudio({
     });
 
     try {
-      finalText = await rewriteWithOllama(settings.ollamaBaseUrl, settings.textModel, enhancementPrompt, rawText);
+      finalText = await rewriteWithOllama({
+        baseUrl: settings.ollamaBaseUrl,
+        modelName: settings.textModel,
+        systemPrompt: enhancementPrompt,
+        userMessage: rewriteUserMessage,
+        rawText,
+      });
     } catch (error) {
       usedRewriteFallback = true;
       setStatus({
@@ -272,7 +303,7 @@ export async function processDictationAudio({
   }
 
   const doneTitle = pasted ? 'Pasted' : 'Done';
-  const doneDetail = rewriteFailureDetail
+  const baseDoneDetail = rewriteFailureDetail
     ? pasted
       ? `${rewriteFailureDetail} The raw text was pasted.`
       : `${rewriteFailureDetail} The raw text was saved to history.`
@@ -283,6 +314,8 @@ export async function processDictationAudio({
       : pasted
         ? 'The refined text was pasted into the active app.'
         : 'The refined text was saved to history.';
+
+  const doneDetail = baseDoneDetail;
 
   const doneStatus: AppStatus = {
     phase: 'done',
@@ -342,16 +375,20 @@ export interface RewriteAudioOptions {
   setStatus?: (status: AppStatus) => void;
 }
 
-export async function runRewrite(options: RewriteAudioOptions): Promise<{ finalText: string; usedFallback: boolean }> {
+export async function runRewrite(options: RewriteAudioOptions): Promise<{ finalText: string; usedFallback: boolean; notice?: string }> {
   const noop = () => {};
   const setStatus = options.setStatus ?? noop;
   const dictionaryContext = buildDictionaryContext(options.dictionary, options.corrections);
-  const enhancementPrompt = getEnhancementPrompt(
-    options.styleMode,
-    options.enhancementLevel,
+  const styleMode = options.styleMode;
+  const enhancementLevel = options.enhancementLevel;
+  const enhancementPrompt = getEnhancementPrompt({
+    style: styleMode,
+    level: enhancementLevel,
     dictionaryContext,
-    options.settings.cloudLanguage,
-  );
+    language: options.settings.cloudLanguage,
+    customPlusVoice: options.settings.customPlusVoice,
+  });
+  const rewriteUserMessage = getRewriteUserMessage(styleMode, options.rawText);
 
   let finalText = options.rawText;
   let usedFallback = false;
@@ -359,6 +396,9 @@ export async function runRewrite(options: RewriteAudioOptions): Promise<{ finalT
   const rewriteTarget = options.settings.rewriteMode === 'cloud'
     ? resolveRewriteTarget(options.settings)
     : null;
+  const fallbackPolicy = resolveRewriteFallback({
+    provider: options.settings.cloudRewriteProvider,
+  });
 
   if (rewriteTarget) {
     setStatus({
@@ -370,20 +410,27 @@ export async function runRewrite(options: RewriteAudioOptions): Promise<{ finalT
     });
 
     try {
-      finalText = await rewriteWithCloud(
-        rewriteTarget.baseUrl,
-        rewriteTarget.apiKey,
-        rewriteTarget.model,
-        enhancementPrompt,
-        options.rawText,
-        { extraHeaders: rewriteTarget.extraHeaders, providerOptions: rewriteTarget.providerOptions },
-      );
+      finalText = await rewriteWithCloud({
+        baseUrl: rewriteTarget.baseUrl,
+        apiKey: rewriteTarget.apiKey,
+        model: rewriteTarget.model,
+        systemPrompt: enhancementPrompt,
+        userMessage: rewriteUserMessage,
+        rawText: options.rawText,
+        extraHeaders: rewriteTarget.extraHeaders,
+        providerOptions: rewriteTarget.providerOptions,
+        timeoutMs: rewriteTarget.timeoutMs,
+      });
       return { finalText, usedFallback: false };
     } catch (cloudError) {
       const message = cloudError instanceof Error ? cloudError.message : String(cloudError);
-      if (options.settings.cloudRewriteProvider === 'openrouter') {
-        console.warn('[openwhisp] OpenRouter rewrite failed, keeping raw text:', message);
-        return { finalText: options.rawText, usedFallback: true };
+      if (!fallbackPolicy.retryLocallyAfterCloudFailure) {
+        console.warn(`[openwhisp] ${fallbackPolicy.providerLabel} rewrite failed, keeping raw text:`, message);
+        return {
+          finalText: options.rawText,
+          usedFallback: true,
+          notice: `${fallbackPolicy.providerLabel} rewrite failed. The raw transcription was kept.`,
+        };
       }
       console.warn('[openwhisp] Cloud rewrite failed, falling back to Ollama:', message);
     }
@@ -397,12 +444,13 @@ export async function runRewrite(options: RewriteAudioOptions): Promise<{ finalT
       preview: options.rawText,
       rawText: options.rawText,
     });
-    finalText = await rewriteWithOllama(
-      options.settings.ollamaBaseUrl,
-      options.settings.textModel,
-      enhancementPrompt,
-      options.rawText,
-    );
+    finalText = await rewriteWithOllama({
+      baseUrl: options.settings.ollamaBaseUrl,
+      modelName: options.settings.textModel,
+      systemPrompt: enhancementPrompt,
+      userMessage: rewriteUserMessage,
+      rawText: options.rawText,
+    });
   } catch (error) {
     usedFallback = true;
     setStatus({
