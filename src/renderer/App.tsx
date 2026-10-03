@@ -367,7 +367,7 @@ function SetupWizard({ bootstrap, busyAction, onAction, onRefresh, onComplete }:
       <div className="setup-body" key={step}>
         {step === 'welcome' && (
           <div className="setup-step setup-step-center">
-            <div className="fn-key"><span>fn</span></div>
+            <img src={logoUrl} alt="Yap" className="setup-logo" />
             <h1 className="setup-title serif">Welcome to Yap</h1>
             <p className="setup-desc">Hold a key, speak, release. Your voice is transcribed, polished, and pasted. Free and open source.</p>
             <div className="setup-nav"><div /><button className="btn btn-primary" onClick={next}>Get Started</button></div>

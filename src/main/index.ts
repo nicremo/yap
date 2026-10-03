@@ -282,6 +282,13 @@ async function restartHotkeyListener(): Promise<void> {
 }
 
 async function bootstrap(): Promise<void> {
+  if (process.platform === 'darwin') {
+    const iconPath = app.isPackaged
+      ? path.join(process.resourcesPath, 'icons', 'appIcon.png')
+      : path.join(projectRoot, 'build', 'icons', 'appIcon.png');
+    app.dock?.setIcon(nativeImage.createFromPath(iconPath));
+  }
+
   console.log('[yap] boot', {
     version: app.getVersion(),
     platform: process.platform,
