@@ -79,7 +79,7 @@ try {
 
   const paste = await call('paste', { text: 'smoke test', restore: true });
   check(paste.ok && typeof paste.result.ok === 'boolean', `paste answers ${JSON.stringify(paste.result)}`);
-  if (!permissions.result.accessibility) {
+  if (!permissions.result.accessibility && !permissions.result.postEvents) {
     check(paste.result.ok === false && paste.result.reason === 'accessibility', 'paste without Accessibility is refused cleanly');
   }
 

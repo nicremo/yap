@@ -15,19 +15,16 @@ function buildMac() {
   const output = path.join(outputDir, 'yap-helper');
   const slices = [];
 
+  // Both slices are required: an app shipped with a one-architecture helper
+  // would install fine and then have no hotkey on the other kind of Mac.
+  // The language mode is pinned so a newer compiler default cannot break it.
   for (const arch of ['arm64', 'x86_64']) {
     const slice = path.join(outputDir, `yap-helper-${arch}`);
-    try {
-      console.log(`[build] Compiling Swift helper (${arch})...`);
-      execFileSync('swiftc', ['-O', '-target', `${arch}-apple-macos12.0`, source, '-o', slice], { stdio: 'inherit' });
-      slices.push(slice);
-    } catch {
-      console.warn(`[build] ${arch} slice failed, continuing without it.`);
-    }
-  }
-
-  if (slices.length === 0) {
-    throw new Error('The Swift helper could not be compiled for any architecture.');
+    console.log(`[build] Compiling Swift helper (${arch})...`);
+    execFileSync('swiftc', ['-O', '-swift-version', '5', '-target', `${arch}-apple-macos12.0`, source, '-o', slice], {
+      stdio: 'inherit',
+    });
+    slices.push(slice);
   }
 
   execFileSync('lipo', ['-create', ...slices, '-output', output], { stdio: 'inherit' });

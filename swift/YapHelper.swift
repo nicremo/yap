@@ -391,7 +391,7 @@ private struct Snapshot {
 }
 
 private var preparedSnapshot: Snapshot?
-private var pendingRestore: (items: [NSPasteboardItem], work: DispatchWorkItem)?
+private var pendingRestore: (items: [NSPasteboardItem], work: DispatchWorkItem, due: DispatchTime)?
 
 private func snapshotPasteboard() -> Snapshot {
     let pasteboard = NSPasteboard.general
@@ -519,11 +519,27 @@ func paste(text: String, restore: Bool, pid: pid_t?) -> [String: Any] {
                 pasteboard.writeObjects(original)
             }
         }
-        pendingRestore = (original, work)
-        DispatchQueue.main.asyncAfter(deadline: .now() + restoreDelay, execute: work)
+        let due = DispatchTime.now() + restoreDelay
+        pendingRestore = (original, work, due)
+        DispatchQueue.main.asyncAfter(deadline: due, execute: work)
     }
 
     return ["ok": posted]
+}
+
+// MARK: - Shutdown
+
+private var terminationSource: DispatchSourceSignal?
+
+/// Leaves once a pending clipboard restore has run, so quitting or restarting
+/// right after a dictation does not cost the user what they had copied.
+private func finishAndExit() {
+    stopTap()
+    guard let pending = pendingRestore else { exit(0) }
+    DispatchQueue.main.asyncAfter(deadline: pending.due) {
+        pendingRestore?.work.perform()
+        exit(0)
+    }
 }
 
 // MARK: - Permission watching
@@ -597,12 +613,18 @@ private func handle(_ line: String) {
         let modifiers = (command["modifiers"] as? NSNumber)?.uint64Value ?? 0
         hotkey.lock.lock()
         let changed = hotkey.keyCode != keyCode || hotkey.modifiers != modifiers
+        // Switching keys mid-press: end that press, or the app keeps recording.
+        let releaseOld = changed && hotkey.isDown
         hotkey.keyCode = keyCode
         hotkey.modifiers = modifiers
         if changed {
             hotkey.isDown = false
+            hotkey.chorded = false
         }
         hotkey.lock.unlock()
+        if releaseOld {
+            emitHotkey(down: false)
+        }
         listenerWanted = true
         startListening()
         reply(listenerStatus())
@@ -632,6 +654,13 @@ private func handle(_ line: String) {
 func serve() -> Never {
     signal(SIGPIPE, SIG_DFL)
 
+    // The app stops the helper with SIGTERM; finish a pending restore first.
+    signal(SIGTERM, SIG_IGN)
+    let termination = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
+    termination.setEventHandler { finishAndExit() }
+    termination.resume()
+    terminationSource = termination
+
     lastPermissions = [
         "accessibility": AXIsProcessTrusted(),
         "inputMonitoring": inputMonitoringGranted(),
@@ -640,22 +669,33 @@ func serve() -> Never {
 
     let timer = DispatchSource.makeTimerSource(queue: .main)
     timer.schedule(deadline: .now() + 1, repeating: 1)
-    timer.setEventHandler(handler: pollPermissions)
+    timer.setEventHandler { pollPermissions() }
     timer.resume()
     permissionTimer = timer
 
+    // Plain read(2) instead of readLine(): stdio would hold the stdin lock
+    // while blocked, and exit() from another thread can wait on that lock.
     let reader = Thread {
-        while let line = readLine(strippingNewline: true) {
-            if line.isEmpty { continue }
-            DispatchQueue.main.async {
-                handle(line)
+        var pending = Data()
+        var chunk = [UInt8](repeating: 0, count: 65_536)
+        func dispatch(_ bytes: Data) {
+            let line = String(decoding: bytes, as: UTF8.self)
+            if line.isEmpty { return }
+            DispatchQueue.main.async { handle(line) }
+        }
+        while true {
+            let count = read(STDIN_FILENO, &chunk, chunk.count)
+            if count < 0 && errno == EINTR { continue }
+            if count <= 0 { break }
+            pending.append(contentsOf: chunk[0..<count])
+            while let newline = pending.firstIndex(of: 0x0A) {
+                dispatch(pending[pending.startIndex..<newline])
+                pending.removeSubrange(pending.startIndex...newline)
             }
         }
+        dispatch(pending)
         // The app closed our stdin: it quit or crashed. Leave with it.
-        DispatchQueue.main.async {
-            stopTap()
-            exit(0)
-        }
+        DispatchQueue.main.async { finishAndExit() }
     }
     reader.name = "yap.stdin"
     reader.start()

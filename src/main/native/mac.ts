@@ -102,7 +102,8 @@ export class MacHelperBridge extends NativeBridge {
       await this.call('hello', {}, CALL_TIMEOUT_MS);
     } catch (error) {
       console.error('[yap] helper did not answer:', error instanceof Error ? error.message : error);
-      child.kill();
+      // Unresponsive, so it would not act on SIGTERM either.
+      child.kill('SIGKILL');
       return false;
     }
 
@@ -237,9 +238,11 @@ export class MacHelperBridge extends NativeBridge {
         call.reject(new Error('The native helper is restarting.'));
       }
       this.pending.clear();
-      const exited = new Promise<void>((resolve) => child.once('exit', () => resolve()));
+      const exited = new Promise<boolean>((resolve) => child.once('exit', () => resolve(true)));
       child.kill();
-      await Promise.race([exited, new Promise((resolve) => setTimeout(resolve, 1_000))]);
+      // SIGTERM lets it finish a pending clipboard restore (under a second).
+      const stopped = await Promise.race([exited, new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 1_500))]);
+      if (!stopped) child.kill('SIGKILL');
     }
     this.restarts = [];
     return this.start();

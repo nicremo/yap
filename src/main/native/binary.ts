@@ -34,7 +34,7 @@ async function modifiedAt(target: string): Promise<number> {
 function compile(source: string, output: string): Promise<boolean> {
   const [command, args] = isWindows
     ? ['g++', ['-O2', '-o', output, source, '-luser32', '-lkernel32']]
-    : ['swiftc', ['-O', source, '-o', output]];
+    : ['swiftc', ['-O', '-swift-version', '5', source, '-o', output]];
 
   return new Promise((resolve) => {
     const child = spawn(command, args, { stdio: ['ignore', 'ignore', 'pipe'] });
