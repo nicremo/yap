@@ -30,6 +30,11 @@ jobs:
       - run: npm test
       - run: npm run build
 
+      - name: End-to-end dictation test
+        run: |
+          command -v xvfb-run >/dev/null || (sudo apt-get update && sudo apt-get install -y xvfb)
+          xvfb-run -a npm run test:e2e
+
   macos-helper:
     name: macOS helper
     runs-on: macos-latest

@@ -162,7 +162,13 @@ What makes it fast:
 npm test             # unit tests
 npm run typecheck
 npm run test:helper  # macOS: protocol test of the compiled native helper
+npm run build && xvfb-run -a npm run test:e2e
+                     # Linux: the built app against a mock Groq server
 ```
+
+The end-to-end test launches the real app with Chromium's fake microphone,
+drives the hotkey and checks the whole path: key setup, Opus upload, rewrite,
+delivery, clipboard behaviour and history.
 
 ## Credits
 

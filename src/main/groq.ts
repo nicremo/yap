@@ -1,9 +1,12 @@
-import { net, session } from 'electron';
+import { app, net, session } from 'electron';
 
 import type { KeyValidationResult } from '../shared/types';
 
-export const GROQ_ORIGIN = 'https://api.groq.com';
-const API_BASE = `${GROQ_ORIGIN}/openai/v1`;
+/* Development builds can point the client at another OpenAI-compatible
+   endpoint (the end-to-end test's mock server). Packaged builds always talk to
+   Groq, so nothing in the environment can redirect the API key elsewhere. */
+const API_BASE = (!app.isPackaged && process.env.YAP_GROQ_API_BASE) || 'https://api.groq.com/openai/v1';
+export const GROQ_ORIGIN = new URL(API_BASE).origin;
 
 /* Requests go through Chromium's network stack (net.fetch) rather than Node's.
    That gets HTTP/2 with long-lived pooled connections, the system proxy and

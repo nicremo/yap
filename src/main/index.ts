@@ -283,6 +283,13 @@ const engine = new DictationEngine(
 bridge.on('hotkey', (signal) => engine.handleHotkey(signal));
 permissions.onChange((state) => patch({ permissions: state }));
 
+// End-to-end tests drive the hotkey from outside; never present in packaged builds.
+if (!app.isPackaged && process.env.YAP_E2E === '1') {
+  (globalThis as { __yapE2E?: unknown }).__yapE2E = {
+    hotkey: (type: 'down' | 'up') => engine.handleHotkey({ type }),
+  };
+}
+
 /* ── Settings ───────────────────────────────────────────────────────────── */
 
 async function updateSettings(updates: UpdateSettingsInput): Promise<AppState> {
