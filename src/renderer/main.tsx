@@ -1,16 +1,25 @@
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-
-import { App } from './App';
+import '@fontsource-variable/geist/wght.css';
+import '@fontsource-variable/geist-mono/wght.css';
 import './styles.css';
 
-if (window.location.hash === '#overlay') {
-  document.documentElement.classList.add('overlay-route');
-  document.body.classList.add('overlay-route');
+import { StrictMode, type ComponentType } from 'react';
+import { createRoot } from 'react-dom/client';
+
+const isOverlay = window.location.hash === '#overlay';
+document.documentElement.classList.toggle('overlay-route', isOverlay);
+
+/* Two entry points in one page: the overlay window only loads the recorder
+   and its pill, not the settings app. */
+async function mount(): Promise<void> {
+  const Root: ComponentType = isOverlay
+    ? (await import('./overlay/Overlay')).Overlay
+    : (await import('./App')).App;
+
+  createRoot(document.getElementById('root') as HTMLElement).render(
+    <StrictMode>
+      <Root />
+    </StrictMode>,
+  );
 }
 
-ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
-);
+void mount();

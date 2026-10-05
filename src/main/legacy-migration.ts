@@ -17,6 +17,7 @@ const MIGRATED_FILES = [
    over would surface as a corrupt-looking setting rather than an empty field,
    so the keys are cleared and the user re-enters them once. */
 const CLEARED_SETTINGS_KEYS = [
+  'groqApiKeyEncrypted',
   'openaiApiKeyEncrypted',
   'openrouterApiKeyEncrypted',
   'fireworksApiKeyEncrypted',

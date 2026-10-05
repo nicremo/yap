@@ -1,68 +1,171 @@
-import { dialog, app } from 'electron';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { app, dialog } from 'electron';
 import path from 'node:path';
 
-import { encryptApiKey } from './api-key';
-import { createDefaultSettings } from './defaults';
-import type { AppSettings, UpdateSettingsInput } from '../shared/types';
+import type {
+  AppSettings,
+  CloudTranscriptionModel,
+  CustomPlusVoice,
+  EnhancementLevel,
+  HotkeyConfig,
+  LocalWhisperModel,
+  StyleMode,
+  TranscriptionMode,
+  UpdateSettingsInput,
+} from '../shared/types';
+import { CLOUD_MODELS, LANGUAGES, LOCAL_MODELS, REWRITE_MODELS } from '../shared/models';
+import { createDefaultSettings, SETTINGS_VERSION } from './defaults';
+import { encryptSecret } from './secrets';
+import { readJsonFile, writeJsonFile } from './json-file';
 
 const SETTINGS_FILE = 'settings.json';
+
+const STYLE_MODES: readonly StyleMode[] = ['conversation', 'vibe-coding', 'custom-plus'];
+const VOICES: readonly CustomPlusVoice[] = ['conversation', 'developer'];
+const LEVELS: readonly EnhancementLevel[] = ['none', 'soft', 'medium', 'high'];
 
 function getSettingsPath(): string {
   return path.join(app.getPath('userData'), SETTINGS_FILE);
 }
 
-export async function loadSettings(): Promise<AppSettings> {
-  const settingsPath = getSettingsPath();
+function pick<T>(value: unknown, allowed: readonly T[], fallback: T): T {
+  return allowed.includes(value as T) ? (value as T) : fallback;
+}
 
-  try {
-    const raw = await readFile(settingsPath, 'utf8');
-    const parsed = JSON.parse(raw) as Partial<AppSettings>;
-    return { ...createDefaultSettings(), ...parsed };
-  } catch {
-    const defaults = createDefaultSettings();
-    await saveSettings(defaults);
+function bool(value: unknown, fallback: boolean): boolean {
+  return typeof value === 'boolean' ? value : fallback;
+}
+
+function isHotkey(value: unknown): value is HotkeyConfig {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    typeof candidate.keyCode === 'number' &&
+    typeof candidate.modifiers === 'number' &&
+    typeof candidate.label === 'string'
+  );
+}
+
+/**
+ * Turns whatever is on disk into a valid current-version settings object.
+ *
+ * Version 1 files come from before the Groq-only cleanup: they carry the key
+ * as `openaiApiKeyEncrypted`, may select the removed `auto` transcription mode
+ * or the removed OpenRouter, Fireworks and Ollama rewrite paths. The key is
+ * kept (it is still a Groq key unless the user pointed the old base URL
+ * somewhere else), everything removed maps onto its closest survivor.
+ */
+export function migrateSettings(raw: unknown, defaults: AppSettings): AppSettings {
+  if (!raw || typeof raw !== 'object') {
     return defaults;
   }
-}
 
-export async function saveSettings(settings: AppSettings): Promise<void> {
-  const settingsPath = getSettingsPath();
-  await mkdir(path.dirname(settingsPath), { recursive: true });
-  await writeFile(settingsPath, `${JSON.stringify(settings, null, 2)}\n`, 'utf8');
-}
+  const source = raw as Record<string, unknown>;
 
-export async function updateSettings(
-  current: AppSettings,
-  updates: UpdateSettingsInput,
-): Promise<AppSettings> {
-  const { openaiApiKey, openrouterApiKey, fireworksApiKey, ...settingUpdates } = updates;
+  const legacyBaseUrl = typeof source.cloudApiBaseUrl === 'string' ? source.cloudApiBaseUrl : '';
+  const legacyKeyIsGroq = legacyBaseUrl === '' || legacyBaseUrl.includes('groq.com');
+  const groqApiKeyEncrypted =
+    typeof source.groqApiKeyEncrypted === 'string'
+      ? source.groqApiKeyEncrypted
+      : typeof source.openaiApiKeyEncrypted === 'string' && legacyKeyIsGroq
+        ? source.openaiApiKeyEncrypted
+        : '';
+  const hasKey = groqApiKeyEncrypted.length > 0;
 
-  const nextSettings: AppSettings = {
-    ...current,
-    ...settingUpdates,
+  let transcriptionMode: TranscriptionMode;
+  if (source.transcriptionMode === 'cloud' || source.transcriptionMode === 'local') {
+    transcriptionMode = source.transcriptionMode;
+  } else if (source.transcriptionMode === 'auto') {
+    transcriptionMode = hasKey ? 'cloud' : 'local';
+  } else {
+    transcriptionMode = defaults.transcriptionMode;
+  }
+
+  let enhancementEnabled: boolean;
+  if (typeof source.enhancementEnabled === 'boolean') {
+    enhancementEnabled = source.enhancementEnabled;
+  } else if (source.rewriteMode === 'local') {
+    // Ollama is gone. Groq takes over when there is a key to use it with.
+    enhancementEnabled = hasKey;
+  } else {
+    enhancementEnabled = defaults.enhancementEnabled;
+  }
+
+  const rewriteModel = REWRITE_MODELS.some((model) => model.id === source.rewriteModel)
+    ? (source.rewriteModel as string)
+    : REWRITE_MODELS.some((model) => model.id === source.cloudRewriteModel)
+      ? (source.cloudRewriteModel as string)
+      : defaults.rewriteModel;
+
+  const rawLanguage = typeof source.language === 'string' ? source.language : source.cloudLanguage;
+  const language = LANGUAGES.some((entry) => entry.code === rawLanguage)
+    ? (rawLanguage as string)
+    : defaults.language;
+
+  const localModel = pick<LocalWhisperModel>(
+    source.localModel ?? source.whisperModel,
+    LOCAL_MODELS.map((model) => model.id),
+    defaults.localModel,
+  );
+
+  return {
+    settingsVersion: SETTINGS_VERSION,
+    storageDirectory:
+      typeof source.storageDirectory === 'string' && source.storageDirectory.length > 0
+        ? source.storageDirectory
+        : defaults.storageDirectory,
+    transcriptionMode,
+    cloudModel: pick<CloudTranscriptionModel>(
+      source.cloudModel,
+      CLOUD_MODELS.map((model) => model.id),
+      defaults.cloudModel,
+    ),
+    localModel,
+    language,
+    groqApiKeyEncrypted,
+    enhancementEnabled,
+    rewriteModel,
+    styleMode: pick(source.styleMode, STYLE_MODES, defaults.styleMode),
+    customPlusVoice: pick(source.customPlusVoice, VOICES, defaults.customPlusVoice),
+    enhancementLevel: pick(source.enhancementLevel, LEVELS, defaults.enhancementLevel),
+    hotkey: isHotkey(source.hotkey) ? source.hotkey : defaults.hotkey,
+    autoPaste: bool(source.autoPaste, defaults.autoPaste),
+    copyToClipboard: bool(source.copyToClipboard, defaults.copyToClipboard),
+    showOverlay: bool(source.showOverlay, defaults.showOverlay),
+    launchAtLogin: bool(source.launchAtLogin, defaults.launchAtLogin),
+    setupComplete: bool(source.setupComplete, defaults.setupComplete),
   };
+}
 
-  if (openaiApiKey !== undefined) {
-    nextSettings.openaiApiKeyEncrypted = openaiApiKey.length > 0
-      ? encryptApiKey(openaiApiKey)
-      : '';
+/** Applies a renderer update, ignoring anything that would not survive a reload. */
+export function applySettingsUpdate(current: AppSettings, updates: UpdateSettingsInput): AppSettings {
+  return migrateSettings({ ...current, ...updates }, current);
+}
+
+export async function loadSettings(): Promise<AppSettings> {
+  const defaults = createDefaultSettings();
+  const raw = await readJsonFile<unknown>(getSettingsPath());
+  const settings = migrateSettings(raw, defaults);
+
+  // Rewrite the file when it was missing, broken or from an older version, so
+  // the obsolete keys of removed providers do not linger on disk.
+  const stored = raw as Record<string, unknown> | undefined;
+  if (!stored || stored.settingsVersion !== SETTINGS_VERSION || Object.keys(stored).length !== Object.keys(settings).length) {
+    await saveSettings(settings);
   }
 
-  if (openrouterApiKey !== undefined) {
-    nextSettings.openrouterApiKeyEncrypted = openrouterApiKey.length > 0
-      ? encryptApiKey(openrouterApiKey)
-      : '';
-  }
+  return settings;
+}
 
-  if (fireworksApiKey !== undefined) {
-    nextSettings.fireworksApiKeyEncrypted = fireworksApiKey.length > 0
-      ? encryptApiKey(fireworksApiKey)
-      : '';
-  }
+export function saveSettings(settings: AppSettings): Promise<void> {
+  return writeJsonFile(getSettingsPath(), settings);
+}
 
-  await saveSettings(nextSettings);
-  return nextSettings;
+export function withGroqKey(settings: AppSettings, rawKey: string): AppSettings {
+  const trimmed = rawKey.trim();
+  return {
+    ...settings,
+    groqApiKeyEncrypted: trimmed.length > 0 ? encryptSecret(trimmed) : '',
+  };
 }
 
 export async function chooseStorageDirectory(currentDirectory: string): Promise<string | null> {

@@ -1,79 +1,73 @@
 import { fileURLToPath } from 'node:url';
 
-import { BrowserWindow, screen } from 'electron';
+import { BrowserWindow, nativeTheme, screen } from 'electron';
 
 const isMac = process.platform === 'darwin';
 
 const preloadPath = fileURLToPath(new URL('../preload/index.cjs', import.meta.url));
 const rendererFilePath = fileURLToPath(new URL('../renderer/index.html', import.meta.url));
-const overlayWidth = 320;
-const overlayHeight = 68;
 
-function getRendererEntry(hash = ''): string {
-  const rendererUrl = process.env.ELECTRON_RENDERER_URL;
-  if (rendererUrl) {
-    return hash ? `${rendererUrl.replace(/\/$/, '')}/#${hash}` : rendererUrl;
-  }
+export const OVERLAY_WIDTH = 360;
+export const OVERLAY_HEIGHT = 88;
 
-  return rendererFilePath + (hash ? `#${hash}` : '');
-}
-
-async function loadRendererWindow(window: BrowserWindow, hash = ''): Promise<void> {
-  const rendererUrl = process.env.ELECTRON_RENDERER_URL;
-
-  if (rendererUrl) {
-    await window.loadURL(getRendererEntry(hash));
+async function loadRenderer(window: BrowserWindow, hash = ''): Promise<void> {
+  const devServerUrl = process.env.ELECTRON_RENDERER_URL;
+  if (devServerUrl) {
+    await window.loadURL(hash ? `${devServerUrl.replace(/\/$/, '')}/#${hash}` : devServerUrl);
     return;
   }
-
-  await window.loadFile(rendererFilePath, {
-    hash,
-  });
+  await window.loadFile(rendererFilePath, { hash });
 }
 
 export async function createMainWindow(): Promise<BrowserWindow> {
   const window = new BrowserWindow({
-    width: 1060,
-    height: 720,
-    minWidth: 800,
-    minHeight: 520,
+    width: 1080,
+    height: 740,
+    minWidth: 860,
+    minHeight: 560,
     show: false,
-    backgroundColor: '#f5f5ef',
+    // Matches the sidebar colour so the first frame does not flash.
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#0a1122' : '#edf1fa',
+    title: 'Yap',
     ...(isMac
       ? { titleBarStyle: 'hiddenInset' as const, trafficLightPosition: { x: 18, y: 18 } }
       : { autoHideMenuBar: true }),
     webPreferences: {
       preload: preloadPath,
       contextIsolation: true,
-      backgroundThrottling: false,
       spellcheck: false,
     },
   });
 
-  await loadRendererWindow(window);
+  await loadRenderer(window);
   return window;
 }
 
 export function positionOverlayWindow(window: BrowserWindow): void {
-  const cursor = screen.getCursorScreenPoint();
-  const display = screen.getDisplayNearestPoint(cursor);
-  const workArea = display.workArea;
-  const margin = 24;
-
-  const x = workArea.x + Math.round((workArea.width - overlayWidth) / 2);
-  const y = workArea.y + workArea.height - overlayHeight - margin;
-
-  window.setBounds({ x, y, width: overlayWidth, height: overlayHeight });
+  const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+  const { workArea } = display;
+  const x = workArea.x + Math.round((workArea.width - OVERLAY_WIDTH) / 2);
+  const y = workArea.y + workArea.height - OVERLAY_HEIGHT - 16;
+  const current = window.getBounds();
+  if (current.x !== x || current.y !== y || current.width !== OVERLAY_WIDTH || current.height !== OVERLAY_HEIGHT) {
+    window.setBounds({ x, y, width: OVERLAY_WIDTH, height: OVERLAY_HEIGHT });
+  }
 }
 
+/**
+ * The overlay doubles as the recorder: it owns the microphone, so it exists
+ * for the whole session even while hidden, and it never takes focus away
+ * from the app the user is dictating into.
+ */
 export async function createOverlayWindow(): Promise<BrowserWindow> {
   const window = new BrowserWindow({
-    width: overlayWidth,
-    height: overlayHeight,
+    width: OVERLAY_WIDTH,
+    height: OVERLAY_HEIGHT,
     show: false,
     frame: false,
     transparent: true,
     resizable: false,
+    movable: false,
     focusable: false,
     skipTaskbar: true,
     hasShadow: false,
@@ -82,6 +76,7 @@ export async function createOverlayWindow(): Promise<BrowserWindow> {
     webPreferences: {
       preload: preloadPath,
       contextIsolation: true,
+      // Recording runs while the window is hidden.
       backgroundThrottling: false,
       spellcheck: false,
     },
@@ -94,7 +89,6 @@ export async function createOverlayWindow(): Promise<BrowserWindow> {
   window.setIgnoreMouseEvents(true);
   positionOverlayWindow(window);
 
-  await loadRendererWindow(window, 'overlay');
-
+  await loadRenderer(window, 'overlay');
   return window;
 }
