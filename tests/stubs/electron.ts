@@ -29,6 +29,15 @@ export const clipboard = {
     clipboardText = text;
   },
   readText: () => clipboardText,
+  readHTML: () => '',
+  readRTF: () => '',
+  readImage: () => ({ isEmpty: () => true }),
+  write: (data: { text?: string }) => {
+    clipboardText = data.text ?? '';
+  },
+  clear: () => {
+    clipboardText = '';
+  },
 };
 
 export const net = {

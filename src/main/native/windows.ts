@@ -241,7 +241,9 @@ export class WindowsHelperBridge extends NativeBridge {
       ok = false;
     }
 
-    if (snapshot) {
+    // After a failed paste the engine leaves the text on the clipboard as a
+    // fallback, so restoring the old content would take it away again.
+    if (snapshot && ok) {
       const saved = snapshot;
       const timer = setTimeout(() => {
         this.pendingRestore = null;
