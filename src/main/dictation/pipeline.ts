@@ -21,8 +21,9 @@ export class NothingHeardError extends Error {
 
 /** Below this the recording is silence, whatever Whisper makes of it. */
 export const SILENCE_PEAK_RMS = 0.004;
-/** Below this, a stock phrase is far more likely a Whisper hallucination than speech. */
-const QUIET_PEAK_RMS = 0.03;
+/** At or above this the recording almost certainly contains speech. Below it,
+    a stock phrase is far more likely a Whisper hallucination than speech. */
+export const SPEECH_PEAK_RMS = 0.03;
 
 /* What Whisper says when it hears (almost) nothing. It learned these from
    subtitled videos, so they come out on quiet recordings with confidence. */
@@ -57,7 +58,7 @@ function normalizeForComparison(text: string): string {
 }
 
 export function isLikelyHallucination(text: string, peakRms: number): boolean {
-  if (peakRms >= QUIET_PEAK_RMS) return false;
+  if (peakRms >= SPEECH_PEAK_RMS) return false;
   return HALLUCINATIONS.has(normalizeForComparison(text));
 }
 
@@ -77,6 +78,7 @@ export async function transcribe(
   audio: AudioInput,
   dictionary: DictionaryEntry[],
   corrections: CorrectionEntry[],
+  options: { expectSpeech?: boolean } = {},
 ): Promise<TranscriptionOutcome> {
   if (settings.transcriptionMode === 'local') {
     const text = await transcribeLocally({
@@ -107,6 +109,13 @@ export async function transcribe(
       language,
       prompt,
     });
+    // An empty answer for audio that clearly has speech in it points at the
+    // compressed file, not the speaker. The WAV settles it.
+    if (useOpus && !text.trim() && options.expectSpeech) {
+      console.warn('[yap] empty transcript for an Opus upload with speech, retrying with WAV');
+      const retry = await transcribeWithGroq({ apiKey, audio: audio.wav, format: 'wav', model: settings.cloudModel, language, prompt });
+      return { text: retry, source: 'cloud', uploadBytes: payload.byteLength + audio.wav.byteLength };
+    }
     return { text, source: 'cloud', uploadBytes: payload.byteLength };
   } catch (error) {
     // The compressed upload is an optimisation. If Groq cannot read it, the

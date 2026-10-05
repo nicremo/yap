@@ -71,7 +71,7 @@ export function HomePage({ state, navigate }: { state: AppState; onState: (next:
         <div className="hero-glow" aria-hidden="true" />
         <div className="hero-content">
           <span className="hero-eyebrow">
-            <Icon name="zap" size={14} /> {settings.transcriptionMode === 'cloud' ? 'Groq · Whisper Large v3' : 'Private, on this device'}
+            <Icon name="zap" size={14} /> {settings.transcriptionMode === 'cloud' ? `Groq · ${engine.detail}` : `${engine.detail} · private, on this device`}
           </span>
           <h2>
             Hold <KeyCap large>{settings.hotkey.label}</KeyCap> speak, release.

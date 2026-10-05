@@ -21,7 +21,7 @@ import { addHistoryEntry, loadHistory, removeHistoryEntry, updateHistoryEntry } 
 import type { HotkeySignal, NativeBridge } from '../native';
 import { isGroqKeySet } from '../secrets';
 import { GestureMachine, type GestureAction } from './gesture';
-import { isLikelyHallucination, NothingHeardError, polish, SILENCE_PEAK_RMS, transcribe } from './pipeline';
+import { isLikelyHallucination, NothingHeardError, polish, SILENCE_PEAK_RMS, SPEECH_PEAK_RMS, transcribe } from './pipeline';
 
 /** Hard stop for a forgotten hands-free recording. */
 const MAX_RECORDING_MS = 10 * 60 * 1000;
@@ -322,7 +322,9 @@ export class DictationEngine {
     const transcribeStartedAt = Date.now();
     let outcome;
     try {
-      outcome = await transcribe(settings, { wav, opus }, dictionary, corrections);
+      outcome = await transcribe(settings, { wav, opus }, dictionary, corrections, {
+        expectSpeech: audio.peakRms >= SPEECH_PEAK_RMS,
+      });
     } catch (error) {
       await persisted;
       await this.updateEntry(historyId, { status: 'transcription-failed', errorMessage: errorMessage(error) });

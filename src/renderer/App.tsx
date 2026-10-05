@@ -78,7 +78,7 @@ function MainView({ state, onState }: { state: AppState; onState: (next: AppStat
         <div className="sidebar-footer">
           <span className={`engine-pill engine-pill-${state.settings.transcriptionMode}`}>
             <Icon name={state.settings.transcriptionMode === 'cloud' ? 'cloud' : 'laptop'} size={13} />
-            {state.settings.transcriptionMode === 'cloud' ? 'Groq cloud' : 'On this Mac'}
+            {state.settings.transcriptionMode === 'cloud' ? 'Groq cloud' : 'Local'}
           </span>
           <span className="version">v{state.version}</span>
         </div>
