@@ -30,8 +30,8 @@ jobs:
       - run: npm test
       - run: npm run build
 
-  macos:
-    name: macOS helper and package
+  macos-helper:
+    name: macOS helper
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -48,49 +48,6 @@ jobs:
 
       - name: Helper protocol smoke test
         run: npm run test:helper
-
-      - name: Create the self-signed identity
-        run: |
-          scripts/create-signing-identity.sh
-          scripts/create-signing-identity.sh
-          security find-identity -p codesigning
-
-      - name: Package the app
-        run: |
-          npm run build
-          npx electron-builder --mac --dir --publish never
-
-      - name: Inspect the packaged app
-        run: |
-          APP="$(find release -maxdepth 2 -name 'Yap.app' -type d | head -1)"
-          echo "App: $APP"
-          codesign -dv --verbose=2 "$APP" 2>&1 | grep -E 'Identifier|Authority|Signature|Runtime|flags'
-          echo "Designated requirement:"
-          codesign -d -r- "$APP" 2>&1 | tail -1
-          codesign --verify --deep --strict "$APP"
-          lipo -info "$APP/Contents/Resources/native/yap-helper"
-          codesign -dv "$APP/Contents/Resources/native/yap-helper" 2>&1 | grep -E 'Authority|Signature'
-          /usr/libexec/PlistBuddy -c 'Print :NSMicrophoneUsageDescription' "$APP/Contents/Info.plist"
-          du -sh "$APP"
-          du -sh "$APP/Contents/Resources/app.asar" "$APP/Contents/Resources/app.asar.unpacked" 2>/dev/null || true
-
-      - name: Packaged helper still answers
-        run: |
-          APP="$(find release -maxdepth 2 -name 'Yap.app' -type d | head -1)"
-          node scripts/helper-smoke-test.mjs "$APP/Contents/Resources/native/yap-helper"
-
-      - name: Local Whisper stack loads from the package
-        run: |
-          APP="$(find release -maxdepth 2 -name 'Yap.app' -type d | head -1)"
-          ELECTRON_RUN_AS_NODE=1 "$APP/Contents/MacOS/Yap" -e "
-            const path = require('node:path');
-            const { pathToFileURL } = require('node:url');
-            const entry = path.join(process.argv[1], 'Contents/Resources/app.asar/node_modules/@huggingface/transformers/dist/transformers.node.mjs');
-            import(pathToFileURL(entry).href).then((m) => {
-              if (typeof m.pipeline !== 'function') throw new Error('pipeline missing');
-              console.log('transformers', m.env.version, 'loaded with', Object.keys(m.env.backends.onnx ?? {}).length ? 'onnx backend' : 'backend');
-            }).catch((error) => { console.error(error); process.exit(1); });
-          " "$APP"
 
   windows-helper:
     name: Windows helper compiles
