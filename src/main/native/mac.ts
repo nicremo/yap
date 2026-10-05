@@ -137,7 +137,10 @@ export class MacHelperBridge extends NativeBridge {
 
     switch (message.event) {
       case 'hotkey':
-        this.emit('hotkey', { type: message.state === 'down' ? 'down' : 'up', focus: toFocus(message.focus) });
+        this.emit('hotkey', {
+          type: message.state === 'down' ? 'down' : message.state === 'chord' ? 'chord' : 'up',
+          focus: toFocus(message.focus),
+        });
         break;
       case 'permissions':
         this.emit('permissions', toPermissions(message));

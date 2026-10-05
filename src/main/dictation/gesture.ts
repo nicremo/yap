@@ -94,6 +94,14 @@ export class GestureMachine {
     }
   }
 
+  /** Another key went down while the hotkey was held: it is being used as a modifier. */
+  chord(): void {
+    if (this.state === 'holding') {
+      this.state = 'releasing';
+      this.onAction('cancel');
+    }
+  }
+
   /** The recording ended for another reason (error, length limit). */
   reset(): void {
     this.clearTimer();

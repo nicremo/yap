@@ -105,6 +105,10 @@ export class DictationEngine {
   /* ── Input ─────────────────────────────────────────────────────────── */
 
   handleHotkey(signal: HotkeySignal): void {
+    if (signal.type === 'chord') {
+      this.gesture.chord();
+      return;
+    }
     this.host.notifyHotkey(signal.type === 'down');
     if (signal.type === 'down') {
       this.lastFocus = signal.focus;

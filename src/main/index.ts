@@ -203,8 +203,10 @@ async function createMain(showOnReady: boolean): Promise<void> {
   });
   window.on('show', updateMicPolling);
   window.on('hide', updateMicPolling);
+  // Coming back from System Settings is when permissions and the fn key
+  // setting usually just changed.
   window.on('focus', () => {
-    void permissions.refresh();
+    void permissions.refresh().then(() => refreshFnKeyAction());
   });
   window.on('close', (event) => {
     if (isQuitting) return;

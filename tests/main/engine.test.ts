@@ -267,6 +267,19 @@ describe('DictationEngine', () => {
     expect(pipeline.transcribe).not.toHaveBeenCalled();
   });
 
+  it('drops the recording when fn is used as a modifier', async () => {
+    engine.handleHotkey({ type: 'down' });
+    await flush();
+    now += 400;
+    engine.handleHotkey({ type: 'chord' });
+    await flush();
+    engine.handleHotkey({ type: 'up' });
+    await flush();
+
+    expect(commands.map((command) => command.type)).toEqual(['start', 'cancel']);
+    expect(pipeline.transcribe).not.toHaveBeenCalled();
+  });
+
   it('does not start and opens the app when the Groq key is missing', async () => {
     keyState.set = false;
     engine.handleHotkey({ type: 'down' });

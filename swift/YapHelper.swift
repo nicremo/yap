@@ -169,6 +169,8 @@ private final class HotkeyState {
     var keyCode: Int64 = 63
     var modifiers: UInt64 = 0
     var isDown = false
+    /// Another key was pressed while a modifier hotkey was held (fn + arrow, ...).
+    var chorded = false
 }
 
 private let hotkey = HotkeyState()
@@ -257,12 +259,25 @@ private func hotkeyCallback(
     var changed = false
     if let next, next != hotkey.isDown {
         hotkey.isDown = next
+        hotkey.chorded = false
         changed = true
+    }
+    // A modifier hotkey used as a modifier (fn + delete, right option + a
+    // letter) is not a dictation. Tell the app once per press so it can drop
+    // the recording that already started.
+    var chord = false
+    if type == .keyDown && hotkey.isDown && !hotkey.chorded
+        && keyCode != hotkey.keyCode && modifierKeyCodes.contains(hotkey.keyCode) {
+        hotkey.chorded = true
+        chord = true
     }
     hotkey.lock.unlock()
 
     if changed, let next {
         emitHotkey(down: next)
+    }
+    if chord {
+        send(["event": "hotkey", "state": "chord"])
     }
 
     // Never swallow or alter the event: other apps see the key exactly as typed.

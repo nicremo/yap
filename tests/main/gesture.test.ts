@@ -102,6 +102,26 @@ describe('GestureMachine', () => {
     expect(actions).toEqual(['start', 'start']);
   });
 
+  it('cancels when the held key turns out to be a modifier for another key', () => {
+    machine.keyDown();
+    clock.advance(400);
+    machine.chord();
+    expect(actions).toEqual(['start', 'cancel']);
+
+    machine.keyUp();
+    expect(actions).toEqual(['start', 'cancel']);
+    expect(machine.current).toBe('idle');
+  });
+
+  it('ignores chords outside a held press', () => {
+    machine.keyDown();
+    machine.keyUp();
+    machine.keyDown();
+    machine.keyUp();
+    machine.chord();
+    expect(actions).toEqual(['start', 'handsfree']);
+  });
+
   it('returns straight to idle when reset during hands-free', () => {
     machine.keyDown();
     machine.keyUp();

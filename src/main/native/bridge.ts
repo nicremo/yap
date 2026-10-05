@@ -15,7 +15,8 @@ export interface ListenerStatus {
 }
 
 export interface HotkeySignal {
-  type: 'down' | 'up';
+  /** 'chord': another key was pressed while the hotkey was held, so it was used as a modifier. */
+  type: 'down' | 'up' | 'chord';
   /** The app that had focus when the key went down. */
   focus?: FocusInfo;
 }
