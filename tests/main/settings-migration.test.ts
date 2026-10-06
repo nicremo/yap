@@ -97,6 +97,14 @@ describe('migrateSettings', () => {
     expect(migrated.rewriteModel).toBe(defaults.rewriteModel);
   });
 
+  it('moves the Llama models, now enterprise only on Groq, back to the default', () => {
+    // A version two file: the model is stored under rewriteModel only.
+    for (const rewriteModel of ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant']) {
+      expect(migrateSettings({ settingsVersion: 2, rewriteModel }, defaults).rewriteModel).toBe('openai/gpt-oss-20b');
+    }
+    expect(migrateSettings({ settingsVersion: 2, rewriteModel: 'qwen/qwen3.8-27b' }, defaults).rewriteModel).toBe('qwen/qwen3.8-27b');
+  });
+
   it('rejects models that Groq does not serve for transcription', () => {
     const migrated = migrateSettings({ ...versionOne, cloudModel: 'gpt-4o-transcribe' }, defaults);
     expect(migrated.cloudModel).toBe(defaults.cloudModel);

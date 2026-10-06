@@ -18,12 +18,17 @@ export interface RewriteModelOption {
   id: string;
   label: string;
   note: string;
+  /** Groq preview model: can change or disappear at short notice. */
+  preview?: boolean;
   /** Extra chat completion parameters, e.g. to keep reasoning models from thinking out loud. */
   params?: Record<string, unknown>;
 }
 
-/* Groq production models only. Preview models can disappear without notice,
-   which would turn every dictation into a raw-text fallback. */
+/* The rewrite models Yap knows how to drive, with the parameters each one
+   needs. Which of them a key can actually use is checked against Groq's
+   model list when the key is saved and then once a day; this list is the
+   offline fallback. A model that turns out to be gone mid-session is
+   replaced by the default for that dictation. */
 export const REWRITE_MODELS: ReadonlyArray<RewriteModelOption> = [
   {
     id: 'openai/gpt-oss-20b',
@@ -37,8 +42,14 @@ export const REWRITE_MODELS: ReadonlyArray<RewriteModelOption> = [
     note: 'Most capable, about 500 tokens/s',
     params: { reasoning_effort: 'low', include_reasoning: false },
   },
-  { id: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B', note: 'About 280 tokens/s' },
-  { id: 'llama-3.1-8b-instant', label: 'Llama 3.1 8B', note: 'Lightweight, about 560 tokens/s' },
+  {
+    id: 'qwen/qwen3.8-27b',
+    label: 'Qwen3.8 27B',
+    note: 'Preview, strong multilingual, about 450 tokens/s',
+    preview: true,
+    // Instruct mode: a faithful rewrite needs no thinking.
+    params: { reasoning_effort: 'none' },
+  },
 ];
 
 export function findRewriteModel(id: string): RewriteModelOption | undefined {
