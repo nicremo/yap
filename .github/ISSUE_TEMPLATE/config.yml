@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Setup and troubleshooting
+    url: https://github.com/nicremo/yap/blob/main/SUPPORT.md
+    about: Read setup, permission, model and packaging guidance.
+  - name: Report a security vulnerability privately
+    url: https://github.com/nicremo/yap/security/advisories/new
+    about: Do not post vulnerabilities or credentials in public issues.

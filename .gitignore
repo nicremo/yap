@@ -16,3 +16,24 @@ build/native/yap-helper
 
 # Intermediate icon build product
 build/icons/icon.iconset/
+
+# Private workspace state and local data
+.claude/
+.codex/
+.agents/
+work/
+credentials/
+secrets/
+*.pem
+*.p8
+*.p12
+*.pfx
+*.key
+settings.json
+history.json
+dictionary.json
+corrections.json
+app-rules.json
+audio/
+models/
+screenshots-tmp/

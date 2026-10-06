@@ -2,7 +2,7 @@
   "name": "yap",
   "version": "1.1.0",
   "license": "MIT",
-  "author": "Fabian Bitzer (https://github.com/nicremo)",
+  "author": "Yap contributors",
   "repository": {
     "type": "git",
     "url": "https://github.com/nicremo/yap.git"
@@ -10,7 +10,19 @@
   "homepage": "https://github.com/nicremo/yap",
   "private": true,
   "type": "module",
-  "description": "Fast, free dictation for macOS. Hold a key, speak, release. Groq transcribes in well under a second, with an optional fully local mode.",
+  "description": "Free, open source dictation for macOS and Windows. A Wispr Flow alternative with fast Groq transcription and optional local Whisper.",
+  "keywords": [
+    "dictation",
+    "speech-to-text",
+    "voice-to-text",
+    "wispr-flow-alternative",
+    "groq",
+    "whisper",
+    "macos",
+    "windows",
+    "open-source",
+    "local-first"
+  ],
   "main": "dist/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
@@ -18,6 +30,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "node tests/e2e/dictation.e2e.mjs",
+    "screenshots": "node scripts/capture-screenshots.mjs",
     "build:native": "node scripts/build-helper-platform.js",
     "test:helper": "node scripts/helper-smoke-test.mjs",
     "package": "npm run build && npm run build:native && electron-builder",

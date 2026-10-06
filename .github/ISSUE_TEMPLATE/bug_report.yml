@@ -1,0 +1,56 @@
+name: Bug report
+description: Report a reproducible problem with Yap.
+title: "bug: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Use synthetic text. Never include keys, personal dictations, recordings or unsanitized logs.
+  - type: input
+    id: version
+    attributes:
+      label: App version or source commit
+      placeholder: "1.1.0"
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Operating system and architecture
+      placeholder: macOS version and Apple Silicon/Intel, or Windows version
+    validations:
+      required: true
+  - type: dropdown
+    id: engine
+    attributes:
+      label: Engine
+      options:
+        - Groq cloud
+        - Local Whisper
+        - Not related to transcription
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Include selected model and shortcut if relevant. Do not include your key.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Sanitized screenshots or diagnostic excerpts
+      description: Remove personal information and machine-specific paths before sharing.
