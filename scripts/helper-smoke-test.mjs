@@ -49,9 +49,20 @@ function check(condition, label) {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** Polls until an event with the given name arrived, so a slow start is not mistaken for a missing event. */
+async function waitForEvent(name, timeoutMs = 5000) {
+  const deadline = Date.now() + timeoutMs;
+  while (!events.some((event) => event.event === name)) {
+    if (Date.now() > deadline) return false;
+    await sleep(20);
+  }
+  return true;
+}
+
 try {
-  await sleep(300);
-  check(events.some((event) => event.event === 'ready'), 'announces readiness');
+  // The first launch of a freshly built binary takes several hundred
+  // milliseconds while macOS checks it, which is exactly the CI situation.
+  check(await waitForEvent('ready'), 'announces readiness');
 
   const hello = await call('hello');
   check(hello.ok && hello.result.version >= 2, `hello answers (version ${hello.result?.version})`);
@@ -87,8 +98,7 @@ try {
   check(unknown.ok === false && /Unknown command/.test(unknown.error), 'unknown commands are rejected');
 
   child.stdin.write('this is not json\n');
-  await sleep(200);
-  check(events.some((event) => event.event === 'error'), 'malformed input is reported, not fatal');
+  check(await waitForEvent('error', 2000), 'malformed input is reported, not fatal');
   const stillAlive = await call('hello');
   check(stillAlive.ok, 'keeps serving after malformed input');
 
