@@ -1,6 +1,6 @@
 {
   "name": "yap",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "license": "MIT",
   "author": "Yap contributors",
   "repository": {
@@ -118,7 +118,10 @@
       "owner": "nicremo",
       "repo": "yap"
     },
-    "afterPack": "scripts/after-pack.cjs"
+    "afterPack": "scripts/after-pack.cjs",
+    "dmg": {
+      "artifactName": "Yap-${version}-${arch}.${ext}"
+    }
   },
   "dependencies": {
     "@huggingface/transformers": "^4.0.1",
