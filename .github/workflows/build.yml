@@ -13,6 +13,7 @@ jobs:
   verify-macos:
     name: Verify macOS
     runs-on: macos-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -37,13 +38,10 @@ jobs:
       - name: Helper protocol smoke test
         run: npm run test:helper
 
-      - name: Create a throwaway signing identity
-        run: |
-          scripts/create-signing-identity.sh
-          scripts/create-signing-identity.sh
-          security find-identity -p codesigning
-
       - name: Package the app
+        env:
+          # CI checks are isolated; public releases use the local Developer ID.
+          YAP_SIGN_IDENTITY: '-'
         run: |
           npm run build
           npx electron-builder --mac --dir --publish never
@@ -143,7 +141,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          draft: ${{ github.event_name == 'workflow_dispatch' }}
+          draft: true
           generate_release_notes: true
           tag_name: ${{ github.ref_name }}
           body: |

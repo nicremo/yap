@@ -1,6 +1,6 @@
 {
   "name": "yap",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "license": "MIT",
   "author": "Yap contributors",
   "repository": {
@@ -34,6 +34,7 @@
     "build:native": "node scripts/build-helper-platform.js",
     "test:helper": "node scripts/helper-smoke-test.mjs",
     "package": "npm run build && npm run build:native && electron-builder",
+    "release:mac": "node scripts/release-mac.mjs",
     "package:mac": "npm run build && npm run build:native && electron-builder --mac",
     "package:win": "npm run build && npm run build:native && electron-builder --win"
   },
@@ -53,7 +54,10 @@
       "!**/node_modules/@huggingface/transformers/dist/*.min.mjs",
       "!**/node_modules/@huggingface/transformers/dist/ort-*.mjs",
       "!**/node_modules/@huggingface/transformers/src/**",
-      "!**/node_modules/@huggingface/transformers/types/**"
+      "!**/node_modules/@huggingface/transformers/types/**",
+      "!work{,/**/*}",
+      "!.env{,.*}",
+      "!**/{secrets,credentials}/**"
     ],
     "extraResources": [
       {
@@ -88,6 +92,8 @@
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "files": [
+        "dist/**/*",
+        "package.json",
         "!**/node_modules/onnxruntime-node/bin/napi-v*/win32/**"
       ],
       "identity": null,
@@ -104,6 +110,8 @@
         "zip"
       ],
       "files": [
+        "dist/**/*",
+        "package.json",
         "!**/node_modules/onnxruntime-node/bin/napi-v*/darwin/**"
       ]
     },
@@ -118,7 +126,10 @@
       "owner": "nicremo",
       "repo": "yap"
     },
-    "afterPack": "scripts/after-pack.cjs"
+    "afterPack": "scripts/after-pack.cjs",
+    "dmg": {
+      "artifactName": "Yap-${version}-${arch}.${ext}"
+    }
   },
   "dependencies": {
     "@huggingface/transformers": "^4.0.1",
@@ -142,5 +153,12 @@
     "typescript": "^6.0.2",
     "vite": "^7.3.2",
     "vitest": "^4.1.10"
+  },
+  "overrides": {
+    "@huggingface/transformers": {
+      "onnxruntime-node": "1.23.2"
+    },
+    "adm-zip": "0.6.1",
+    "global-agent": "4.1.3"
   }
 }

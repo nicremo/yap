@@ -605,6 +605,20 @@ export const de: Messages = {
   },
 
   updater: {
+    title: 'App-Updates',
+    hint: 'Yap prüft GitHub beim Start und alle vier Stunden. Updates werden automatisch heruntergeladen und beim Beenden installiert.',
+    check: 'Nach Updates suchen',
+    restart: 'Neu starten und installieren',
+    idle: 'Automatische Updates aktiviert',
+    disabled: 'Updates sind in der installierten App verfügbar.',
+    checking: 'Updates werden gesucht...',
+    current: 'Du bist auf dem neuesten Stand.',
+    error: 'Updates konnten nicht geprüft werden. Prüfe deine Verbindung und versuche es erneut.',
+    available: (version) => `Version ${version} wird heruntergeladen...`,
+    downloading: (version, percent) => `Version ${version} wird heruntergeladen: ${percent}%`,
+    downloaded: (version) => `Version ${version} ist bereit zur Installation.`,
+    finishDictation: 'Beende dein Diktat vor dem Neustart.',
+
     ready: 'Yap-Update bereit',
     readyBody: (version) => `Version ${version} wird installiert, wenn du Yap das nächste Mal beendest.`,
   },

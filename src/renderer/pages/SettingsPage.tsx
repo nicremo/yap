@@ -15,6 +15,11 @@ export function SettingsPage({ state, onState }: { state: AppState; onState: (ne
   const { settings } = state;
   const { busy, error, run } = useAction();
   const [confirmingSetup, setConfirmingSetup] = useState(false);
+  const updater = state.updater;
+  const canRestart = ['idle', 'done', 'error'].includes(state.status.phase);
+  const updateText = updater.kind === 'downloading' ? t.updater.downloading(updater.version, updater.percent)
+    : updater.kind === 'available' ? t.updater.available(updater.version)
+    : updater.kind === 'downloaded' ? t.updater.downloaded(updater.version) : t.updater[updater.kind];
   const update = (patch: UpdateSettingsInput) => run('settings', async () => onState(await window.yap.updateSettings(patch)));
 
   return (
@@ -139,6 +144,27 @@ export function SettingsPage({ state, onState }: { state: AppState; onState: (ne
           ) : (
             <Button size="sm" variant="secondary" onClick={() => setConfirmingSetup(true)}>
               {t.settings.runSetupAgain}
+            </Button>
+          )}
+        </div>
+      </Card>
+
+      <Card title={t.updater.title}>
+        <p>{t.updater.hint}</p>
+        <div className="row">
+          <div className="row-text">
+            <strong role="status">{updateText}</strong>
+            {updater.kind === 'downloaded' && !canRestart && <span>{t.updater.finishDictation}</span>}
+          </div>
+          {updater.kind === 'downloaded' ? (
+            <Button size="sm" variant="primary" disabled={!canRestart || !!busy}
+              onClick={() => void run('updater', async () => { await window.yap.installUpdate(); })}>
+              {t.updater.restart}
+            </Button>
+          ) : (
+            <Button size="sm" variant="secondary" disabled={!state.isPackaged || !!busy || ['checking', 'available', 'downloading'].includes(updater.kind)}
+              onClick={() => void run('updater', async () => { await window.yap.checkForUpdates(); })}>
+              {t.updater.check}
             </Button>
           )}
         </div>

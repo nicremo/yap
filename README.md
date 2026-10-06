@@ -59,7 +59,9 @@ Groq controls its [free-tier limits](https://console.groq.com/docs/rate-limits),
 
 ## Get started
 
-The repository currently provides the source. Prebuilt installers will be listed on the [Releases page](https://github.com/nicremo/yap/releases) when published. If that page has no downloads, use the source setup below.
+The first notarized release is being prepared. Installers for Apple Silicon Macs, Intel Macs and Windows will appear on [GitHub Releases](https://github.com/nicremo/yap/releases) once Apple's checks and the update assets are verified. You can already run Yap from source using the instructions below.
+
+Groq mode uses your own API key. Local transcription needs an initial model download. The app itself is free.
 
 ### Run from source
 
@@ -197,3 +199,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development, screenshot capture and p
 Yap builds on [OpenWhisp](https://github.com/giusmarci/openwhisp). The original copyright notice is preserved in [LICENSE](LICENSE).
 
 **MIT licensed. Free to use, study, modify and share.**
+
+### Automatic updates
+
+Installed builds check GitHub for stable releases at launch and every four hours. Updates download automatically and install when Yap quits. Settings also offers a manual check and a restart button once an update is ready. Development builds skip the updater.
+
+See [the release guide](docs/RELEASING.md) for local Apple notarization and the required update assets.

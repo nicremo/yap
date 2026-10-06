@@ -286,7 +286,11 @@ async function run(context) {
     return saved.copyLastShortcut || false;
   });
   expect(shortcut === 'Control+Alt+Shift+6', 'the pressed combination is stored as an accelerator', shortcut);
+  // Persistence completes before OS registration and the renderer state patch.
+  await waitFor('the system to accept the shortcut', async () =>
+    (await window.evaluate(() => window.yap.getState())).copyLastShortcut === 'active', 3_000);
   expect((await window.evaluate(() => window.yap.getState())).copyLastShortcut === 'active', 'the system accepted the shortcut');
+  await window.getByRole('button', { name: 'Ctrl+Alt+Shift+6' }).waitFor({ state: 'visible' });
   expect(await window.getByRole('button', { name: 'Ctrl+Alt+Shift+6' }).isVisible(), 'Settings shows it as Ctrl+Alt+Shift+6');
   await app.evaluate(({ clipboard }) => clipboard.writeText('something else'));
   since = await statusCount();

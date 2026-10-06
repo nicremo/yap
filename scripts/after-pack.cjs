@@ -22,7 +22,7 @@ const SELF_SIGNED_NAME = 'Yap Self-Signed';
 const MACH_O_MAGICS = new Set(['feedface', 'feedfacf', 'cefaedfe', 'cffaedfe', 'cafebabe', 'bebafeca']);
 
 function chooseIdentity() {
-  if (process.env.YAP_SIGN_IDENTITY) return { name: process.env.YAP_SIGN_IDENTITY, developerId: false };
+  if (process.env.YAP_SIGN_IDENTITY) return { name: process.env.YAP_SIGN_IDENTITY, developerId: process.env.YAP_SIGN_IDENTITY.startsWith('Developer ID Application:') };
 
   const valid = spawnSync('security', ['find-identity', '-v', '-p', 'codesigning'], { encoding: 'utf8' }).stdout ?? '';
   const developerId = valid.match(/"(Developer ID Application: [^"]+)"/);
@@ -85,6 +85,10 @@ exports.default = async function afterPack(context) {
   if (context.electronPlatformName !== 'darwin') return;
 
   const appPath = path.join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`);
+  const asar = require('@electron/asar');
+  const archive = path.join(appPath, 'Contents', 'Resources', 'app.asar');
+  const unexpected = asar.listPackage(archive).find((file) => !/^\/(dist|node_modules)(\/|$)|^\/package\.json$/.test(file));
+  if (unexpected) throw new Error(`Unexpected file in public app archive: ${unexpected}`);
   const entitlements = path.resolve(__dirname, '..', 'build', 'entitlements.mac.plist');
   const identity = chooseIdentity();
   console.log(`[afterPack] signing with ${identity.name === '-' ? 'an ad-hoc signature' : `"${identity.name}"`}`);
@@ -95,6 +99,12 @@ exports.default = async function afterPack(context) {
   }
   codesign(appPath, identity, entitlements, ['--deep']);
   execFileSync('codesign', ['--verify', '--deep', '--strict', '--verbose=2', appPath], { stdio: 'inherit' });
+
+  if (process.env.YAP_NOTARY_PROFILE) {
+    if (!identity.developerId) throw new Error('Notarization requires a Developer ID Application certificate.');
+    const { notarizeApp } = await import('./notarize.mjs');
+    await notarizeApp(appPath, process.env.YAP_NOTARY_PROFILE, path.resolve(__dirname, '..', 'work', 'notarization'));
+  }
 
   if (identity.name === '-') {
     console.log('[afterPack] Ad-hoc signed. Run scripts/create-signing-identity.sh once so permissions survive updates.');

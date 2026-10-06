@@ -622,6 +622,20 @@ export const en = {
   },
 
   updater: {
+    title: 'App updates',
+    hint: 'Yap checks GitHub at launch and every four hours. Updates download automatically and install when you quit.',
+    check: 'Check for updates',
+    restart: 'Restart and install',
+    idle: 'Automatic updates enabled',
+    disabled: 'Updates are available in the installed app.',
+    checking: 'Checking for updates...',
+    current: 'You are up to date.',
+    error: 'Could not check for updates. Check your connection and try again.',
+    available: (version: string) => `Downloading version ${version}...`,
+    downloading: (version: string, percent: number) => `Downloading version ${version}: ${percent}%`,
+    downloaded: (version: string) => `Version ${version} is ready to install.`,
+    finishDictation: 'Finish your dictation before restarting.',
+
     ready: 'Yap update ready',
     readyBody: (version: string) => `Version ${version} will be installed the next time you quit Yap.`,
   },

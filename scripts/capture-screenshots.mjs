@@ -26,7 +26,7 @@ async function startPreview() {
 
   // Readiness flags illustrate a configured demo. There is no provider key.
   const state = {
-    platform: 'darwin', version, isPackaged: false,
+    updater: { kind: 'disabled' }, platform: 'darwin', version, isPackaged: false,
     settings: {
       settingsVersion: 2, storageDirectory: '/Example/Yap',
       transcriptionMode: 'cloud', cloudModel: 'whisper-large-v3',

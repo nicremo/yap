@@ -17,6 +17,7 @@ import type {
   RuleLevel,
   StyleMode,
   UpdateSettingsInput,
+  UpdaterState,
 } from '../shared/types';
 
 function subscribe<T>(channel: string, listener: (payload: T) => void): () => void {
@@ -40,6 +41,8 @@ const api = {
   initialTheme: themeArgument === 'light' || themeArgument === 'dark' ? themeArgument : 'system',
   /** The language the window was opened with; later switches arrive through onLocale. */
   initialLocale: (isLocale(localeArgument) ? localeArgument : 'en') as Locale,
+  checkForUpdates: () => ipcRenderer.invoke('updater:check') as Promise<UpdaterState>,
+  installUpdate: () => ipcRenderer.invoke('updater:install') as Promise<boolean>,
   getState: () => ipcRenderer.invoke('app:getState') as Promise<AppState>,
   updateSettings: (updates: UpdateSettingsInput) => ipcRenderer.invoke('settings:update', updates) as Promise<AppState>,
   chooseStorage: () => ipcRenderer.invoke('settings:chooseStorage') as Promise<AppState>,
