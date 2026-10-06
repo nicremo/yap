@@ -31,6 +31,7 @@ export function createDefaultSettings(): AppSettings {
     copyToClipboard: false,
     showOverlay: true,
     launchAtLogin: false,
+    theme: 'system',
     setupComplete: false,
     setupStep: 'welcome',
   };

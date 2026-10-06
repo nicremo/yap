@@ -134,6 +134,34 @@ const PATHS: Record<string, ReactNode> = {
       <path d="M12 16v-4M12 8h.01" />
     </>
   ),
+  monitor: (
+    <>
+      <rect width="20" height="14" x="2" y="3" rx="2" />
+      <path d="M8 21h8M12 17v4" />
+    </>
+  ),
+  sun: (
+    <>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2M12 20v2m-7.07-17.07 1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+    </>
+  ),
+  moon: <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />,
+  search: (
+    <>
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.3-4.3" />
+    </>
+  ),
+  plus: <path d="M5 12h14M12 5v14" />,
+  chevronRight: <path d="m9 18 6-6-6-6" />,
+  paste: (
+    <>
+      <path d="M11 14h10M16 4h2a2 2 0 0 1 2 2v1.344M17 18l4-4-4-4" />
+      <path d="M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 1.793-1.113" />
+      <rect x="8" y="2" width="8" height="4" rx="1" />
+    </>
+  ),
 };
 
 export type IconName = keyof typeof PATHS;

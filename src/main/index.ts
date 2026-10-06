@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, Notification, Tray, nativeImage, shell } from 'electron';
+import { app, BrowserWindow, Menu, nativeTheme, Notification, Tray, nativeImage, shell } from 'electron';
 import log from 'electron-log/main.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -35,7 +35,7 @@ import { getGroqApiKey, isGroqKeySet } from './secrets';
 import { applySettingsUpdate, chooseStorageDirectory, loadSettings, saveSettings, withGroqKey } from './settings';
 import { ensureStorage } from './storage';
 import { disposeAutoUpdater, initializeAutoUpdater } from './updater';
-import { createMainWindow, createOverlayWindow, positionOverlayWindow } from './windows';
+import { createMainWindow, createOverlayWindow, positionOverlayWindow, windowBackground } from './windows';
 
 const projectRoot = path.resolve(fileURLToPath(new URL('../../', import.meta.url)));
 const AUDIO_CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1000;
@@ -416,6 +416,9 @@ async function updateSettings(updates: UpdateSettingsInput): Promise<AppState> {
   if (previous.launchAtLogin !== settings.launchAtLogin) {
     applyLaunchAtLogin(settings.launchAtLogin);
   }
+  if (previous.theme !== settings.theme) {
+    nativeTheme.themeSource = settings.theme;
+  }
   if (previous.storageDirectory !== settings.storageDirectory) {
     await ensureStorage(settings);
   }
@@ -495,6 +498,10 @@ async function bootstrap(): Promise<void> {
   }
 
   settings = await loadSettings();
+  // Before any window exists: the renderer's prefers-color-scheme, native
+  // scrollbars, select popups and menus all follow it.
+  nativeTheme.themeSource = settings.theme;
+  nativeTheme.on('updated', () => liveWindow(mainWindow)?.setBackgroundColor(windowBackground()));
   await ensureStorage(settings);
   applyLaunchAtLogin(settings.launchAtLogin);
 

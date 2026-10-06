@@ -110,6 +110,12 @@ describe('migrateSettings', () => {
     expect(migrated.cloudModel).toBe(defaults.cloudModel);
   });
 
+  it('defaults the theme to System and keeps a valid choice', () => {
+    expect(migrateSettings({}, defaults).theme).toBe('system');
+    expect(migrateSettings({ theme: 'light' }, defaults).theme).toBe('light');
+    expect(migrateSettings({ theme: 'sepia' }, defaults).theme).toBe('system');
+  });
+
   it('keeps a known setup step and resets anything else', () => {
     expect(migrateSettings({ setupStep: 'permissions' }, defaults).setupStep).toBe('permissions');
     expect(migrateSettings({ setupStep: 'nonsense' }, defaults).setupStep).toBe('welcome');

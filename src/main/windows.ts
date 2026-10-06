@@ -10,6 +10,11 @@ const rendererFilePath = fileURLToPath(new URL('../renderer/index.html', import.
 export const OVERLAY_WIDTH = 360;
 export const OVERLAY_HEIGHT = 88;
 
+/** The sidebar colour of the current theme, so a window never flashes the wrong one. */
+export function windowBackground(): string {
+  return nativeTheme.shouldUseDarkColors ? '#141519' : '#f1f0ea';
+}
+
 async function loadRenderer(window: BrowserWindow, hash = ''): Promise<void> {
   const devServerUrl = process.env.ELECTRON_RENDERER_URL;
   if (devServerUrl) {
@@ -27,7 +32,7 @@ export async function createMainWindow(): Promise<BrowserWindow> {
     minHeight: 560,
     show: false,
     // Matches the sidebar colour so the first frame does not flash.
-    backgroundColor: nativeTheme.shouldUseDarkColors ? '#0a1122' : '#edf1fa',
+    backgroundColor: windowBackground(),
     title: 'Yap',
     ...(isMac
       ? { titleBarStyle: 'hiddenInset' as const, trafficLightPosition: { x: 18, y: 18 } }

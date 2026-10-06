@@ -3,6 +3,7 @@ import { useState } from 'react';
 import type { AppState } from '../shared/types';
 import { Icon, type IconName } from './components/Icon';
 import { LogoTile } from './components/Logo';
+import { ThemeToggle } from './components/ThemeToggle';
 import { useAppState } from './lib/store';
 import { DictionaryPage } from './pages/DictionaryPage';
 import { EnginePage } from './pages/EnginePage';
@@ -80,6 +81,7 @@ function MainView({ state, onState }: { state: AppState; onState: (next: AppStat
             <Icon name={state.settings.transcriptionMode === 'cloud' ? 'cloud' : 'laptop'} size={13} />
             {state.settings.transcriptionMode === 'cloud' ? 'Groq cloud' : 'Local'}
           </span>
+          <ThemeToggle state={state} onState={onState} />
           <span className="version">v{state.version}</span>
         </div>
       </aside>

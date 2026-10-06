@@ -4,6 +4,8 @@ export type EnhancementLevel = 'none' | 'soft' | 'medium' | 'high';
 export type StyleMode = 'conversation' | 'vibe-coding' | 'custom-plus';
 export type CustomPlusVoice = 'conversation' | 'developer';
 export type TranscriptionMode = 'cloud' | 'local';
+/** System follows the macOS appearance. */
+export type ThemePreference = 'system' | 'light' | 'dark';
 export type CloudTranscriptionModel = 'whisper-large-v3' | 'whisper-large-v3-turbo';
 export type LocalWhisperModel = 'onnx-community/whisper-base' | 'onnx-community/whisper-small';
 
@@ -59,6 +61,7 @@ export interface AppSettings {
   copyToClipboard: boolean;
   showOverlay: boolean;
   launchAtLogin: boolean;
+  theme: ThemePreference;
   setupComplete: boolean;
   /** Where the setup wizard resumes, e.g. after macOS restarted Yap for a permission. */
   setupStep: SetupStep;

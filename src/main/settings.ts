@@ -9,6 +9,7 @@ import type {
   HotkeyConfig,
   LocalWhisperModel,
   StyleMode,
+  ThemePreference,
   TranscriptionMode,
   UpdateSettingsInput,
 } from '../shared/types';
@@ -23,6 +24,7 @@ const SETTINGS_FILE = 'settings.json';
 const STYLE_MODES: readonly StyleMode[] = ['conversation', 'vibe-coding', 'custom-plus'];
 const VOICES: readonly CustomPlusVoice[] = ['conversation', 'developer'];
 const LEVELS: readonly EnhancementLevel[] = ['none', 'soft', 'medium', 'high'];
+const THEMES: readonly ThemePreference[] = ['system', 'light', 'dark'];
 
 function getSettingsPath(): string {
   return path.join(app.getPath('userData'), SETTINGS_FILE);
@@ -133,6 +135,7 @@ export function migrateSettings(raw: unknown, defaults: AppSettings): AppSetting
     copyToClipboard: bool(source.copyToClipboard, defaults.copyToClipboard),
     showOverlay: bool(source.showOverlay, defaults.showOverlay),
     launchAtLogin: bool(source.launchAtLogin, defaults.launchAtLogin),
+    theme: pick(source.theme, THEMES, defaults.theme),
     setupComplete: bool(source.setupComplete, defaults.setupComplete),
     setupStep: pick(source.setupStep, SETUP_STEPS, defaults.setupStep),
   };

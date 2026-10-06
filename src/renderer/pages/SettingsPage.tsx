@@ -1,7 +1,8 @@
-import type { AppState, UpdateSettingsInput } from '../../shared/types';
+import type { AppState, ThemePreference, UpdateSettingsInput } from '../../shared/types';
 import { HotkeySettings } from '../components/HotkeyRecorder';
 import { PermissionList } from '../components/PermissionList';
-import { Button, Card, Notice, ToggleRow } from '../components/ui';
+import { THEME_OPTIONS } from '../components/ThemeToggle';
+import { Button, Card, Notice, Segmented, ToggleRow } from '../components/ui';
 import { useAction } from '../lib/store';
 
 export function SettingsPage({ state, onState }: { state: AppState; onState: (next: AppState) => void }) {
@@ -15,6 +16,21 @@ export function SettingsPage({ state, onState }: { state: AppState; onState: (ne
         <h1>Settings</h1>
       </header>
       {error && <Notice tone="danger">{error}</Notice>}
+
+      <Card title="Appearance">
+        <div className="row">
+          <div className="row-text">
+            <strong>Theme</strong>
+            <span>System follows the macOS appearance.</span>
+          </div>
+          <Segmented<ThemePreference>
+            label="Theme"
+            value={settings.theme}
+            options={THEME_OPTIONS}
+            onChange={(theme) => void update({ theme })}
+          />
+        </div>
+      </Card>
 
       <Card title="Shortcut">
         <HotkeySettings state={state} onSave={(hotkey) => void update({ hotkey })} />
