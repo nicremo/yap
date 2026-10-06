@@ -123,6 +123,8 @@ export interface EngineState {
   groqKeySet: boolean;
   localModelReady: boolean;
   localModelDownload: LocalModelDownload | null;
+  /** Rewrite models this key can use, in catalogue order. */
+  rewriteModelIds: string[];
 }
 
 export type DictationStatus = 'success' | 'transcription-failed' | 'audio-only';

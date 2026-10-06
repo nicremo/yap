@@ -26,13 +26,16 @@ export class GroqError extends Error {
   readonly kind: GroqErrorKind;
   readonly status?: number;
   readonly retryAfterMs?: number;
+  /** Groq's machine-readable error code, e.g. model_not_found. */
+  readonly code?: string;
 
-  constructor(kind: GroqErrorKind, message: string, status?: number, retryAfterMs?: number) {
+  constructor(kind: GroqErrorKind, message: string, status?: number, retryAfterMs?: number, code?: string) {
     super(message);
     this.name = 'GroqError';
     this.kind = kind;
     this.status = status;
     this.retryAfterMs = retryAfterMs;
+    this.code = code;
   }
 
   get retryable(): boolean {
@@ -79,8 +82,18 @@ function extractErrorMessage(body: string): string {
   return body.trim().slice(0, 300);
 }
 
+function extractErrorCode(body: string): string | undefined {
+  try {
+    const parsed = JSON.parse(body) as { error?: { code?: unknown } };
+    return typeof parsed.error?.code === 'string' ? parsed.error.code : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function classifyHttpError(status: number, body: string, retryAfter: string | null): GroqError {
   const detail = extractErrorMessage(body);
+  const code = extractErrorCode(body);
 
   if (status === 401 || status === 403) {
     return new GroqError('auth', 'Groq rejected the API key. Check it in Engine settings.', status);
@@ -94,9 +107,17 @@ export function classifyHttpError(status: number, body: string, retryAfter: stri
     return new GroqError('request', 'The recording is too large for Groq (25 MB limit on the free tier).', status);
   }
   if (status >= 500) {
-    return new GroqError('server', `Groq had a server error (${status}).${detail ? ` ${detail}` : ''}`, status);
+    return new GroqError('server', `Groq had a server error (${status}).${detail ? ` ${detail}` : ''}`, status, undefined, code);
   }
-  return new GroqError('request', `Groq refused the request (${status}).${detail ? ` ${detail}` : ''}`, status);
+  return new GroqError('request', `Groq refused the request (${status}).${detail ? ` ${detail}` : ''}`, status, undefined, code);
+}
+
+/** The model is gone or this key cannot use it: worth falling back to another model. */
+export function isModelUnavailableError(error: unknown): boolean {
+  return (
+    error instanceof GroqError &&
+    (error.status === 404 || error.code === 'model_not_found' || error.code === 'model_decommissioned')
+  );
 }
 
 function describeNetworkError(error: unknown): string {
@@ -270,32 +291,38 @@ export async function chatWithGroq(request: ChatRequest): Promise<ChatResult> {
   };
 }
 
-export async function validateGroqKey(apiKey: string, requiredModel?: string): Promise<KeyValidationResult> {
+/** The ids of every model this key can use. Empty when Groq sent something unreadable. */
+export async function listGroqModels(apiKey: string): Promise<string[]> {
+  const body = await requestOnce({
+    path: '/models',
+    apiKey,
+    init: { method: 'GET' },
+    timeoutMs: 10_000,
+  });
+  try {
+    const data = (JSON.parse(body) as { data?: Array<{ id?: unknown }> }).data ?? [];
+    return data.map((model) => model.id).filter((id): id is string => typeof id === 'string');
+  } catch {
+    return [];
+  }
+}
+
+export async function validateGroqKey(
+  apiKey: string,
+  requiredModel?: string,
+): Promise<KeyValidationResult & { models?: string[] }> {
   const trimmed = apiKey.trim();
   if (!trimmed) {
     return { valid: false, error: 'Paste your Groq API key first.' };
   }
 
   try {
-    const body = await requestOnce({
-      path: '/models',
-      apiKey: trimmed,
-      init: { method: 'GET' },
-      timeoutMs: 10_000,
-    });
-
-    if (requiredModel) {
-      let models: Array<{ id?: string }> = [];
-      try {
-        models = (JSON.parse(body) as { data?: Array<{ id?: string }> }).data ?? [];
-      } catch {
-        // The key authenticated, an odd body is not the user's problem.
-      }
-      if (models.length > 0 && !models.some((model) => model.id === requiredModel)) {
-        return { valid: false, error: `This key has no access to ${requiredModel}.` };
-      }
+    const models = await listGroqModels(trimmed);
+    // An unreadable list is not the user's problem: the key authenticated.
+    if (requiredModel && models.length > 0 && !models.includes(requiredModel)) {
+      return { valid: false, error: `This key has no access to ${requiredModel}.` };
     }
-    return { valid: true };
+    return { valid: true, models };
   } catch (error) {
     if (error instanceof GroqError && error.kind === 'auth') {
       return { valid: false, error: 'Groq does not accept this key. Copy it again from console.groq.com.' };

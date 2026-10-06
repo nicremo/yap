@@ -404,7 +404,7 @@ export class DictationEngine {
     console.log('[yap:dictation]', {
       source: outcome.source,
       model: outcome.source === 'cloud' ? settings.cloudModel : settings.localModel,
-      rewriteModel: polished.durationMs !== null ? settings.rewriteModel : null,
+      rewriteModel: polished.model ?? null,
       style: style.styleMode,
       level: style.enhancementLevel,
       matchedApp: style.matchedApp ?? null,

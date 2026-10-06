@@ -140,6 +140,8 @@ export interface PolishOutcome {
   text: string;
   /** Null when enhancement did not run. */
   durationMs: number | null;
+  /** The rewrite model that produced the text. */
+  model?: string;
   notice?: string;
 }
 
@@ -173,5 +175,5 @@ export async function polish(options: {
     dictionaryContext: buildDictionaryContext(options.dictionary, options.corrections),
   });
 
-  return { text: result.text, durationMs: Date.now() - startedAt, notice: result.notice };
+  return { text: result.text, durationMs: Date.now() - startedAt, model: result.model, notice: result.notice };
 }

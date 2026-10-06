@@ -16,6 +16,13 @@ import { sweepAudioStore } from './audio-store';
 import { DictationEngine } from './dictation/engine';
 import { loadCorrections, loadDictionary } from './dictionary';
 import { validateGroqKey } from './groq';
+import {
+  loadGroqModelList,
+  offeredRewriteModelIds,
+  onGroqModelsChange,
+  refreshGroqModelList,
+  storeGroqModelList,
+} from './groq-models';
 import { clearAudioReferences, flushHistory, loadHistory } from './history';
 import { registerIpcHandlers } from './ipc';
 import { flushJsonWrites } from './json-file';
@@ -32,6 +39,8 @@ import { createMainWindow, createOverlayWindow, positionOverlayWindow } from './
 
 const projectRoot = path.resolve(fileURLToPath(new URL('../../', import.meta.url)));
 const AUDIO_CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1000;
+/** The model list itself is only fetched when it is older than a day. */
+const MODEL_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 /** How long after a permission click in Yap a grant brings the window back. */
 const GRANT_WATCH_MS = 10 * 60 * 1000;
 
@@ -45,6 +54,7 @@ let status: AppStatus = { phase: 'idle', title: 'Ready', detail: '' };
 let fnKeyAction: AppState['fnKeyAction'] = null;
 let micPollTimer: ReturnType<typeof setInterval> | null = null;
 let audioCleanupTimer: ReturnType<typeof setInterval> | null = null;
+let modelCheckTimer: ReturnType<typeof setInterval> | null = null;
 
 const bridge = createNativeBridge();
 const permissions = new PermissionsService(bridge, {
@@ -67,6 +77,7 @@ function engineState(): AppState['engine'] {
     groqKeySet: settings ? isGroqKeySet(settings) : false,
     localModelReady: localModel.isReady,
     localModelDownload: localModel.currentDownload,
+    rewriteModelIds: offeredRewriteModelIds(),
   };
 }
 
@@ -432,6 +443,19 @@ async function refreshFnKeyAction(): Promise<void> {
   }
 }
 
+/** Keeps the offered rewrite models in line with what Groq serves this key. */
+async function checkGroqModels(): Promise<void> {
+  const apiKey = settings ? getGroqApiKey(settings) : null;
+  if (!apiKey) return;
+  try {
+    await refreshGroqModelList(apiKey);
+  } catch (error) {
+    console.warn('[yap] Groq model list not refreshed:', error instanceof Error ? error.message : error);
+  }
+}
+
+onGroqModelsChange(() => patch({ engine: engineState() }));
+
 async function runAudioCleanup(): Promise<void> {
   try {
     const sweep = await sweepAudioStore(settings, await loadHistory());
@@ -480,11 +504,12 @@ async function bootstrap(): Promise<void> {
     getSettings: () => settings,
     updateSettings,
     saveGroqKey: async (key) => {
-      const result = await validateGroqKey(key, settings.cloudModel);
+      const { models, ...result } = await validateGroqKey(key, settings.cloudModel);
       if (result.valid) {
         settings = withGroqKey(settings, key);
         await saveSettings(settings);
         getGroqApiKey(settings);
+        await storeGroqModelList(models ?? []).catch(() => undefined);
         patch({ engine: engineState() });
       }
       return { result, state: await getState() };
@@ -560,13 +585,18 @@ async function bootstrap(): Promise<void> {
   // Warm everything a first dictation would otherwise wait for: the cached
   // stores, the decrypted key (a keychain prompt belongs here, not mid
   // dictation) and, in local mode, the model.
-  void Promise.all([loadDictionary(), loadCorrections(), loadAppRules(), loadHistory()]);
+  void Promise.all([loadDictionary(), loadCorrections(), loadAppRules(), loadHistory(), loadGroqModelList()]).then(() =>
+    patch({ engine: engineState() }),
+  );
   getGroqApiKey(settings);
   void localModel.refresh().then(() => localModel.warmUp());
 
   engine.refreshStatus();
   setTimeout(() => void runAudioCleanup(), 15_000);
   audioCleanupTimer = setInterval(() => void runAudioCleanup(), AUDIO_CLEANUP_INTERVAL_MS);
+  // Off the startup path: the first dictation should not share the network with it.
+  setTimeout(() => void checkGroqModels(), 20_000);
+  modelCheckTimer = setInterval(() => void checkGroqModels(), MODEL_CHECK_INTERVAL_MS);
 
   initializeAutoUpdater();
 }
@@ -574,8 +604,10 @@ async function bootstrap(): Promise<void> {
 async function shutdown(): Promise<void> {
   if (micPollTimer) clearInterval(micPollTimer);
   if (audioCleanupTimer) clearInterval(audioCleanupTimer);
+  if (modelCheckTimer) clearInterval(modelCheckTimer);
   micPollTimer = null;
   audioCleanupTimer = null;
+  modelCheckTimer = null;
   disposeAutoUpdater();
   bridge.dispose();
   await flushHistory().catch(() => undefined);

@@ -1,5 +1,5 @@
 import type { AppState, CloudTranscriptionModel, TranscriptionMode, UpdateSettingsInput } from '../../shared/types';
-import { CLOUD_MODELS, LANGUAGES, REWRITE_MODELS } from '../../shared/models';
+import { CLOUD_MODELS, DEFAULT_REWRITE_MODEL, findRewriteModel, LANGUAGES, REWRITE_MODELS } from '../../shared/models';
 import { GroqKeyField } from '../components/GroqKeyField';
 import { Icon } from '../components/Icon';
 import { LocalModelPicker } from '../components/LocalModelPicker';
@@ -100,21 +100,51 @@ export function EnginePage({ state, onState }: { state: AppState; onState: (next
           checked={settings.enhancementEnabled}
           onChange={(enhancementEnabled) => void update({ enhancementEnabled })}
         />
-        {settings.enhancementEnabled && (
-          <Field label="Model">
-            <select className="select" value={settings.rewriteModel} onChange={(event) => void update({ rewriteModel: event.target.value })}>
-              {REWRITE_MODELS.map((model) => (
-                <option key={model.id} value={model.id}>
-                  {model.label} · {model.note}
-                </option>
-              ))}
-            </select>
-          </Field>
-        )}
+        {settings.enhancementEnabled && <RewriteModelField state={state} onChange={(rewriteModel) => void update({ rewriteModel })} />}
         {settings.enhancementEnabled && settings.transcriptionMode === 'local' && engine.groqKeySet && (
           <Notice tone="neutral">Polishing sends the transcribed text to Groq. Turn it off to keep everything local.</Notice>
         )}
       </Card>
+    </>
+  );
+}
+
+function RewriteModelField({ state, onChange }: { state: AppState; onChange: (model: string) => void }) {
+  const { settings, engine } = state;
+  const offered = REWRITE_MODELS.filter((model) => engine.rewriteModelIds.includes(model.id));
+  const selected = findRewriteModel(settings.rewriteModel);
+  const available = engine.rewriteModelIds.includes(settings.rewriteModel);
+  const fallback = findRewriteModel(DEFAULT_REWRITE_MODEL)?.label ?? DEFAULT_REWRITE_MODEL;
+
+  return (
+    <>
+      <Field
+        label="Model"
+        hint={
+          selected?.preview && available
+            ? `Preview models can change or disappear at short notice. Yap falls back to ${fallback} when this one is gone.`
+            : undefined
+        }
+      >
+        <select className="select" value={settings.rewriteModel} onChange={(event) => onChange(event.target.value)}>
+          {offered.map((model) => (
+            <option key={model.id} value={model.id}>
+              {model.label} · {model.note}
+            </option>
+          ))}
+          {!available && (
+            <option value={settings.rewriteModel} disabled>
+              {selected?.label ?? settings.rewriteModel} (not available)
+            </option>
+          )}
+        </select>
+      </Field>
+      {!available && (
+        <Notice tone="warning">
+          {selected?.label ?? settings.rewriteModel} is not available for your Groq key right now. {fallback} polishes your
+          dictations until it is back.
+        </Notice>
+      )}
     </>
   );
 }

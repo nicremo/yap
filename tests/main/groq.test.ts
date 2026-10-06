@@ -6,6 +6,8 @@ import {
   chatWithGroq,
   classifyHttpError,
   GroqError,
+  isModelUnavailableError,
+  listGroqModels,
   setGroqTransport,
   transcribeWithGroq,
   validateGroqKey,
@@ -108,6 +110,20 @@ describe('error classification', () => {
     expect(limited.retryAfterMs).toBe(7_000);
     expect(limited.message).toContain('7s');
   });
+
+  it('recognises a model that is gone or not available to the key', () => {
+    const notFound = classifyHttpError(
+      404,
+      '{"error":{"message":"The model `qwen/qwen3.8-27b` does not exist","type":"invalid_request_error","code":"model_not_found"}}',
+      null,
+    );
+    expect(notFound.code).toBe('model_not_found');
+    expect(isModelUnavailableError(notFound)).toBe(true);
+    expect(isModelUnavailableError(classifyHttpError(400, '{"error":{"code":"model_decommissioned"}}', null))).toBe(true);
+    expect(isModelUnavailableError(classifyHttpError(400, '{"error":{"code":"invalid_value"}}', null))).toBe(false);
+    expect(isModelUnavailableError(classifyHttpError(500, '', null))).toBe(false);
+    expect(isModelUnavailableError(new Error('x'))).toBe(false);
+  });
 });
 
 describe('transcribeWithGroq', () => {
@@ -168,9 +184,18 @@ describe('chatWithGroq', () => {
 });
 
 describe('validateGroqKey', () => {
-  it('accepts a key that lists the transcription model', async () => {
-    transport([() => new Response(JSON.stringify({ data: [{ id: 'whisper-large-v3' }] }), { status: 200 })]);
-    await expect(validateGroqKey('gsk_ok', 'whisper-large-v3')).resolves.toEqual({ valid: true });
+  it('accepts a key that lists the transcription model and returns the model list', async () => {
+    transport([() => new Response(JSON.stringify({ data: [{ id: 'whisper-large-v3' }, { id: 'openai/gpt-oss-20b' }] }), { status: 200 })]);
+    await expect(validateGroqKey('gsk_ok', 'whisper-large-v3')).resolves.toEqual({
+      valid: true,
+      models: ['whisper-large-v3', 'openai/gpt-oss-20b'],
+    });
+  });
+
+  it('refuses a key without the transcription model', async () => {
+    transport([() => new Response(JSON.stringify({ data: [{ id: 'openai/gpt-oss-20b' }] }), { status: 200 })]);
+    const result = await validateGroqKey('gsk_ok', 'whisper-large-v3');
+    expect(result).toMatchObject({ valid: false, error: expect.stringContaining('whisper-large-v3') });
   });
 
   it('explains a rejected key', async () => {
@@ -178,6 +203,13 @@ describe('validateGroqKey', () => {
     const result = await validateGroqKey('gsk_bad');
     expect(result.valid).toBe(false);
     expect(result.error).toContain('does not accept');
+  });
+
+  it('lists the models with the key', async () => {
+    const { calls } = transport([() => new Response(JSON.stringify({ data: [{ id: 'a' }, { id: 2 }, {}] }), { status: 200 })]);
+    await expect(listGroqModels('gsk_ok')).resolves.toEqual(['a']);
+    expect(calls[0].url).toMatch(/\/models$/);
+    expect((calls[0].init.headers as Record<string, string>).Authorization).toBe('Bearer gsk_ok');
   });
 
   it('refuses an empty key without a request', async () => {

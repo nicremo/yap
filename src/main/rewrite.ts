@@ -1,6 +1,7 @@
 import type { CustomPlusVoice, EnhancementLevel, StyleMode } from '../shared/types';
-import { findRewriteModel } from '../shared/models';
-import { chatWithGroq } from './groq';
+import { DEFAULT_REWRITE_MODEL, findRewriteModel } from '../shared/models';
+import { chatWithGroq, isModelUnavailableError, type ChatResult } from './groq';
+import { markRewriteModelUnavailable, resolveRewriteModel } from './groq-models';
 import { getEnhancementPrompt, getRewriteUserMessage } from './prompts';
 
 function stripReasoningArtifacts(text: string): string {
@@ -68,6 +69,8 @@ export interface RewriteInput {
 export interface RewriteOutput {
   text: string;
   usedFallback: boolean;
+  /** The model that produced the text. */
+  model: string;
   notice?: string;
 }
 
@@ -80,27 +83,49 @@ export async function rewriteText(input: RewriteInput): Promise<RewriteOutput> {
     customPlusVoice: input.voice,
   });
 
-  try {
-    const result = await chatWithGroq({
+  const request = (model: string): Promise<ChatResult> =>
+    chatWithGroq({
       apiKey: input.apiKey,
-      model: input.model,
+      model,
       systemPrompt,
       userMessage: getRewriteUserMessage(input.style, input.text),
       maxTokens: estimateMaxTokens(input.text),
-      extraParams: findRewriteModel(input.model)?.params,
+      extraParams: findRewriteModel(model)?.params,
       timeoutMs: 10_000 + Math.ceil(input.text.length / 1_000) * 2_000,
       signal: input.signal,
     });
+
+  // A model known to be unavailable is skipped without a failed round trip.
+  let model = resolveRewriteModel(input.model);
+  let notice: string | undefined;
+
+  try {
+    let result: ChatResult;
+    try {
+      result = await request(model);
+    } catch (error) {
+      if (!isModelUnavailableError(error) || model === DEFAULT_REWRITE_MODEL) throw error;
+      // Preview models can disappear overnight: this dictation still gets polished.
+      console.warn('[yap] rewrite model unavailable, falling back to the default:', model);
+      if (markRewriteModelUnavailable(model)) {
+        const gone = findRewriteModel(model)?.label ?? model;
+        const fallback = findRewriteModel(DEFAULT_REWRITE_MODEL)?.label ?? DEFAULT_REWRITE_MODEL;
+        notice = `${gone} is not available right now, ${fallback} polished this dictation.`;
+      }
+      model = DEFAULT_REWRITE_MODEL;
+      result = await request(model);
+    }
 
     if (result.finishReason === 'length') {
       return {
         text: input.text,
         usedFallback: true,
+        model,
         notice: 'The polished text was cut off, so the raw transcript was used.',
       };
     }
 
-    return { text: cleanRewriteOutput(result.content, input.text), usedFallback: false };
+    return { text: cleanRewriteOutput(result.content, input.text), usedFallback: false, model, notice };
   } catch (error) {
     if (input.signal?.aborted) {
       throw error;
@@ -110,6 +135,7 @@ export async function rewriteText(input: RewriteInput): Promise<RewriteOutput> {
     return {
       text: input.text,
       usedFallback: true,
+      model,
       notice: `Polishing failed, the raw transcript was used. ${reason}`,
     };
   }
