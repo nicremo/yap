@@ -39,6 +39,8 @@ import { createMainWindow, createOverlayWindow, positionOverlayWindow, windowBac
 
 const projectRoot = path.resolve(fileURLToPath(new URL('../../', import.meta.url)));
 const AUDIO_CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1000;
+/** The pill's exit animation; the window hides only after it. */
+const OVERLAY_EXIT_MS = 320;
 /** The model list itself is only fetched when it is older than a day. */
 const MODEL_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 /** How long after a permission click in Yap a grant brings the window back. */
@@ -48,6 +50,7 @@ let settings: AppSettings;
 let mainWindow: BrowserWindow | null = null;
 let overlayWindow: BrowserWindow | null = null;
 let overlayPromise: Promise<BrowserWindow | null> | null = null;
+let overlayHideTimer: ReturnType<typeof setTimeout> | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
 let status: AppStatus = { phase: 'idle', title: 'Ready', detail: '' };
@@ -170,8 +173,17 @@ function syncOverlay(reposition = false): void {
   if (!window) return;
 
   if (!overlayShouldShow()) {
-    if (window.isVisible()) window.hide();
+    if (window.isVisible() && !overlayHideTimer) {
+      overlayHideTimer = setTimeout(() => {
+        overlayHideTimer = null;
+        if (!overlayShouldShow()) liveWindow(overlayWindow)?.hide();
+      }, OVERLAY_EXIT_MS);
+    }
     return;
+  }
+  if (overlayHideTimer) {
+    clearTimeout(overlayHideTimer);
+    overlayHideTimer = null;
   }
   if (reposition || !window.isVisible()) {
     positionOverlayWindow(window);
