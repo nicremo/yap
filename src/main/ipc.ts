@@ -5,6 +5,7 @@ import type {
   AppSettings,
   AppState,
   EnhancementLevel,
+  RuleLevel,
   KeyValidationResult,
   PermissionKind,
   RecordedAudio,
@@ -43,6 +44,8 @@ export interface IpcController {
 const PERMISSION_KINDS: readonly PermissionKind[] = ['microphone', 'accessibility', 'inputMonitoring'];
 const STYLE_MODES: readonly StyleMode[] = ['conversation', 'vibe-coding', 'custom-plus'];
 const LEVELS: readonly EnhancementLevel[] = ['none', 'soft', 'medium', 'high'];
+/** An app rule can also turn polishing off for its app. */
+const RULE_LEVELS: readonly RuleLevel[] = [...LEVELS, 'off'];
 const EXTERNAL_PROTOCOLS = ['https:', 'http:', 'x-apple.systempreferences:', 'ms-settings:'];
 
 function requireString(value: unknown, label: string): string {
@@ -111,7 +114,7 @@ export function registerIpcHandlers(controller: IpcController): void {
       typeof candidate.appIdentifier !== 'string' ||
       typeof candidate.label !== 'string' ||
       !STYLE_MODES.includes(candidate.styleMode) ||
-      !LEVELS.includes(candidate.enhancementLevel)
+      !RULE_LEVELS.includes(candidate.enhancementLevel)
     ) {
       throw new Error('Invalid app rule.');
     }
@@ -125,14 +128,10 @@ export function registerIpcHandlers(controller: IpcController): void {
     return appRules;
   });
   handle('appRules:update', async (_event, appIdentifier: unknown, styleMode: unknown, level: unknown) => {
-    if (!STYLE_MODES.includes(styleMode as StyleMode) || !LEVELS.includes(level as EnhancementLevel)) {
+    if (!STYLE_MODES.includes(styleMode as StyleMode) || !RULE_LEVELS.includes(level as RuleLevel)) {
       throw new Error('Invalid app rule update.');
     }
-    const appRules = await updateAppRule(
-      requireString(appIdentifier, 'the app'),
-      styleMode as StyleMode,
-      level as EnhancementLevel,
-    );
+    const appRules = await updateAppRule(requireString(appIdentifier, 'the app'), styleMode as StyleMode, level as RuleLevel);
     controller.patch({ appRules });
     return appRules;
   });

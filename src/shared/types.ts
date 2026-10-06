@@ -29,11 +29,14 @@ export interface CorrectionEntry {
   addedAt: string;
 }
 
+/** A rule can also switch polishing off for its app. */
+export type RuleLevel = EnhancementLevel | 'off';
+
 export interface AppRule {
   appIdentifier: string;
   label: string;
   styleMode: StyleMode;
-  enhancementLevel: EnhancementLevel;
+  enhancementLevel: RuleLevel;
 }
 
 export interface HotkeyConfig {

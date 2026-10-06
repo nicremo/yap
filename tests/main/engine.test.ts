@@ -9,7 +9,7 @@ const pipeline = vi.hoisted(() => ({
 }));
 const keyState = vi.hoisted(() => ({ set: true }));
 const rulesState = vi.hoisted(() => ({ rules: [] as AppRule[] }));
-const historyState = vi.hoisted(() => ({ entries: [] as Array<{ id: string; appName?: string; styleMode?: string }> }));
+const historyState = vi.hoisted(() => ({ entries: [] as Array<{ id: string; appName?: string; styleMode?: string; appRule?: string }> }));
 
 vi.mock('../../src/main/dictation/pipeline', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../src/main/dictation/pipeline')>()),
@@ -335,6 +335,27 @@ describe('DictationEngine', () => {
 
     expect(pipeline.polish).toHaveBeenCalledWith(expect.objectContaining({ styleMode: 'vibe-coding', enhancementLevel: 'high' }));
     expect(historyState.entries[0]).toMatchObject({ appName: 'Slack' });
+  });
+
+  it('leaves the text unpolished in an app whose rule says Off, and records the rule', async () => {
+    rulesState.rules = [{ appIdentifier: SLACK.bundleIdentifier!, label: 'Slack', styleMode: 'conversation', enhancementLevel: 'off' }];
+    focusNow = SLACK;
+    await hold(1_200);
+    await waitFor(() => pasted.length === 1);
+
+    expect(pipeline.polish).not.toHaveBeenCalled();
+    expect(pasted[0].text).toBe('hallo welt');
+    await waitFor(() => (historyState.entries[0] as { appRule?: string })?.appRule === 'Slack');
+  });
+
+  it('records which app rule styled a dictation', async () => {
+    rulesState.rules = [{ appIdentifier: SLACK.bundleIdentifier!, label: 'Slack', styleMode: 'vibe-coding', enhancementLevel: 'high' }];
+    focusNow = SLACK;
+    await hold(1_200);
+    await waitFor(() => pasted.length === 1);
+
+    expect(pipeline.polish).toHaveBeenCalledWith(expect.objectContaining({ styleMode: 'vibe-coding', enhancementLevel: 'high' }));
+    await waitFor(() => (historyState.entries[0] as { appRule?: string })?.appRule === 'Slack');
   });
 
   it('takes the focus at the stop press in hands-free mode', async () => {

@@ -13,6 +13,8 @@ import type {
   RecorderCommand,
   RecorderEvent,
   RetranscribeMode,
+  RuleLevel,
+  StyleMode,
   UpdateSettingsInput,
 } from '../shared/types';
 
@@ -50,7 +52,7 @@ const api = {
   removeCorrection: (from: string) => ipcRenderer.invoke('corrections:remove', from) as Promise<CorrectionEntry[]>,
   addAppRule: (rule: AppRule) => ipcRenderer.invoke('appRules:add', rule) as Promise<AppRule[]>,
   removeAppRule: (appIdentifier: string) => ipcRenderer.invoke('appRules:remove', appIdentifier) as Promise<AppRule[]>,
-  updateAppRule: (appIdentifier: string, styleMode: string, enhancementLevel: string) =>
+  updateAppRule: (appIdentifier: string, styleMode: StyleMode, enhancementLevel: RuleLevel) =>
     ipcRenderer.invoke('appRules:update', appIdentifier, styleMode, enhancementLevel) as Promise<AppRule[]>,
 
   removeHistoryEntry: (id: string) => ipcRenderer.invoke('history:remove', id) as Promise<HistoryEntry[]>,

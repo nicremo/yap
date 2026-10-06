@@ -1,7 +1,7 @@
 import { app } from 'electron';
 import path from 'node:path';
 
-import type { AppRule, EnhancementLevel, FocusInfo, StyleMode } from '../shared/types';
+import type { AppRule, EnhancementLevel, FocusInfo, RuleLevel, StyleMode } from '../shared/types';
 import { readJsonFile, writeJsonFile } from './json-file';
 
 const APP_RULES_FILE = 'app-rules.json';
@@ -94,7 +94,7 @@ export async function removeAppRule(appIdentifier: string): Promise<AppRule[]> {
 export async function updateAppRule(
   appIdentifier: string,
   styleMode: StyleMode,
-  enhancementLevel: EnhancementLevel,
+  enhancementLevel: RuleLevel,
 ): Promise<AppRule[]> {
   const rules = await loadAppRules();
   if (!rules.some((r) => r.appIdentifier === appIdentifier)) {
@@ -105,20 +105,33 @@ export async function updateAppRule(
   );
 }
 
+export interface ResolvedStyle {
+  styleMode: StyleMode;
+  enhancementLevel: EnhancementLevel;
+  /** False when the app's rule switches polishing off. Off in Style switches it off everywhere. */
+  polish: boolean;
+  /** The app rule that applied, by app name. */
+  matchedApp?: string;
+}
+
+/**
+ * The style for a dictation, decided by the app that has focus when it ends.
+ * A rule for that app (matched by bundle identifier) replaces the defaults.
+ */
 export function resolveStyleForApp(
   focusInfo: FocusInfo | undefined,
   rules: AppRule[],
   defaultStyle: StyleMode,
   defaultLevel: EnhancementLevel,
-): { styleMode: StyleMode; enhancementLevel: EnhancementLevel; matchedApp?: string } {
-  if (!focusInfo?.bundleIdentifier) {
-    return { styleMode: defaultStyle, enhancementLevel: defaultLevel };
+): ResolvedStyle {
+  const match = focusInfo?.bundleIdentifier
+    ? rules.find((rule) => rule.appIdentifier === focusInfo.bundleIdentifier)
+    : undefined;
+  if (!match) {
+    return { styleMode: defaultStyle, enhancementLevel: defaultLevel, polish: true };
   }
-
-  const match = rules.find((r) => r.appIdentifier === focusInfo.bundleIdentifier);
-  if (match) {
-    return { styleMode: match.styleMode, enhancementLevel: match.enhancementLevel, matchedApp: match.label };
+  if (match.enhancementLevel === 'off') {
+    return { styleMode: match.styleMode, enhancementLevel: defaultLevel, polish: false, matchedApp: match.label };
   }
-
-  return { styleMode: defaultStyle, enhancementLevel: defaultLevel };
+  return { styleMode: match.styleMode, enhancementLevel: match.enhancementLevel, polish: true, matchedApp: match.label };
 }

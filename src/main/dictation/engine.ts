@@ -371,19 +371,23 @@ export class DictationEngine {
     const focus = await focusPromise;
     const style = resolveStyleForApp(focus, rules, settings.styleMode, settings.enhancementLevel);
 
-    if (settings.enhancementEnabled && isGroqKeySet(settings)) {
+    if (settings.enhancementEnabled && style.polish && isGroqKeySet(settings)) {
       job.phase = 'rewriting';
       job.preview = corrected;
       this.publishStatus();
     }
-    const polished = await polish({
-      settings,
-      text: corrected,
-      styleMode: style.styleMode,
-      enhancementLevel: style.enhancementLevel,
-      dictionary,
-      corrections,
-    });
+    // Off in Style stops polishing everywhere (polish() checks it); an app
+    // rule set to Off stops it for that app.
+    const polished = style.polish
+      ? await polish({
+          settings,
+          text: corrected,
+          styleMode: style.styleMode,
+          enhancementLevel: style.enhancementLevel,
+          dictionary,
+          corrections,
+        })
+      : { text: corrected, durationMs: null };
 
     job.phase = 'pasting';
     job.preview = polished.text;
