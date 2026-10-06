@@ -210,9 +210,24 @@ function setStatus(next: AppStatus): void {
  * TransformProcessType, which briefly hides windows and can leave a
  * duplicate Dock icon when switched quickly.
  */
+let dockIcon: Electron.NativeImage | null = null;
+
+/** The approved tile, also in development where the bundle icon is Electron's. */
+function applyDockIcon(): void {
+  if (process.platform !== 'darwin' || !app.dock) return;
+  dockIcon ??= nativeImage.createFromPath(
+    app.isPackaged
+      ? path.join(process.resourcesPath, 'icons', 'appIcon.png')
+      : path.join(projectRoot, 'build', 'icons', 'appIcon.png'),
+  );
+  if (!dockIcon.isEmpty()) app.dock.setIcon(dockIcon);
+}
+
 function setDockVisible(visible: boolean): void {
   if (process.platform !== 'darwin') return;
   app.setActivationPolicy(visible ? 'regular' : 'accessory');
+  // Set again after every switch, so the Dock never shows a stale icon.
+  if (visible) applyDockIcon();
 }
 
 function showMainWindow(): void {
