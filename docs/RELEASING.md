@@ -27,7 +27,7 @@ npm run release:mac -- --profile Yap-notary
 ```
 
 The command verifies authentication and the Developer ID certificate first,
-runs type checking and tests, builds both architectures, submits each signed app
+prepares the native dependencies for both CPU architectures, runs type checking and tests, builds both architectures, submits each signed app
 to Apple and staples its ticket before creating the ZIP and DMG artifacts.
 It then signs and notarizes the DMGs, validates their tickets and Gatekeeper
 assessment, and refreshes the manifest checksums after stapling. Local reports
@@ -53,3 +53,5 @@ from Settings and restart to install a downloaded update after finishing their
 dictation. Updates also install when the app quits. Development builds do not
 contact the update feed. A signed build without a notarization ticket is not a
 completed public macOS release.
+
+The ONNX runtime is pinned to 1.23.2 because 1.24.3 omits Intel macOS binaries. The local build also installs the matching Sharp optional packages for both architectures. Package validation rejects unexpected archive files before signing or submitting to Apple.

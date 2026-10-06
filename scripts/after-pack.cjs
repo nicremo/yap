@@ -85,6 +85,10 @@ exports.default = async function afterPack(context) {
   if (context.electronPlatformName !== 'darwin') return;
 
   const appPath = path.join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`);
+  const asar = require('@electron/asar');
+  const archive = path.join(appPath, 'Contents', 'Resources', 'app.asar');
+  const unexpected = asar.listPackage(archive).find((file) => !/^\/(dist|node_modules)(\/|$)|^\/package\.json$/.test(file));
+  if (unexpected) throw new Error(`Unexpected file in public app archive: ${unexpected}`);
   const entitlements = path.resolve(__dirname, '..', 'build', 'entitlements.mac.plist');
   const identity = chooseIdentity();
   console.log(`[afterPack] signing with ${identity.name === '-' ? 'an ad-hoc signature' : `"${identity.name}"`}`);

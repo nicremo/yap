@@ -28,6 +28,7 @@ async function run(command, args) {
     child.once('exit', (code) => code === 0 ? resolve() : reject(new Error(`${command} exited with ${code}`)));
   });
 }
+await run('node', ['scripts/prepare-mac-dependencies.mjs']);
 await run('npm', ['run', 'typecheck']);
 await run('npm', ['test']);
 await run('npm', ['run', 'build']);
@@ -42,6 +43,7 @@ for (const arch of ['arm64', 'x64']) {
   await notarize(image, profile, path.join(root, 'work', 'notarization'));
   await execute('xcrun', ['stapler', 'staple', image]);
   await execute('xcrun', ['stapler', 'validate', image]);
+  await execute(require('app-builder-bin').appBuilderPath, ['blockmap', '--input', image, '--output', `${image}.blockmap`]);
   await execute('spctl', ['--assess', '--type', 'open', '--context', 'context:primary-signature', '--verbose=2', image]);
 }
 // Stapling changes DMG bytes. Recompute its manifest hash only after stapling.
