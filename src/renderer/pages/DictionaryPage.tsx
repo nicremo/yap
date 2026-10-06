@@ -38,6 +38,7 @@ export function DictionaryPage({ state }: { state: AppState }) {
         title="Add an entry"
         action={
           <Segmented<'word' | 'correction'>
+            label="Entry type"
             value={mode}
             options={[
               { value: 'word', label: 'Word' },

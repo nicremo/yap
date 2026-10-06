@@ -26,6 +26,7 @@ export function EnginePage({ state, onState }: { state: AppState; onState: (next
 
       <Card title="Transcription">
         <Segmented<TranscriptionMode>
+          label="Transcription"
           value={settings.transcriptionMode}
           options={[
             {

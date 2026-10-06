@@ -43,6 +43,7 @@ export function StylePage({ state, onState }: { state: AppState; onState: (next:
       {error && <Notice tone="danger">{error}</Notice>}
 
       <Segmented<StyleMode>
+        label="Style"
         value={settings.styleMode}
         options={STYLE_TABS.map((tab) => ({ value: tab.value, label: tab.label }))}
         onChange={(styleMode) => void update({ styleMode })}
@@ -53,6 +54,7 @@ export function StylePage({ state, onState }: { state: AppState; onState: (next:
         <div className="voice-row">
           <span className="field-label">Voice</span>
           <Segmented<CustomPlusVoice>
+            label="Voice"
             value={voice}
             options={[
               { value: 'conversation', label: 'Conversation' },

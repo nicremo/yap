@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import { useRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
 
 import { Icon, type IconName } from './Icon';
 
@@ -86,27 +86,68 @@ export function Segmented<T extends string>({
   options,
   onChange,
   disabled,
+  label,
+  size = 'md',
 }: {
   value: T;
-  options: ReadonlyArray<{ value: T; label: ReactNode }>;
+  options: ReadonlyArray<{ value: T; label: ReactNode; disabled?: boolean }>;
   onChange: (value: T) => void;
   disabled?: boolean;
+  /** Read by screen readers: what this group chooses. */
+  label: string;
+  size?: 'sm' | 'md';
 }) {
+  const buttons = useRef<Array<HTMLButtonElement | null>>([]);
+  const selected = options.findIndex((option) => option.value === value);
+
+  // Arrow keys move the selection, like native radio groups.
+  const move = (delta: number) => {
+    const count = options.length;
+    let next = selected < 0 ? 0 : selected;
+    for (let step = 0; step < count; step += 1) {
+      next = (next + delta + count) % count;
+      if (!options[next].disabled) break;
+    }
+    onChange(options[next].value);
+    buttons.current[next]?.focus();
+  };
+
   return (
-    <div className="segmented" role="radiogroup">
-      {options.map((option) => (
-        <button
-          key={option.value}
-          type="button"
-          role="radio"
-          aria-checked={value === option.value}
-          className={`segmented-item${value === option.value ? ' segmented-item-active' : ''}`}
-          disabled={disabled}
-          onClick={() => onChange(option.value)}
-        >
-          {option.label}
-        </button>
-      ))}
+    <div
+      className={`segmented segmented-${size}`}
+      role="radiogroup"
+      aria-label={label}
+      onKeyDown={(event) => {
+        if (disabled) return;
+        if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+          event.preventDefault();
+          move(1);
+        } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+          event.preventDefault();
+          move(-1);
+        }
+      }}
+    >
+      {options.map((option, index) => {
+        const active = index === selected;
+        return (
+          <button
+            key={option.value}
+            ref={(element) => {
+              buttons.current[index] = element;
+            }}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            tabIndex={active || (selected < 0 && index === 0) ? 0 : -1}
+            className={`segmented-item${active ? ' segmented-item-active' : ''}`}
+            disabled={disabled || option.disabled}
+            onClick={() => onChange(option.value)}
+          >
+            {option.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -175,10 +216,19 @@ export function KeyCap({ children, large }: { children: ReactNode; large?: boole
   return <kbd className={`keycap${large ? ' keycap-large' : ''}`}>{children}</kbd>;
 }
 
-export function Progress({ value }: { value: number }) {
+export function Progress({ value, label }: { value: number; label?: string }) {
+  const clamped = Math.max(0.02, Math.min(1, value));
   return (
-    <div className="progress" role="progressbar" aria-valuenow={Math.round(value * 100)} aria-valuemin={0} aria-valuemax={100}>
-      <div className="progress-bar" style={{ width: `${Math.max(2, Math.min(100, value * 100))}%` }} />
+    <div
+      className="progress"
+      role="progressbar"
+      aria-label={label}
+      aria-valuenow={Math.round(value * 100)}
+      aria-valuemin={0}
+      aria-valuemax={100}
+    >
+      {/* scaleX instead of width: a transform animates without relayout. */}
+      <div className="progress-bar" style={{ transform: `scaleX(${clamped})` }} />
     </div>
   );
 }
