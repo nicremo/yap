@@ -4,7 +4,7 @@ import type { Readable } from 'node:stream';
 
 import { clipboard, type NativeImage } from 'electron';
 
-import type { FocusInfo, HotkeyConfig } from '../../shared/types';
+import type { FocusInfo, HotkeyConfig, HotkeyErrorCode } from '../../shared/types';
 import {
   ALL_NATIVE_PERMISSIONS_GRANTED,
   NativeBridge,
@@ -94,6 +94,13 @@ function restoreClipboard(snapshot: ClipboardSnapshot): void {
   });
 }
 
+/** The helper reports listener failures in English; the UI needs a code it can word. */
+export function listenerErrorCode(message: string | undefined): HotkeyErrorCode {
+  if (message?.startsWith('Fn key')) return 'fn-unsupported';
+  if (message?.startsWith('Unsupported key')) return 'key-unsupported';
+  return 'listener-failed';
+}
+
 /**
  * The Windows helper keeps its original one-shot protocol: a long-running
  * `listen` process for the hotkey and short-lived processes for focus and
@@ -130,7 +137,7 @@ export class WindowsHelperBridge extends NativeBridge {
 
   async listen(hotkey: HotkeyConfig): Promise<ListenerStatus> {
     if (!this.binary && !(await this.start())) {
-      this.setListener({ active: false, mode: null, error: 'The native helper is missing. Reinstall Yap.' });
+      this.setListener({ active: false, mode: null, error: 'helper-missing' });
       return this.listener;
     }
 
@@ -147,7 +154,8 @@ export class WindowsHelperBridge extends NativeBridge {
         if (message.type === 'fnDown') this.emit('hotkey', { type: 'down' });
         if (message.type === 'fnUp') this.emit('hotkey', { type: 'up' });
         if (message.type === 'error') {
-          this.setListener({ active: false, mode: null, error: message.message ?? 'The hotkey listener failed.' });
+          console.warn('[yap] listener error:', message.message);
+          this.setListener({ active: false, mode: null, error: listenerErrorCode(message.message) });
         }
       } catch {
         // Ignore malformed lines.
@@ -158,7 +166,7 @@ export class WindowsHelperBridge extends NativeBridge {
       if (this.listenerProcess !== child) return;
       this.listenerProcess = null;
       if (!this.disposed && this.listener.active) {
-        this.setListener({ active: false, mode: null, error: 'The hotkey listener stopped.' });
+        this.setListener({ active: false, mode: null, error: 'stopped' });
       }
     });
 

@@ -1,3 +1,5 @@
+import { en } from './i18n/en';
+import type { Messages } from './i18n/en';
 import type { HotkeyConfig } from './types';
 
 export const MODIFIER_FLAGS = {
@@ -14,18 +16,30 @@ export const MODIFIER_LABELS: Record<string, string> = {
   control: '\u2303',
 };
 
-export const KEY_LABELS: Record<number, string> = {
+type KeyName = Exclude<keyof Messages['keys'], 'other'>;
+
+/** Keys whose name depends on the language. */
+const NAMED_KEYS: Record<number, KeyName> = {
   // Modifier-only keys (right-side variants)
-  54: 'Right Command (\u2318)',
-  61: 'Right Option (\u2325)',
-  60: 'Right Shift (\u21E7)',
-  62: 'Right Control (\u2303)',
+  54: 'rightCommand',
+  61: 'rightOption',
+  60: 'rightShift',
+  62: 'rightControl',
   // Modifier-only keys (left-side variants)
-  55: 'Left Command (\u2318)',
-  58: 'Left Option (\u2325)',
-  56: 'Left Shift (\u21E7)',
-  59: 'Left Control (\u2303)',
-  // Function keys
+  55: 'leftCommand',
+  58: 'leftOption',
+  56: 'leftShift',
+  59: 'leftControl',
+  // Common keys
+  36: 'return',
+  48: 'tab',
+  49: 'space',
+  51: 'delete',
+  53: 'escape',
+};
+
+/** Keys that read the same in every language. */
+const LITERAL_KEYS: Record<number, string> = {
   63: 'Fn',
   122: 'F1',
   120: 'F2',
@@ -42,12 +56,6 @@ export const KEY_LABELS: Record<number, string> = {
   105: 'F13',
   107: 'F14',
   113: 'F15',
-  // Common keys
-  36: 'Return',
-  48: 'Tab',
-  49: 'Space',
-  51: 'Delete',
-  53: 'Escape',
   // Letters (a-z)
   0: 'A', 11: 'B', 8: 'C', 2: 'D', 14: 'E', 3: 'F', 5: 'G', 4: 'H',
   34: 'I', 38: 'J', 40: 'K', 37: 'L', 46: 'M', 45: 'N', 31: 'O',
@@ -58,13 +66,16 @@ export const KEY_LABELS: Record<number, string> = {
   23: '5', 22: '6', 26: '7', 28: '8', 25: '9',
 };
 
-export const MODIFIER_ONLY_KEYCODES = new Set([54, 55, 56, 58, 59, 60, 61, 62, 63]);
-
-export function formatHotkeyLabel(config: HotkeyConfig): string {
-  return config.label;
+function keyName(keyCode: number, names: Messages['keys']): string {
+  const named = NAMED_KEYS[keyCode];
+  if (named) return names[named];
+  return LITERAL_KEYS[keyCode] ?? names.other(keyCode);
 }
 
-export function buildHotkeyLabel(keyCode: number, modifiers: number): string {
+export const MODIFIER_ONLY_KEYCODES = new Set([54, 55, 56, 58, 59, 60, 61, 62, 63]);
+
+/** The key's name in a language. English is what settings.json stores. */
+export function buildHotkeyLabel(keyCode: number, modifiers: number, names: Messages['keys'] = en.keys): string {
   const parts: string[] = [];
 
   if (modifiers & MODIFIER_FLAGS.control) parts.push(MODIFIER_LABELS.control);
@@ -72,13 +83,16 @@ export function buildHotkeyLabel(keyCode: number, modifiers: number): string {
   if (modifiers & MODIFIER_FLAGS.shift) parts.push(MODIFIER_LABELS.shift);
   if (modifiers & MODIFIER_FLAGS.command) parts.push(MODIFIER_LABELS.command);
 
-  if (!MODIFIER_ONLY_KEYCODES.has(keyCode)) {
-    parts.push(KEY_LABELS[keyCode] ?? `Key ${keyCode}`);
-  } else if (parts.length === 0) {
-    parts.push(KEY_LABELS[keyCode] ?? `Key ${keyCode}`);
+  if (!MODIFIER_ONLY_KEYCODES.has(keyCode) || parts.length === 0) {
+    parts.push(keyName(keyCode, names));
   }
 
   return parts.join('');
+}
+
+/** The dictation key as the UI shows it, in the current language. */
+export function hotkeyLabel(config: Pick<HotkeyConfig, 'keyCode' | 'modifiers'>, names: Messages['keys']): string {
+  return buildHotkeyLabel(config.keyCode, config.modifiers, names);
 }
 
 export const FN_KEY_CODE = 63;

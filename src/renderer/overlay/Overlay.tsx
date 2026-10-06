@@ -1,7 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
+import { formatSeconds, type Locale, type Messages } from '../../shared/i18n';
 import type { AppStatus } from '../../shared/types';
 import { Icon } from '../components/Icon';
+import { useI18n } from '../lib/i18n';
 import { AudioRecorder, describeMicrophoneError } from '../recorder/recorder';
 
 const BAR_COUNT = 16;
@@ -19,9 +21,12 @@ const LABEL_FADE_MS = 160;
  * recorder, so a new dictation can start while the previous one is still
  * being handed over.
  */
-function useRecorderHost(onLevel: (level: number) => void): void {
+function useRecorderHost(onLevel: (level: number) => void, t: Messages): void {
   const levelRef = useRef(onLevel);
   levelRef.current = onLevel;
+  // Read when an error happens, so it is worded in the language of that moment.
+  const textsRef = useRef(t.microphone);
+  textsRef.current = t.microphone;
 
   useEffect(() => {
     const recorders = new Map<number, AudioRecorder>();
@@ -41,7 +46,7 @@ function useRecorderHost(onLevel: (level: number) => void): void {
           () => window.yap.sendRecorderEvent({ type: 'started', sessionId }),
           (error: unknown) => {
             recorders.delete(sessionId);
-            window.yap.sendRecorderEvent({ type: 'failed', sessionId, message: describeMicrophoneError(error) });
+            window.yap.sendRecorderEvent({ type: 'failed', sessionId, message: describeMicrophoneError(error, textsRef.current) });
           },
         );
         return;
@@ -57,12 +62,13 @@ function useRecorderHost(onLevel: (level: number) => void): void {
       }
 
       if (!recorder) {
-        window.yap.sendRecorderEvent({ type: 'failed', sessionId, message: 'The microphone did not start.' });
+        window.yap.sendRecorderEvent({ type: 'failed', sessionId, message: textsRef.current.notStarted });
         return;
       }
       recorder.stop().then(
         (result) => window.yap.sendRecordedAudio({ sessionId, ...result }),
-        (error: unknown) => window.yap.sendRecorderEvent({ type: 'failed', sessionId, message: describeMicrophoneError(error) }),
+        (error: unknown) =>
+          window.yap.sendRecorderEvent({ type: 'failed', sessionId, message: describeMicrophoneError(error, textsRef.current) }),
       );
     });
 
@@ -143,17 +149,31 @@ function viewFor(status: AppStatus): View {
   }
 }
 
-function labelFor(status: AppStatus, view: View): string {
+/** The word for a finished dictation: Done when it arrived, otherwise where it is now. */
+function doneWord(status: AppStatus, t: Messages): string {
+  switch (status.delivery) {
+    case 'pasted':
+      return t.overlay.done;
+    case 'saved':
+      return t.overlay.saved;
+    case undefined:
+      return status.title;
+    default:
+      return t.overlay.copied;
+  }
+}
+
+function labelFor(status: AppStatus, view: View, t: Messages, locale: Locale): string {
   switch (view) {
     case 'listening':
-      return status.handsfree ? 'Hands-free · tap to finish' : 'Listening';
+      return status.handsfree ? t.overlay.handsfree : t.overlay.listening;
     case 'processing':
       // One label for transcribing, polishing and pasting: at well under a
       // second in total, three would only flicker.
-      return 'Transcribing';
+      return t.overlay.processing;
     case 'done': {
-      const word = status.title === 'Pasted' ? 'Done' : status.title.replace(/ instead$/, '');
-      return status.metrics ? `${word} · ${(status.metrics.totalMs / 1000).toFixed(2)} s` : word;
+      const word = doneWord(status, t);
+      return status.metrics ? `${word} · ${formatSeconds(status.metrics.totalMs, locale)}` : word;
     }
     case 'error':
       return status.title;
@@ -163,6 +183,7 @@ function labelFor(status: AppStatus, view: View): string {
 }
 
 export function Overlay() {
+  const { locale, t } = useI18n();
   const [status, setStatus] = useState<AppStatus>({ phase: 'idle', title: '', detail: '' });
   const [settled, setSettled] = useState(false);
   const [exiting, setExiting] = useState(false);
@@ -175,7 +196,7 @@ export function Overlay() {
   // A finished dictation shows its result briefly, then settles back.
   const view: View = statusView === 'done' && settled ? 'idle' : statusView;
   const [bars, pushLevel] = useWaveform(view === 'listening');
-  useRecorderHost(pushLevel);
+  useRecorderHost(pushLevel, t);
 
   useEffect(() => {
     setSettled(false);
@@ -192,7 +213,7 @@ export function Overlay() {
     };
   }, [status, statusView]);
 
-  const label = labelFor(status, view);
+  const label = labelFor(status, view, t, locale);
   const [shownLabel, fading] = useCrossfade(label);
   const open = view !== 'idle' && !exiting;
 

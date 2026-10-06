@@ -1,6 +1,7 @@
 import { app, net, session } from 'electron';
 
 import type { KeyValidationResult } from '../shared/types';
+import { t } from './i18n';
 
 /* Development builds can point the client at another OpenAI-compatible
    endpoint (the end-to-end test's mock server). Packaged builds always talk to
@@ -95,21 +96,23 @@ export function classifyHttpError(status: number, body: string, retryAfter: stri
   const detail = extractErrorMessage(body);
   const code = extractErrorCode(body);
 
+  const { groq } = t();
+
   if (status === 401 || status === 403) {
-    return new GroqError('auth', 'Groq rejected the API key. Check it in Engine settings.', status);
+    return new GroqError('auth', groq.authRejected, status);
   }
   if (status === 429) {
     const retryAfterMs = parseRetryAfter(retryAfter);
-    const wait = retryAfterMs !== undefined ? ` Try again in ${Math.max(1, Math.ceil(retryAfterMs / 1000))}s.` : '';
-    return new GroqError('rate-limit', `Groq rate limit reached.${wait}`, status, retryAfterMs);
+    const seconds = retryAfterMs !== undefined ? Math.max(1, Math.ceil(retryAfterMs / 1000)) : undefined;
+    return new GroqError('rate-limit', groq.rateLimit(seconds), status, retryAfterMs);
   }
   if (status === 413) {
-    return new GroqError('request', 'The recording is too large for Groq (25 MB limit on the free tier).', status);
+    return new GroqError('request', groq.tooLarge, status);
   }
   if (status >= 500) {
-    return new GroqError('server', `Groq had a server error (${status}).${detail ? ` ${detail}` : ''}`, status, undefined, code);
+    return new GroqError('server', groq.serverError(status, detail), status, undefined, code);
   }
-  return new GroqError('request', `Groq refused the request (${status}).${detail ? ` ${detail}` : ''}`, status, undefined, code);
+  return new GroqError('request', groq.refused(status, detail), status, undefined, code);
 }
 
 /** The model is gone or this key cannot use it: worth falling back to another model. */
@@ -123,9 +126,9 @@ export function isModelUnavailableError(error: unknown): boolean {
 function describeNetworkError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   if (/ERR_INTERNET_DISCONNECTED|ERR_NETWORK_CHANGED|ENOTFOUND|ERR_NAME_NOT_RESOLVED/i.test(message)) {
-    return 'No internet connection. Groq could not be reached.';
+    return t().groq.offline;
   }
-  return `Groq could not be reached (${message}).`;
+  return t().groq.unreachable(message);
 }
 
 interface TimedRequest {
@@ -161,7 +164,7 @@ async function requestOnce({ path, apiKey, init, timeoutMs, signal }: TimedReque
   } catch (error) {
     if (error instanceof GroqError) throw error;
     if (timedOut) {
-      throw new GroqError('timeout', `Groq did not answer within ${Math.round(timeoutMs / 1000)}s.`);
+      throw new GroqError('timeout', t().groq.timeout(Math.round(timeoutMs / 1000)));
     }
     if (signal?.aborted) {
       throw error;
@@ -281,7 +284,7 @@ export async function chatWithGroq(request: ChatRequest): Promise<ChatResult> {
   try {
     payload = JSON.parse(body);
   } catch {
-    throw new GroqError('server', 'Groq returned an unreadable response.');
+    throw new GroqError('server', t().groq.unreadable);
   }
 
   const choice = payload.choices?.[0];
@@ -313,20 +316,20 @@ export async function validateGroqKey(
 ): Promise<KeyValidationResult & { models?: string[] }> {
   const trimmed = apiKey.trim();
   if (!trimmed) {
-    return { valid: false, error: 'Paste your Groq API key first.' };
+    return { valid: false, error: t().groq.pasteKeyFirst };
   }
 
   try {
     const models = await listGroqModels(trimmed);
     // An unreadable list is not the user's problem: the key authenticated.
     if (requiredModel && models.length > 0 && !models.includes(requiredModel)) {
-      return { valid: false, error: `This key has no access to ${requiredModel}.` };
+      return { valid: false, error: t().groq.noModelAccess(requiredModel) };
     }
     return { valid: true, models };
   } catch (error) {
     if (error instanceof GroqError && error.kind === 'auth') {
-      return { valid: false, error: 'Groq does not accept this key. Copy it again from console.groq.com.' };
+      return { valid: false, error: t().groq.keyNotAccepted };
     }
-    return { valid: false, error: error instanceof Error ? error.message : 'Validation failed.' };
+    return { valid: false, error: error instanceof Error ? error.message : t().groq.validationFailed };
   }
 }

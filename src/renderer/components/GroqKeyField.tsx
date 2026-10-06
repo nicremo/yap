@@ -2,11 +2,13 @@ import { useState } from 'react';
 
 import type { AppState } from '../../shared/types';
 import { GROQ_CONSOLE_URL } from '../../shared/models';
+import { useT } from '../lib/i18n';
 import { useAction } from '../lib/store';
 import { Icon } from './Icon';
 import { Button, Chip, Notice } from './ui';
 
 export function GroqKeyField({ state, onState }: { state: AppState; onState: (next: AppState) => void }) {
+  const t = useT();
   const [key, setKey] = useState('');
   const [replacing, setReplacing] = useState(false);
   const { busy, error, run, clearError } = useAction();
@@ -17,7 +19,7 @@ export function GroqKeyField({ state, onState }: { state: AppState; onState: (ne
       const { result, state: next } = await window.yap.saveGroqKey(key);
       onState(next);
       if (!result.valid) {
-        throw new Error(result.error ?? 'Groq did not accept this key.');
+        throw new Error(result.error ?? t.groqKey.rejected);
       }
       setKey('');
       setReplacing(false);
@@ -28,12 +30,14 @@ export function GroqKeyField({ state, onState }: { state: AppState; onState: (ne
       <div className="key-field key-field-connected">
         <span className="key-field-status">
           <Icon name="key" size={16} />
-          <span>Groq API key</span>
-          <Chip tone="success" icon="check">Connected</Chip>
+          <span>{t.groqKey.label}</span>
+          <Chip tone="success" icon="check">
+            {t.common.connected}
+          </Chip>
         </span>
         <div className="key-field-actions">
           <Button size="sm" variant="ghost" onClick={() => setReplacing(true)}>
-            Replace
+            {t.common.replace}
           </Button>
           <Button
             size="sm"
@@ -41,7 +45,7 @@ export function GroqKeyField({ state, onState }: { state: AppState; onState: (ne
             busy={busy === 'clear'}
             onClick={() => void run('clear', async () => onState(await window.yap.clearGroqKey()))}
           >
-            Remove
+            {t.common.remove}
           </Button>
         </div>
       </div>
@@ -70,17 +74,17 @@ export function GroqKeyField({ state, onState }: { state: AppState; onState: (ne
           }}
         />
         <Button type="submit" variant="primary" busy={busy === 'save'} disabled={!key.trim()}>
-          Verify & save
+          {t.groqKey.verify}
         </Button>
         {replacing && (
           <Button variant="ghost" onClick={() => setReplacing(false)}>
-            Cancel
+            {t.common.cancel}
           </Button>
         )}
       </form>
       {error && <Notice tone="danger">{error}</Notice>}
       <button type="button" className="inline-link" onClick={() => void window.yap.openExternal(GROQ_CONSOLE_URL)}>
-        Get a free key at console.groq.com <Icon name="external" size={12} />
+        {t.groqKey.getKey} <Icon name="external" size={12} />
       </button>
     </div>
   );

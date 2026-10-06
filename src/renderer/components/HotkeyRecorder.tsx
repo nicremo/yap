@@ -1,7 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 
 import type { AppState, HotkeyConfig } from '../../shared/types';
-import { buildHotkeyLabel, FN_HOTKEY, FN_KEY_CODE, MODIFIER_FLAGS, MODIFIER_ONLY_KEYCODES, RIGHT_ALT_HOTKEY } from '../../shared/hotkeys';
+import {
+  buildHotkeyLabel,
+  FN_HOTKEY,
+  FN_KEY_CODE,
+  hotkeyLabel,
+  MODIFIER_FLAGS,
+  MODIFIER_ONLY_KEYCODES,
+  RIGHT_ALT_HOTKEY,
+} from '../../shared/hotkeys';
+import { rich, useT } from '../lib/i18n';
 import { Button, KeyCap, Notice, ToggleRow } from './ui';
 
 const DOM_TO_MAC: Record<string, number> = {
@@ -42,6 +51,7 @@ function modifierFlagForKeyCode(keyCode: number): number {
 }
 
 function HotkeyCapture({ current, onSave }: { current: HotkeyConfig; onSave: (config: HotkeyConfig) => void }) {
+  const t = useT();
   const [recording, setRecording] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const pending = useRef<{ keyCode: number; modifiers: number } | null>(null);
@@ -79,7 +89,7 @@ function HotkeyCapture({ current, onSave }: { current: HotkeyConfig; onSave: (co
       if (MODIFIER_ONLY_KEYCODES.has(keyCode)) {
         // A modifier on its own is decided on release, so combos stay possible.
         pending.current = { keyCode, modifiers: modifiers & ~modifierFlagForKeyCode(keyCode) };
-        setPreview(buildHotkeyLabel(keyCode, pending.current.modifiers));
+        setPreview(buildHotkeyLabel(keyCode, pending.current.modifiers, t.keys));
         return;
       }
 
@@ -98,14 +108,14 @@ function HotkeyCapture({ current, onSave }: { current: HotkeyConfig; onSave: (co
       window.removeEventListener('keydown', handleKeyDown, true);
       window.removeEventListener('keyup', handleKeyUp, true);
     };
-  }, [recording, onSave]);
+  }, [recording, onSave, t]);
 
   return (
     <div className="hotkey-capture">
       <div className="row">
         <div className="row-text">
-          <strong>Dictation key</strong>
-          <span>{recording ? 'Press the key or combination. Escape cancels.' : 'Hold it to talk, double tap for hands-free.'}</span>
+          <strong>{t.hotkey.dictationKey}</strong>
+          <span>{recording ? t.hotkey.recordingHint : t.hotkey.idleHint}</span>
         </div>
         <button
           type="button"
@@ -116,7 +126,7 @@ function HotkeyCapture({ current, onSave }: { current: HotkeyConfig; onSave: (co
             pending.current = null;
           }}
         >
-          {recording ? preview ?? 'Press a key…' : current.label}
+          {recording ? preview ?? t.hotkey.pressKey : hotkeyLabel(current, t.keys)}
         </button>
       </div>
     </div>
@@ -124,32 +134,33 @@ function HotkeyCapture({ current, onSave }: { current: HotkeyConfig; onSave: (co
 }
 
 export function FnKeyNotice({ state }: { state: AppState }) {
+  const t = useT();
   const usesFn = state.settings.hotkey.keyCode === FN_KEY_CODE && state.settings.hotkey.modifiers === 0;
   if (!usesFn || !state.fnKeyAction || state.fnKeyAction === 'nothing' || state.fnKeyAction === 'unknown') {
     return null;
   }
-
-  const action = {
-    'input-source': 'switches the input source',
-    emoji: 'opens the emoji picker',
-    dictation: 'starts Apple Dictation',
-  }[state.fnKeyAction];
 
   return (
     <Notice
       tone="warning"
       action={
         <Button size="sm" onClick={() => void window.yap.openKeyboardSettings()}>
-          Keyboard Settings
+          {t.hotkey.keyboardSettings}
         </Button>
       }
     >
-      Pressing <KeyCap>fn</KeyCap> also {action}. Set <em>Press 🌐 key to</em> to <em>Do Nothing</em> in Keyboard Settings.
+      {rich(t.hotkey.fnNotice, {
+        fn: <KeyCap>fn</KeyCap>,
+        action: t.hotkey.fnActions[state.fnKeyAction],
+        setting: <em>{t.hotkey.fnSetting}</em>,
+        value: <em>{t.hotkey.fnValue}</em>,
+      })}
     </Notice>
   );
 }
 
 export function HotkeySettings({ state, onSave }: { state: AppState; onSave: (config: HotkeyConfig) => void }) {
+  const t = useT();
   const hotkey = state.settings.hotkey;
   const isFn = hotkey.keyCode === FN_KEY_CODE && hotkey.modifiers === 0;
   const isMac = state.platform === 'darwin';
@@ -158,8 +169,8 @@ export function HotkeySettings({ state, onSave }: { state: AppState; onSave: (co
     <div className="hotkey-settings">
       {isMac && (
         <ToggleRow
-          title="Use the fn key"
-          description="Hold fn (🌐) to dictate. Works on every Mac keyboard."
+          title={t.hotkey.useFn}
+          description={t.hotkey.useFnHint}
           checked={isFn}
           onChange={(value) => onSave(value ? FN_HOTKEY : RIGHT_ALT_HOTKEY)}
         />

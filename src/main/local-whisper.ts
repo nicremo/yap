@@ -1,6 +1,8 @@
 import path from 'node:path';
 
+import { formatNumber } from '../shared/i18n';
 import type { LocalWhisperModel } from '../shared/types';
+import { currentLocale, t } from './i18n';
 import { pathExists } from './storage';
 
 /* The encoder stays full precision because quantising it costs Whisper a lot
@@ -55,10 +57,10 @@ async function createTranscriber(
         loadedBytes += entry.loaded;
         totalBytes += entry.total;
       }
-      const megabytes = (value: number) => Math.round(value / 1_000_000);
+      const megabytes = (value: number) => formatNumber(Math.round(value / 1_000_000), currentLocale());
       onProgress({
         progress: totalBytes > 0 ? Math.min(1, loadedBytes / totalBytes) : 0,
-        detail: `${megabytes(loadedBytes)} of ${megabytes(totalBytes)} MB`,
+        detail: t().local.progress(megabytes(loadedBytes), megabytes(totalBytes)),
       });
     },
   } as Record<string, unknown>);
@@ -100,7 +102,7 @@ export function decodePcm16Wav(buffer: Uint8Array): Float32Array {
     String.fromCharCode(view.getUint8(offset), view.getUint8(offset + 1), view.getUint8(offset + 2), view.getUint8(offset + 3));
 
   if (buffer.byteLength < 44 || tag(0) !== 'RIFF' || tag(8) !== 'WAVE') {
-    throw new Error('The recording is not a valid WAV file.');
+    throw new Error(t().local.invalidWav);
   }
 
   let offset = 12;
@@ -128,7 +130,7 @@ export function decodePcm16Wav(buffer: Uint8Array): Float32Array {
   }
 
   if (format !== 1 || channels !== 1 || bitsPerSample !== 16 || dataOffset === 0) {
-    throw new Error('Expected a mono 16-bit PCM WAV recording.');
+    throw new Error(t().local.unsupportedWav);
   }
 
   const samples = new Float32Array(Math.floor(dataSize / 2));

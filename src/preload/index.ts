@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 
+import { isLocale, type Locale } from '../shared/i18n';
 import type {
   AppRule,
   AppState,
@@ -26,11 +27,19 @@ function subscribe<T>(channel: string, listener: (payload: T) => void): () => vo
   };
 }
 
-const themeArgument = process.argv.find((argument) => argument.startsWith('--yap-theme='))?.slice('--yap-theme='.length);
+function argument(name: string): string | undefined {
+  const prefix = `--${name}=`;
+  return process.argv.find((value) => value.startsWith(prefix))?.slice(prefix.length);
+}
+
+const themeArgument = argument('yap-theme');
+const localeArgument = argument('yap-locale');
 
 const api = {
   /** The theme the window was opened with, before the state arrives. */
   initialTheme: themeArgument === 'light' || themeArgument === 'dark' ? themeArgument : 'system',
+  /** The language the window was opened with; later switches arrive through onLocale. */
+  initialLocale: (isLocale(localeArgument) ? localeArgument : 'en') as Locale,
   getState: () => ipcRenderer.invoke('app:getState') as Promise<AppState>,
   updateSettings: (updates: UpdateSettingsInput) => ipcRenderer.invoke('settings:update', updates) as Promise<AppState>,
   chooseStorage: () => ipcRenderer.invoke('settings:chooseStorage') as Promise<AppState>,
@@ -71,6 +80,7 @@ const api = {
   onStatus: (listener: (status: AppStatus) => void) => subscribe('app:status', listener),
   onStatePatch: (listener: (patch: Partial<AppState>) => void) => subscribe('state:patch', listener),
   onHotkeyActivity: (listener: (down: boolean) => void) => subscribe('hotkey:activity', listener),
+  onLocale: (listener: (locale: Locale) => void) => subscribe('app:locale', listener),
 
   /* Recorder protocol, used by the overlay window only. */
   onRecorderCommand: (listener: (command: RecorderCommand) => void) => subscribe('recorder:command', listener),

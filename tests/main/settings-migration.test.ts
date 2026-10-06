@@ -150,3 +150,14 @@ describe('applySettingsUpdate', () => {
     expect(next.groqApiKeyEncrypted).toBe(current.groqApiKeyEncrypted);
   });
 });
+
+describe('uiLanguage', () => {
+  it('follows the system until the user picks a language', () => {
+    expect(migrateSettings({}, defaults).uiLanguage).toBe('system');
+    expect(applySettingsUpdate(defaults, { uiLanguage: 'de' }).uiLanguage).toBe('de');
+  });
+
+  it('ignores a language Yap does not speak', () => {
+    expect(migrateSettings({ ...defaults, uiLanguage: 'fr' }, defaults).uiLanguage).toBe('system');
+  });
+});

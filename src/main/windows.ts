@@ -2,6 +2,7 @@ import { fileURLToPath } from 'node:url';
 
 import { BrowserWindow, nativeTheme, screen } from 'electron';
 
+import type { Locale } from '../shared/i18n';
 import type { ThemePreference } from '../shared/types';
 
 const isMac = process.platform === 'darwin';
@@ -26,7 +27,7 @@ async function loadRenderer(window: BrowserWindow, hash = ''): Promise<void> {
   await window.loadFile(rendererFilePath, { hash });
 }
 
-export async function createMainWindow(theme: ThemePreference): Promise<BrowserWindow> {
+export async function createMainWindow(theme: ThemePreference, locale: Locale): Promise<BrowserWindow> {
   const window = new BrowserWindow({
     width: 1080,
     height: 740,
@@ -43,8 +44,8 @@ export async function createMainWindow(theme: ThemePreference): Promise<BrowserW
       preload: preloadPath,
       contextIsolation: true,
       spellcheck: false,
-      // Read by the preload, so the first frame already has the right theme.
-      additionalArguments: [`--yap-theme=${theme}`],
+      // Read by the preload, so the first frame already has the right theme and language.
+      additionalArguments: [`--yap-theme=${theme}`, `--yap-locale=${locale}`],
     },
   });
 
@@ -73,7 +74,7 @@ export function positionOverlayWindow(window: BrowserWindow): void {
  * setVisibleOnAllWorkspaces, whose process type switch hides the windows and
  * the Dock icon for a moment and can activate Yap.
  */
-export async function createOverlayWindow(): Promise<BrowserWindow> {
+export async function createOverlayWindow(locale: Locale): Promise<BrowserWindow> {
   const window = new BrowserWindow({
     ...(isMac ? { type: 'panel' } : {}),
     width: OVERLAY_WIDTH,
@@ -94,6 +95,7 @@ export async function createOverlayWindow(): Promise<BrowserWindow> {
       // Recording runs while the window is hidden.
       backgroundThrottling: false,
       spellcheck: false,
+      additionalArguments: [`--yap-locale=${locale}`],
     },
   });
 

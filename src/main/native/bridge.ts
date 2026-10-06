@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 
-import type { FocusInfo, HotkeyConfig } from '../../shared/types';
+import type { FocusInfo, HotkeyConfig, HotkeyErrorCode } from '../../shared/types';
 
 export interface NativePermissions {
   accessibility: boolean;
@@ -11,7 +11,8 @@ export interface NativePermissions {
 export interface ListenerStatus {
   active: boolean;
   mode: 'listen-only' | 'active' | null;
-  error: string | null;
+  /** Why it is not running, as a code the UI words in its language. */
+  error: HotkeyErrorCode | null;
 }
 
 export interface HotkeySignal {
@@ -83,7 +84,7 @@ export class NullBridge extends NativeBridge {
   }
 
   getListenerStatus(): ListenerStatus {
-    return { active: false, mode: null, error: 'No global hotkey support on this platform.' };
+    return { active: false, mode: null, error: 'unsupported' };
   }
 
   async getPermissions(): Promise<NativePermissions> {

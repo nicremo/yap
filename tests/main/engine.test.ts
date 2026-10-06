@@ -53,6 +53,7 @@ import { clipboard } from 'electron';
 
 import { DictationEngine } from '../../src/main/dictation/engine';
 import { createDefaultSettings } from '../../src/main/defaults';
+import { setLocale } from '../../src/main/i18n';
 import type { NativeBridge } from '../../src/main/native';
 
 const permissions: PermissionsState = {
@@ -406,6 +407,31 @@ describe('DictationEngine', () => {
     bridge.getFocus = () => new Promise(() => undefined);
     await hold(1_200);
     await waitFor(() => pasted.length === 1, 2_000);
+  });
+
+  it('marks where the text went, so the pill can word it', async () => {
+    await hold(1_200);
+    await waitFor(() => statuses.at(-1)?.phase === 'done');
+    expect(statuses.at(-1)).toMatchObject({ delivery: 'pasted' });
+  });
+
+  it('speaks German when the UI is German', async () => {
+    setLocale('de');
+    try {
+      engine.refreshStatus();
+      expect(statuses.at(-1)).toMatchObject({ phase: 'idle', title: 'Bereit', detail: 'Halte Fn gedrückt, um zu diktieren.' });
+
+      settings = { ...settings, hotkey: { keyCode: 61, modifiers: 0, label: 'Right Option (⌥)' } };
+      engine.handleHotkey({ type: 'down' });
+      await flush();
+      expect(statuses.at(-1)).toMatchObject({ title: 'Hört zu', detail: 'Lass Rechte Wahltaste (⌥) los, um zu beenden.' });
+      now += 1_200;
+      engine.handleHotkey({ type: 'up' });
+      await waitFor(() => statuses.at(-1)?.phase === 'done');
+      expect(statuses.at(-1)).toMatchObject({ title: 'Eingefügt', detail: expect.stringMatching(/^Fertig in \d+,\d\d\u00a0s\.$/) });
+    } finally {
+      setLocale('en');
+    }
   });
 
   it('reports a microphone failure and resets for the next press', async () => {

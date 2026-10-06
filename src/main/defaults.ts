@@ -32,6 +32,7 @@ export function createDefaultSettings(): AppSettings {
     showOverlay: true,
     launchAtLogin: false,
     theme: 'system',
+    uiLanguage: 'system',
     setupComplete: false,
     setupStep: 'welcome',
   };

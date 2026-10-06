@@ -1,10 +1,11 @@
 import { safeStorage } from 'electron';
 
 import type { AppSettings } from '../shared/types';
+import { t } from './i18n';
 
 export function encryptSecret(rawValue: string): string {
   if (!safeStorage.isEncryptionAvailable()) {
-    throw new Error('Secure storage is not available on this system, so the API key cannot be saved.');
+    throw new Error(t().secrets.cannotSave);
   }
 
   return safeStorage.encryptString(rawValue).toString('base64');
@@ -12,11 +13,11 @@ export function encryptSecret(rawValue: string): string {
 
 export function decryptSecret(encrypted: string): string {
   if (!encrypted) {
-    throw new Error('There is no stored API key.');
+    throw new Error(t().secrets.noKey);
   }
 
   if (!safeStorage.isEncryptionAvailable()) {
-    throw new Error('Secure storage is not available on this system, so the API key cannot be read.');
+    throw new Error(t().secrets.cannotRead);
   }
 
   return safeStorage.decryptString(Buffer.from(encrypted, 'base64'));

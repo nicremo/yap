@@ -14,9 +14,11 @@ import type {
   UpdateSettingsInput,
 } from '../shared/types';
 import { buildHotkeyLabel } from '../shared/hotkeys';
+import { UI_LANGUAGES } from '../shared/i18n';
 import { CLOUD_MODELS, LANGUAGES, LOCAL_MODELS, REWRITE_MODELS } from '../shared/models';
 import { SETUP_STEPS } from '../shared/setup';
 import { createDefaultSettings, SETTINGS_VERSION } from './defaults';
+import { t } from './i18n';
 import { encryptSecret } from './secrets';
 import { readJsonFile, writeJsonFile } from './json-file';
 
@@ -140,6 +142,7 @@ export function migrateSettings(raw: unknown, defaults: AppSettings): AppSetting
     showOverlay: bool(source.showOverlay, defaults.showOverlay),
     launchAtLogin: bool(source.launchAtLogin, defaults.launchAtLogin),
     theme: pick(source.theme, THEMES, defaults.theme),
+    uiLanguage: pick(source.uiLanguage, UI_LANGUAGES, defaults.uiLanguage),
     setupComplete: bool(source.setupComplete, defaults.setupComplete),
     setupStep: pick(source.setupStep, SETUP_STEPS, defaults.setupStep),
   };
@@ -179,7 +182,7 @@ export function withGroqKey(settings: AppSettings, rawKey: string): AppSettings 
 
 export async function chooseStorageDirectory(currentDirectory: string): Promise<string | null> {
   const result = await dialog.showOpenDialog({
-    title: 'Choose storage folder',
+    title: t().dialogs.chooseStorage,
     defaultPath: currentDirectory,
     properties: ['openDirectory', 'createDirectory'],
   });

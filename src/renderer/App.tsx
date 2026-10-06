@@ -4,6 +4,7 @@ import type { AppState } from '../shared/types';
 import { Icon, type IconName } from './components/Icon';
 import { LogoImage } from './components/Logo';
 import { ThemeToggle } from './components/ThemeToggle';
+import { useT } from './lib/i18n';
 import { findIssues } from './lib/issues';
 import { useAppState } from './lib/store';
 import { DictionaryPage } from './pages/DictionaryPage';
@@ -16,13 +17,13 @@ import { SetupWizard } from './setup/SetupWizard';
 
 export type Page = 'home' | 'history' | 'style' | 'engine' | 'dictionary' | 'settings';
 
-const NAVIGATION: ReadonlyArray<{ page: Page; label: string; icon: IconName }> = [
-  { page: 'home', label: 'Home', icon: 'home' },
-  { page: 'history', label: 'History', icon: 'clock' },
-  { page: 'style', label: 'Style', icon: 'sparkles' },
-  { page: 'engine', label: 'Engine', icon: 'cpu' },
-  { page: 'dictionary', label: 'Dictionary', icon: 'book' },
-  { page: 'settings', label: 'Settings', icon: 'sliders' },
+const NAVIGATION: ReadonlyArray<{ page: Page; icon: IconName }> = [
+  { page: 'home', icon: 'home' },
+  { page: 'history', icon: 'clock' },
+  { page: 'style', icon: 'sparkles' },
+  { page: 'engine', icon: 'cpu' },
+  { page: 'dictionary', icon: 'book' },
+  { page: 'settings', icon: 'sliders' },
 ];
 
 export function App() {
@@ -52,16 +53,17 @@ export function App() {
 }
 
 function EngineStatus({ state, onOpen }: { state: AppState; onOpen: () => void }) {
+  const t = useT();
   const cloud = state.settings.transcriptionMode === 'cloud';
   const ready = cloud ? state.engine.groqKeySet : state.engine.localModelReady;
-  const label = cloud ? 'Groq' : state.platform === 'darwin' ? 'On this Mac' : 'On this PC';
-  const detail = ready ? 'ready' : cloud ? 'needs a key' : 'needs a model';
+  const label = cloud ? 'Groq' : state.platform === 'darwin' ? t.common.onThisMac : t.common.onThisPC;
+  const detail = ready ? t.engineStatus.ready : cloud ? t.engineStatus.needsKey : t.engineStatus.needsModel;
 
   return (
     <button
       type="button"
       className={`engine-status${ready ? '' : ' engine-status-off'}`}
-      title={`Transcription: ${label}, ${detail}`}
+      title={t.engineStatus.title(label, detail)}
       onClick={onOpen}
     >
       <span className="status-dot" />
@@ -71,9 +73,10 @@ function EngineStatus({ state, onOpen }: { state: AppState; onOpen: () => void }
 }
 
 function MainView({ state, onState }: { state: AppState; onState: (next: AppState) => void }) {
+  const t = useT();
   const [page, setPage] = useState<Page>('home');
   const content = useRef<HTMLElement>(null);
-  const attention = findIssues(state).length > 0;
+  const attention = findIssues(state, t).length > 0;
 
   // Every page starts at its top, not where the previous one was scrolled to.
   useEffect(() => {
@@ -88,7 +91,7 @@ function MainView({ state, onState }: { state: AppState; onState: (next: AppStat
           <LogoImage className="brand-logo" />
           <span className="brand-name">Yap</span>
         </div>
-        <nav className="nav" aria-label="Sections">
+        <nav className="nav" aria-label={t.nav.sections}>
           {NAVIGATION.map((item) => (
             <button
               key={item.page}
@@ -98,8 +101,8 @@ function MainView({ state, onState }: { state: AppState; onState: (next: AppStat
               onClick={() => setPage(item.page)}
             >
               <Icon name={item.icon} size={16} />
-              {item.label}
-              {item.page === 'home' && attention && <span className="nav-dot" role="img" aria-label="Needs attention" />}
+              {t.nav[item.page]}
+              {item.page === 'home' && attention && <span className="nav-dot" role="img" aria-label={t.nav.needsAttention} />}
             </button>
           ))}
         </nav>

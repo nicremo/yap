@@ -25,7 +25,7 @@ vi.mock('../../src/main/native/binary', () => ({
   ensureHelperBinary: async () => 'C:\\yap\\yap-helper.exe',
 }));
 
-const { WindowsHelperBridge, translateHotkey } = await import('../../src/main/native/windows');
+const { WindowsHelperBridge, listenerErrorCode, translateHotkey } = await import('../../src/main/native/windows');
 
 describe('WindowsHelperBridge.paste', () => {
   let bridge: InstanceType<typeof WindowsHelperBridge>;
@@ -100,5 +100,23 @@ describe('translateHotkey', () => {
   it('maps macOS key codes and modifiers to the helper codes', () => {
     expect(translateHotkey({ keyCode: 61, modifiers: 0, label: 'Right Option' } as never)).toEqual({ keyCode: 4, modifiers: 0 });
     expect(translateHotkey({ keyCode: 49, modifiers: 0x100000 | 0x20000, label: 'Cmd+Shift+Space' } as never)).toEqual({ keyCode: 300, modifiers: 0x01 | 0x04 });
+  });
+});
+
+describe('listenerErrorCode', () => {
+  it('turns the helper messages into codes the UI can word', () => {
+    expect(listenerErrorCode('Fn key is not available on Windows. Please choose a different dictation key.')).toBe('fn-unsupported');
+    expect(listenerErrorCode('Unsupported key code for Windows.')).toBe('key-unsupported');
+    expect(listenerErrorCode('Could not create the global hotkey listener.')).toBe('listener-failed');
+    expect(listenerErrorCode(undefined)).toBe('listener-failed');
+  });
+});
+
+describe('toListenerStatus', () => {
+  it('takes the code from the macOS helper and keeps its English message out of the UI', async () => {
+    const { toListenerStatus } = await import('../../src/main/native/mac');
+    expect(toListenerStatus({ active: false, error: 'macOS refused…', errorCode: 'refused' })).toMatchObject({ error: 'refused' });
+    expect(toListenerStatus({ active: false, error: 'Something new' })).toMatchObject({ error: 'listener-failed' });
+    expect(toListenerStatus({ active: true, mode: 'listen-only' })).toEqual({ active: true, mode: 'listen-only', error: null });
   });
 });

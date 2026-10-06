@@ -2,9 +2,12 @@ import { randomUUID } from 'node:crypto';
 
 import { clipboard, type WebContents } from 'electron';
 
+import { hotkeyLabel } from '../../shared/hotkeys';
+import { formatSeconds } from '../../shared/i18n';
 import type {
   AppSettings,
   AppStatus,
+  DeliveryOutcome,
   DictationMetrics,
   FocusInfo,
   HistoryEntry,
@@ -18,6 +21,7 @@ import { deleteAudioRecording, readAudioRecording, writeAudioRecording } from '.
 import { applyCorrections, loadCorrections, loadDictionary } from '../dictionary';
 import { prewarmGroq } from '../groq';
 import { addHistoryEntry, loadHistory, removeHistoryEntry, updateHistoryEntry } from '../history';
+import { currentLocale, t } from '../i18n';
 import type { HotkeySignal, NativeBridge } from '../native';
 import { isGroqKeySet } from '../secrets';
 import { GestureMachine, type GestureAction } from './gesture';
@@ -66,7 +70,8 @@ interface PendingAudio {
 interface Job {
   phase: 'transcribing' | 'rewriting' | 'pasting';
   preview?: string;
-  label?: string;
+  /** Started from History, not by the hotkey. */
+  retranscribing?: boolean;
 }
 
 interface DeliverySlot {
@@ -74,11 +79,7 @@ interface DeliverySlot {
   release: () => void;
 }
 
-type Delivery = 'pasted' | 'copied' | 'saved' | 'paste-failed' | 'needs-accessibility' | 'no-target';
-
-function formatSeconds(ms: number): string {
-  return `${(ms / 1000).toFixed(ms < 10_000 ? 2 : 1)} s`;
-}
+type Delivery = DeliveryOutcome;
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -138,7 +139,7 @@ export class DictationEngine {
       this.session = null;
       clearTimeout(session.maxTimer);
       this.gesture.reset();
-      this.showResult({ phase: 'error', title: 'Microphone error', detail: event.message });
+      this.showResult({ phase: 'error', title: t().status.microphoneError, detail: event.message });
     }
   }
 
@@ -180,19 +181,20 @@ export class DictationEngine {
   private findBlocker(): { title: string; detail: string; openApp: boolean } | null {
     const settings = this.host.getSettings();
     const { microphone } = this.host.getPermissions();
+    const { status } = t();
 
     if (microphone === 'denied' || microphone === 'restricted') {
-      return { title: 'Microphone blocked', detail: 'Allow microphone access for Yap in System Settings.', openApp: true };
+      return { title: status.microphoneBlocked, detail: status.microphoneBlockedDetail, openApp: true };
     }
     if (microphone === 'not-determined') {
       this.host.requestMicrophone();
-      return { title: 'Microphone access needed', detail: 'Allow access in the system prompt, then try again.', openApp: false };
+      return { title: status.microphoneNeeded, detail: status.microphoneNeededDetail, openApp: false };
     }
     if (settings.transcriptionMode === 'cloud' && !isGroqKeySet(settings)) {
-      return { title: 'Groq key missing', detail: 'Add your Groq API key in Engine settings.', openApp: true };
+      return { title: status.groqKeyMissing, detail: status.groqKeyMissingDetail, openApp: true };
     }
     if (settings.transcriptionMode === 'local' && !this.host.isLocalModelReady()) {
-      return { title: 'Local model missing', detail: 'Download the local model in Engine settings.', openApp: true };
+      return { title: status.localModelMissing, detail: status.localModelMissingDetail, openApp: true };
     }
     return null;
   }
@@ -226,7 +228,7 @@ export class DictationEngine {
     const recorder = await this.host.getRecorder();
     if (this.session !== session) return;
     if (!recorder) {
-      this.handleRecorderEvent({ type: 'failed', sessionId: id, message: 'The recorder window is not available. Restart Yap.' });
+      this.handleRecorderEvent({ type: 'failed', sessionId: id, message: t().status.recorderUnavailable });
       return;
     }
     recorder.send('recorder:command', { type: 'start', sessionId: id, encodeOpus: settings.transcriptionMode === 'cloud' });
@@ -253,7 +255,7 @@ export class DictationEngine {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pendingAudio.delete(sessionId);
-        reject(new Error('The recording could not be finished. Try again.'));
+        reject(new Error(t().status.recordingUnfinished));
       }, AUDIO_TIMEOUT_MS);
       this.pendingAudio.set(sessionId, { resolve, reject, timer });
     });
@@ -304,16 +306,16 @@ export class DictationEngine {
 
     try {
       const recorder = await this.host.getRecorder();
-      if (!recorder) throw new Error('The recorder window is not available. Restart Yap.');
+      if (!recorder) throw new Error(t().status.recorderUnavailable);
       recorder.send('recorder:command', { type: 'stop', sessionId: session.id });
       const audio = await audioPromise;
       await this.process(job, audio, releasedAt, slot, focus);
     } catch (error) {
       if (error instanceof NothingHeardError) {
-        this.showResult({ phase: 'error', title: 'Nothing heard', detail: error.message });
+        this.showResult({ phase: 'error', title: t().status.nothingHeard, detail: error.message });
       } else {
         console.warn('[yap] dictation failed:', errorMessage(error));
-        this.showResult({ phase: 'error', title: 'Dictation failed', detail: errorMessage(error) });
+        this.showResult({ phase: 'error', title: t().status.dictationFailed, detail: errorMessage(error) });
       }
     } finally {
       slot.release();
@@ -437,25 +439,22 @@ export class DictationEngine {
   }
 
   private describeDelivery(delivery: Delivery, text: string, metrics: DictationMetrics, notice?: string): AppStatus {
-    const timing = `Done in ${formatSeconds(metrics.totalMs)}.`;
-    const base = { phase: 'done' as const, preview: text, metrics };
+    const { status } = t();
+    const timing = status.doneIn(formatSeconds(metrics.totalMs, currentLocale()));
+    const base = { phase: 'done' as const, preview: text, metrics, delivery };
     switch (delivery) {
       case 'pasted':
-        return { ...base, title: 'Pasted', detail: notice ?? timing };
+        return { ...base, title: status.pasted, detail: notice ?? timing };
       case 'copied':
-        return { ...base, title: 'Copied', detail: notice ?? `${timing} The text is on your clipboard.` };
+        return { ...base, title: status.copied, detail: notice ?? `${timing} ${status.onClipboard}` };
       case 'saved':
-        return { ...base, title: 'Saved', detail: notice ?? `${timing} The text is in your history.` };
+        return { ...base, title: status.saved, detail: notice ?? `${timing} ${status.inHistory}` };
       case 'needs-accessibility':
-        return {
-          ...base,
-          title: 'Copied instead',
-          detail: 'Turn on Accessibility for Yap to paste automatically. The text is on your clipboard.',
-        };
+        return { ...base, title: status.copiedInstead, detail: status.needsAccessibility };
       case 'paste-failed':
-        return { ...base, title: 'Copied instead', detail: 'Pasting failed, the text is on your clipboard.' };
+        return { ...base, title: status.copiedInstead, detail: status.pasteFailed };
       case 'no-target':
-        return { ...base, title: 'Copied', detail: 'No text field was focused, so the text is on your clipboard.' };
+        return { ...base, title: status.copied, detail: status.noTarget };
     }
   }
 
@@ -498,19 +497,21 @@ export class DictationEngine {
   async pasteAgain(text: string): Promise<void> {
     const settings = this.host.getSettings();
     const delivery = await this.deliver(text, { ...settings, autoPaste: true });
+    const { status } = t();
     const titles: Record<Delivery, string> = {
-      pasted: 'Pasted',
-      copied: 'Copied',
-      saved: 'Saved',
-      'needs-accessibility': 'Copied instead',
-      'paste-failed': 'Copied instead',
-      'no-target': 'Copied',
+      pasted: status.pasted,
+      copied: status.copied,
+      saved: status.saved,
+      'needs-accessibility': status.copiedInstead,
+      'paste-failed': status.copiedInstead,
+      'no-target': status.copied,
     };
     this.showResult({
       phase: 'done',
       title: titles[delivery],
-      detail: delivery === 'pasted' ? 'Pasted again.' : 'The text is on your clipboard.',
+      detail: delivery === 'pasted' ? status.pastedAgain : status.onClipboard,
       preview: text,
+      delivery,
     });
   }
 
@@ -569,13 +570,13 @@ export class DictationEngine {
   async retranscribe(id: string, mode: RetranscribeMode): Promise<HistoryEntry[]> {
     const settings = this.host.getSettings();
     const entry = (await loadHistory()).find((candidate) => candidate.id === id);
-    if (!entry) throw new Error('This history entry no longer exists.');
-    if (!entry.audioFilename) throw new Error('The audio of this dictation has expired.');
+    if (!entry) throw new Error(t().status.entryGone);
+    if (!entry.audioFilename) throw new Error(t().status.audioExpired);
 
     const wav = await readAudioRecording(settings, entry.audioFilename).catch(() => null);
-    if (!wav) throw new Error('The audio file is missing on disk.');
+    if (!wav) throw new Error(t().status.audioMissing);
 
-    const job: Job = { phase: 'transcribing', label: 'Retranscribing' };
+    const job: Job = { phase: 'transcribing', retranscribing: true };
     this.jobs.push(job);
     this.publishStatus();
 
@@ -584,8 +585,9 @@ export class DictationEngine {
       const outcome = await transcribe(settings, { wav: new Uint8Array(wav), opus: null }, dictionary, corrections);
       const rawText = outcome.text.trim();
       if (!rawText) {
-        await this.updateEntry(id, { status: 'transcription-failed', errorMessage: 'No speech was detected in the recording.' });
-        this.showResult({ phase: 'error', title: 'Nothing heard', detail: 'No speech was detected in the recording.' });
+        const { status } = t();
+        await this.updateEntry(id, { status: 'transcription-failed', errorMessage: status.noSpeech });
+        this.showResult({ phase: 'error', title: status.nothingHeard, detail: status.noSpeech });
         return loadHistory();
       }
 
@@ -615,11 +617,16 @@ export class DictationEngine {
         status: 'success',
         errorMessage: notice,
       });
-      this.showResult({ phase: 'done', title: 'Retranscribed', detail: notice ?? 'Copy the new text from History.', preview: finalText });
+      this.showResult({
+        phase: 'done',
+        title: t().status.retranscribed,
+        detail: notice ?? t().status.retranscribedDetail,
+        preview: finalText,
+      });
       return loadHistory();
     } catch (error) {
       await this.updateEntry(id, { status: 'transcription-failed', errorMessage: errorMessage(error) });
-      this.showResult({ phase: 'error', title: 'Retranscription failed', detail: errorMessage(error) });
+      this.showResult({ phase: 'error', title: t().status.retranscriptionFailed, detail: errorMessage(error) });
       throw error;
     } finally {
       this.jobs.splice(this.jobs.indexOf(job), 1);
@@ -629,19 +636,16 @@ export class DictationEngine {
 
   /* ── Status ────────────────────────────────────────────────────────── */
 
-  private hotkeyLabel(): string {
-    return this.host.getSettings().hotkey.label;
-  }
-
   private publishStatus(): void {
-    const label = this.hotkeyLabel();
+    const { status, keys } = t();
+    const label = hotkeyLabel(this.host.getSettings().hotkey, keys);
 
     if (this.session) {
       const handsfree = this.session.handsfree;
       this.host.setStatus({
         phase: 'listening',
-        title: handsfree ? 'Hands-free' : 'Listening',
-        detail: handsfree ? `Press ${label} to finish.` : `Release ${label} to finish.`,
+        title: handsfree ? status.handsfree : status.listening,
+        detail: handsfree ? status.pressToFinish(label) : status.releaseToFinish(label),
         handsfree,
       });
       return;
@@ -649,22 +653,16 @@ export class DictationEngine {
 
     const job = this.jobs[0];
     if (job) {
-      const titles = { transcribing: 'Transcribing', rewriting: 'Polishing', pasting: 'Pasting' } as const;
-      const details = {
-        transcribing: 'Turning your voice into text.',
-        rewriting: 'Cleaning up the text.',
-        pasting: 'Sending the text to your app.',
-      } as const;
       this.host.setStatus({
         phase: job.phase,
-        title: job.label ?? titles[job.phase],
-        detail: details[job.phase],
+        title: job.retranscribing ? status.retranscribing : status.phases[job.phase],
+        detail: status.phaseDetails[job.phase],
         preview: job.preview,
       });
       return;
     }
 
-    this.host.setStatus(this.lastResult ?? { phase: 'idle', title: 'Ready', detail: `Hold ${label} to dictate.` });
+    this.host.setStatus(this.lastResult ?? { phase: 'idle', title: status.ready, detail: status.holdToDictate(label) });
   }
 
   private showResult(status: AppStatus): void {

@@ -1,4 +1,7 @@
+import { hotkeyLabel } from '../../shared/hotkeys';
+import type { Messages } from '../../shared/i18n';
 import type { AppState, PermissionKind } from '../../shared/types';
+import { useT } from '../lib/i18n';
 import { useAction } from '../lib/store';
 import { Icon, type IconName } from './Icon';
 import { Button, Chip, Notice } from './ui';
@@ -13,14 +16,14 @@ interface Row {
   blocked?: boolean;
 }
 
-function buildRows(state: AppState): Row[] {
+function buildRows(state: AppState, t: Messages): Row[] {
   const { permissions } = state;
   const rows: Row[] = [
     {
       kind: 'microphone',
       icon: 'mic',
-      title: 'Microphone',
-      description: 'Records your voice while the shortcut is held.',
+      title: t.permissions.microphone,
+      description: t.permissions.microphoneHint,
       granted: permissions.microphone === 'granted' || permissions.microphone === 'unknown',
       blocked: permissions.microphone === 'denied' || permissions.microphone === 'restricted',
     },
@@ -30,8 +33,8 @@ function buildRows(state: AppState): Row[] {
     rows.push({
       kind: 'accessibility',
       icon: 'shield',
-      title: 'Accessibility',
-      description: 'Pastes the text into the app you are typing in and watches the shortcut.',
+      title: t.permissions.accessibility,
+      description: t.permissions.accessibilityHint,
       granted: permissions.accessibility,
     });
 
@@ -41,10 +44,8 @@ function buildRows(state: AppState): Row[] {
       rows.push({
         kind: 'inputMonitoring',
         icon: 'keyboard',
-        title: 'Input Monitoring',
-        description: permissions.hotkeyActive
-          ? 'Optional. Lets Yap watch the shortcut passively.'
-          : 'Needed when the shortcut does not react.',
+        title: t.permissions.inputMonitoring,
+        description: permissions.hotkeyActive ? t.permissions.inputMonitoringOptional : t.permissions.inputMonitoringNeeded,
         granted: false,
         optional: permissions.hotkeyActive,
       });
@@ -52,8 +53,8 @@ function buildRows(state: AppState): Row[] {
       rows.push({
         kind: 'inputMonitoring',
         icon: 'keyboard',
-        title: 'Input Monitoring',
-        description: 'Lets Yap watch the shortcut passively.',
+        title: t.permissions.inputMonitoring,
+        description: t.permissions.inputMonitoringGranted,
         granted: true,
       });
     }
@@ -63,8 +64,9 @@ function buildRows(state: AppState): Row[] {
 }
 
 export function PermissionList({ state, onState }: { state: AppState; onState: (next: AppState) => void }) {
+  const t = useT();
   const { busy, error, run } = useAction();
-  const rows = buildRows(state);
+  const rows = buildRows(state, t);
   const { permissions } = state;
   const missingRequired = rows.some((row) => !row.granted && !row.optional);
   const canRepair = state.platform === 'darwin' && state.isPackaged;
@@ -86,14 +88,16 @@ export function PermissionList({ state, onState }: { state: AppState; onState: (
             <span>{row.description}</span>
           </div>
           {row.granted ? (
-            <Chip tone="success" icon="check">Allowed</Chip>
+            <Chip tone="success" icon="check">
+              {t.common.allowed}
+            </Chip>
           ) : row.optional ? (
             <Button size="sm" variant="ghost" busy={busy === row.kind} onClick={() => void request(row.kind)}>
-              Allow
+              {t.common.allow}
             </Button>
           ) : (
             <Button size="sm" variant="primary" busy={busy === row.kind} onClick={() => void request(row.kind)}>
-              {row.blocked ? 'Open Settings' : 'Allow'}
+              {row.blocked ? t.common.openSettings : t.common.allow}
             </Button>
           )}
         </div>
@@ -105,14 +109,22 @@ export function PermissionList({ state, onState }: { state: AppState; onState: (
             <Icon name="zap" size={18} />
           </span>
           <div className="permission-text">
-            <strong>Shortcut listener</strong>
+            <strong>{t.permissions.listener}</strong>
             <span>
               {permissions.hotkeyActive
-                ? `Reacting to ${state.settings.hotkey.label}.`
-                : permissions.hotkeyError ?? 'Waiting for permissions.'}
+                ? t.permissions.listenerReacting(hotkeyLabel(state.settings.hotkey, t.keys))
+                : permissions.hotkeyError
+                  ? t.hotkey.errors[permissions.hotkeyError]
+                  : t.permissions.listenerWaiting}
             </span>
           </div>
-          {permissions.hotkeyActive ? <Chip tone="success" icon="check">Active</Chip> : <Chip tone="warning">Inactive</Chip>}
+          {permissions.hotkeyActive ? (
+            <Chip tone="success" icon="check">
+              {t.common.active}
+            </Chip>
+          ) : (
+            <Chip tone="warning">{t.common.inactive}</Chip>
+          )}
         </div>
       )}
 
@@ -120,17 +132,18 @@ export function PermissionList({ state, onState }: { state: AppState; onState: (
 
       {permissions.nativePermissionsRequired && missingRequired && (
         <p className="permission-hint">
-          macOS opens System Settings. Switch Yap on in the list, the status here updates by itself.
+          {t.permissions.hint}
           {canRepair && (
             <>
-              {' '}Switched on already and still missing? An update can leave an outdated entry behind.{' '}
+              {' '}
+              {t.permissions.repairHint}{' '}
               <button
                 type="button"
                 className="inline-link"
                 disabled={busy === 'repair'}
                 onClick={() => void run('repair', async () => onState(await window.yap.repairPermissions()))}
               >
-                {busy === 'repair' ? 'Repairing…' : 'Repair permissions'}
+                {busy === 'repair' ? t.permissions.repairing : t.permissions.repair}
               </button>
             </>
           )}

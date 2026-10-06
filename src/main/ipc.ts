@@ -18,6 +18,7 @@ import { addAppRule, removeAppRule, updateAppRule } from './app-rules';
 import { addCorrection, addDictionaryEntry, removeCorrection, removeDictionaryEntry } from './dictionary';
 import type { DictationEngine } from './dictation/engine';
 import { clearHistory, loadHistory, removeHistoryEntry } from './history';
+import { t } from './i18n';
 import { deleteAudioRecording, resolveAudioPath } from './audio-store';
 
 export interface IpcController {
@@ -159,7 +160,7 @@ export function registerIpcHandlers(controller: IpcController): void {
   handle('history:revealAudio', async (_event, id: unknown) => {
     const entryId = requireString(id, 'the entry');
     const target = (await loadHistory()).find((entry) => entry.id === entryId);
-    if (!target?.audioFilename) throw new Error('This dictation has no audio file anymore.');
+    if (!target?.audioFilename) throw new Error(t().status.noAudioFile);
     shell.showItemInFolder(resolveAudioPath(controller.getSettings(), target.audioFilename));
   });
   handle('history:paste', async (_event, id: unknown, version: unknown) => {

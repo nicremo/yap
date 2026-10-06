@@ -7,6 +7,7 @@ import type {
 } from '../../shared/types';
 import { buildDictionaryContext, buildWhisperPrompt } from '../dictionary';
 import { GroqError, transcribeWithGroq } from '../groq';
+import { t } from '../i18n';
 import { transcribeLocally } from '../local-whisper';
 import { rewriteText } from '../rewrite';
 import { getGroqApiKey } from '../secrets';
@@ -14,7 +15,7 @@ import { getStoragePaths } from '../storage';
 
 export class NothingHeardError extends Error {
   constructor() {
-    super('Nothing was heard. Hold the key a little longer while you speak.');
+    super(t().status.nothingHeardDetail);
     this.name = 'NothingHeardError';
   }
 }
@@ -92,7 +93,7 @@ export async function transcribe(
 
   const apiKey = getGroqApiKey(settings);
   if (!apiKey) {
-    throw new Error('No Groq API key is set. Add one in Engine settings.');
+    throw new Error(t().status.noGroqKey);
   }
 
   const prompt = buildWhisperPrompt(dictionary, corrections) || undefined;

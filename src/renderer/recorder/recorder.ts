@@ -1,3 +1,4 @@
+import { en, type Messages } from '../../shared/i18n/en';
 import { encodeWav, mergeChunks, peakWindowRms, resample, TARGET_SAMPLE_RATE } from './wav';
 
 /* Runs on the audio thread. Collects samples into small blocks and hands
@@ -113,18 +114,27 @@ async function openMicrophone(deviceId: string | null): Promise<MediaStream> {
   }
 }
 
-export function describeMicrophoneError(error: unknown): string {
+/** The recording ended before the microphone ever opened. */
+export class MicrophoneNotStartedError extends Error {
+  constructor() {
+    super(en.microphone.notStarted);
+    this.name = 'MicrophoneNotStartedError';
+  }
+}
+
+export function describeMicrophoneError(error: unknown, texts: Messages['microphone'] = en.microphone): string {
+  if (error instanceof MicrophoneNotStartedError) return texts.notStarted;
   const name = error instanceof DOMException ? error.name : '';
   switch (name) {
     case 'NotAllowedError':
     case 'SecurityError':
-      return 'Microphone access is blocked. Allow Yap under System Settings, Privacy & Security, Microphone.';
+      return texts.blocked;
     case 'NotFoundError':
-      return 'No microphone was found.';
+      return texts.notFound;
     case 'NotReadableError':
-      return 'The microphone is in use by another app or unavailable.';
+      return texts.busy;
     default:
-      return error instanceof Error ? error.message : 'The microphone could not start.';
+      return error instanceof Error ? error.message : texts.failed;
   }
 }
 
@@ -312,7 +322,7 @@ export class AudioRecorder {
 
     if (!this.context) {
       await this.release();
-      throw new Error('The microphone did not start.');
+      throw new MicrophoneNotStartedError();
     }
 
     await sleep(TAIL_MS);

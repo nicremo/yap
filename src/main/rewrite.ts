@@ -2,6 +2,7 @@ import type { CustomPlusVoice, EnhancementLevel, StyleMode } from '../shared/typ
 import { DEFAULT_REWRITE_MODEL, findRewriteModel } from '../shared/models';
 import { chatWithGroq, isModelUnavailableError, type ChatResult } from './groq';
 import { markRewriteModelUnavailable, resolveRewriteModel } from './groq-models';
+import { t } from './i18n';
 import { getEnhancementPrompt, getRewriteUserMessage } from './prompts';
 
 function stripReasoningArtifacts(text: string): string {
@@ -110,7 +111,7 @@ export async function rewriteText(input: RewriteInput): Promise<RewriteOutput> {
       if (markRewriteModelUnavailable(model)) {
         const gone = findRewriteModel(model)?.label ?? model;
         const fallback = findRewriteModel(DEFAULT_REWRITE_MODEL)?.label ?? DEFAULT_REWRITE_MODEL;
-        notice = `${gone} is not available right now, ${fallback} polished this dictation.`;
+        notice = t().rewrite.modelFallback(gone, fallback);
       }
       model = DEFAULT_REWRITE_MODEL;
       result = await request(model);
@@ -121,7 +122,7 @@ export async function rewriteText(input: RewriteInput): Promise<RewriteOutput> {
         text: input.text,
         usedFallback: true,
         model,
-        notice: 'The polished text was cut off, so the raw transcript was used.',
+        notice: t().rewrite.cutOff,
       };
     }
 
@@ -136,7 +137,7 @@ export async function rewriteText(input: RewriteInput): Promise<RewriteOutput> {
       text: input.text,
       usedFallback: true,
       model,
-      notice: `Polishing failed, the raw transcript was used. ${reason}`,
+      notice: t().rewrite.failed(reason),
     };
   }
 }

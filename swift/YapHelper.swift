@@ -235,6 +235,8 @@ private var tapRunLoop: CFRunLoop?
 private var tapMode: String?
 private var listenerWanted = false
 private var listenerError: String?
+/// The same failure as a stable code, which Yap words in the user's language.
+private var listenerErrorCode: String?
 
 /// Sent straight from the tap thread. The focus is asked separately when the
 /// dictation ends, so nothing here can slow down keyboard input.
@@ -397,6 +399,7 @@ func listenerStatus() -> [String: Any] {
         "active": tapPort != nil,
         "mode": orNull(tapMode),
         "error": orNull(tapPort == nil ? listenerError : nil),
+        "errorCode": orNull(tapPort == nil ? listenerErrorCode : nil),
     ]
 }
 
@@ -412,12 +415,15 @@ func startListening() {
         tapMode = "active"
     } else if !AXIsProcessTrusted() && !inputMonitoringGranted() {
         listenerError = "Yap needs Accessibility access to see the dictation key."
+        listenerErrorCode = "needs-access"
     } else {
         listenerError = "macOS refused the keyboard listener. Remove Yap from Accessibility and Input Monitoring in System Settings, then grant access again."
+        listenerErrorCode = "refused"
     }
 
     if tapPort != nil {
         listenerError = nil
+        listenerErrorCode = nil
         resyncHotkey()
     }
     var message: [String: Any] = ["event": "listener"]

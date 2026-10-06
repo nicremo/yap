@@ -1,3 +1,4 @@
+import type { UiLanguage } from './i18n';
 import type { SetupStep } from './setup';
 
 export type EnhancementLevel = 'none' | 'soft' | 'medium' | 'high';
@@ -65,6 +66,8 @@ export interface AppSettings {
   showOverlay: boolean;
   launchAtLogin: boolean;
   theme: ThemePreference;
+  /** The language of Yap itself, not the one dictated in. */
+  uiLanguage: UiLanguage;
   setupComplete: boolean;
   /** Where the setup wizard resumes, e.g. after macOS restarted Yap for a permission. */
   setupStep: SetupStep;
@@ -72,6 +75,19 @@ export interface AppSettings {
 
 /** Settings as the renderer sees them: the encrypted key never leaves main. */
 export type PublicSettings = Omit<AppSettings, 'groqApiKeyEncrypted'>;
+
+/** Why the shortcut listener is not running. The UI words it in the current language. */
+export type HotkeyErrorCode =
+  | 'needs-access'
+  | 'refused'
+  | 'helper-missing'
+  | 'helper-crashing'
+  | 'reconnecting'
+  | 'fn-unsupported'
+  | 'key-unsupported'
+  | 'listener-failed'
+  | 'stopped'
+  | 'unsupported';
 
 export type MicrophoneStatus = 'granted' | 'denied' | 'restricted' | 'not-determined' | 'unknown';
 
@@ -81,7 +97,7 @@ export interface PermissionsState {
   inputMonitoring: boolean;
   /** The global hotkey listener is running. This is the ground truth for hotkey capability. */
   hotkeyActive: boolean;
-  hotkeyError: string | null;
+  hotkeyError: HotkeyErrorCode | null;
   /** macOS needs Accessibility and Input Monitoring, Windows does not. */
   nativePermissionsRequired: boolean;
 }
@@ -110,6 +126,9 @@ export interface DictationMetrics {
   uploadBytes: number | null;
 }
 
+/** Where a finished dictation went. */
+export type DeliveryOutcome = 'pasted' | 'copied' | 'saved' | 'paste-failed' | 'needs-accessibility' | 'no-target';
+
 export interface AppStatus {
   phase: DictationPhase;
   title: string;
@@ -117,6 +136,8 @@ export interface AppStatus {
   preview?: string;
   handsfree?: boolean;
   metrics?: DictationMetrics;
+  /** Set on a finished dictation, so the pill can word it without parsing the title. */
+  delivery?: DeliveryOutcome;
 }
 
 export interface LocalModelDownload {

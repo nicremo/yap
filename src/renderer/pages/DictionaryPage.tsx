@@ -2,9 +2,11 @@ import { useState } from 'react';
 
 import type { AppState } from '../../shared/types';
 import { Button, Card, Chip, Notice, Segmented } from '../components/ui';
+import { useT } from '../lib/i18n';
 import { useAction } from '../lib/store';
 
 export function DictionaryPage({ state }: { state: AppState }) {
+  const t = useT();
   const [mode, setMode] = useState<'word' | 'correction'>('word');
   const [word, setWord] = useState('');
   const [from, setFrom] = useState('');
@@ -29,20 +31,20 @@ export function DictionaryPage({ state }: { state: AppState }) {
   return (
     <>
       <header className="page-header">
-        <h1>Dictionary</h1>
-        <p>Teach Yap your vocabulary. Names and terms get spelled right, recurring mistakes get fixed.</p>
+        <h1>{t.dictionary.title}</h1>
+        <p>{t.dictionary.lead}</p>
       </header>
       {error && <Notice tone="danger">{error}</Notice>}
 
       <Card
-        title="Add an entry"
+        title={t.dictionary.addEntry}
         action={
           <Segmented<'word' | 'correction'>
-            label="Entry type"
+            label={t.dictionary.entryType}
             value={mode}
             options={[
-              { value: 'word', label: 'Word' },
-              { value: 'correction', label: 'Correction' },
+              { value: 'word', label: t.dictionary.word },
+              { value: 'correction', label: t.dictionary.correction },
             ]}
             onChange={setMode}
           />
@@ -56,9 +58,9 @@ export function DictionaryPage({ state }: { state: AppState }) {
               void addWord();
             }}
           >
-            <input className="input" placeholder="Kubernetes, Supabase, DHBW…" value={word} onChange={(event) => setWord(event.target.value)} />
+            <input className="input" placeholder={t.dictionary.wordPlaceholder} value={word} onChange={(event) => setWord(event.target.value)} />
             <Button type="submit" variant="primary" busy={busy === 'add'} disabled={!word.trim()}>
-              Add
+              {t.common.add}
             </Button>
           </form>
         ) : (
@@ -69,18 +71,16 @@ export function DictionaryPage({ state }: { state: AppState }) {
               void addCorrection();
             }}
           >
-            <input className="input" placeholder="Whisper hears…" value={from} onChange={(event) => setFrom(event.target.value)} />
+            <input className="input" placeholder={t.dictionary.fromPlaceholder} value={from} onChange={(event) => setFrom(event.target.value)} />
             <span className="arrow">→</span>
-            <input className="input" placeholder="Should be…" value={to} onChange={(event) => setTo(event.target.value)} />
+            <input className="input" placeholder={t.dictionary.toPlaceholder} value={to} onChange={(event) => setTo(event.target.value)} />
             <Button type="submit" variant="primary" busy={busy === 'add'} disabled={!from.trim() || !to.trim()}>
-              Add
+              {t.common.add}
             </Button>
           </form>
         )}
         <p className="field-hint">
-          {mode === 'word'
-            ? 'Words are passed to Whisper as spelling hints and to the polishing step.'
-            : 'Corrections are applied to every transcript, with or without polishing.'}
+          {mode === 'word' ? t.dictionary.wordHint : t.dictionary.correctionHint}
         </p>
       </Card>
 
@@ -88,12 +88,12 @@ export function DictionaryPage({ state }: { state: AppState }) {
         <Card
           title={
             <>
-              Words <Chip>{state.dictionary.length}</Chip>
+              {t.dictionary.words} <Chip>{state.dictionary.length}</Chip>
             </>
           }
         >
           {state.dictionary.length === 0 ? (
-            <p className="empty">No words yet.</p>
+            <p className="empty">{t.dictionary.noWords}</p>
           ) : (
             <ul className="entry-list">
               {state.dictionary.map((entry) => (
@@ -102,7 +102,7 @@ export function DictionaryPage({ state }: { state: AppState }) {
                   <button
                     type="button"
                     className="icon-button"
-                    aria-label={`Remove ${entry.word}`}
+                    aria-label={t.dictionary.removeEntry(entry.word)}
                     onClick={() => void run('remove', () => window.yap.removeDictionaryWord(entry.word))}
                   >
                     ×
@@ -116,12 +116,12 @@ export function DictionaryPage({ state }: { state: AppState }) {
         <Card
           title={
             <>
-              Corrections <Chip>{state.corrections.length}</Chip>
+              {t.dictionary.corrections} <Chip>{state.corrections.length}</Chip>
             </>
           }
         >
           {state.corrections.length === 0 ? (
-            <p className="empty">No corrections yet.</p>
+            <p className="empty">{t.dictionary.noCorrections}</p>
           ) : (
             <ul className="entry-list">
               {state.corrections.map((entry) => (
@@ -132,7 +132,7 @@ export function DictionaryPage({ state }: { state: AppState }) {
                   <button
                     type="button"
                     className="icon-button"
-                    aria-label={`Remove ${entry.from}`}
+                    aria-label={t.dictionary.removeEntry(entry.from)}
                     onClick={() => void run('remove', () => window.yap.removeCorrection(entry.from))}
                   >
                     ×

@@ -1,7 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import readline from 'node:readline';
 
-import type { FocusInfo, HotkeyConfig } from '../../shared/types';
+import type { FocusInfo, HotkeyConfig, HotkeyErrorCode } from '../../shared/types';
 import {
   NativeBridge,
   type ListenerStatus,
@@ -29,11 +29,21 @@ function toPermissions(value: Record<string, unknown>): NativePermissions {
   };
 }
 
-function toListenerStatus(value: Record<string, unknown>): ListenerStatus {
+const HELPER_ERROR_CODES: readonly HotkeyErrorCode[] = ['needs-access', 'refused'];
+
+export function toListenerStatus(value: Record<string, unknown>): ListenerStatus {
+  let error: HotkeyErrorCode | null = null;
+  if (HELPER_ERROR_CODES.includes(value.errorCode as HotkeyErrorCode)) {
+    error = value.errorCode as HotkeyErrorCode;
+  } else if (typeof value.error === 'string') {
+    // The helper's English message is for the log, the code for the UI.
+    console.warn('[yap] listener error:', value.error);
+    error = 'listener-failed';
+  }
   return {
     active: value.active === true,
     mode: value.mode === 'listen-only' || value.mode === 'active' ? value.mode : null,
-    error: typeof value.error === 'string' ? value.error : null,
+    error,
   };
 }
 
@@ -83,7 +93,7 @@ export class MacHelperBridge extends NativeBridge {
 
     const binary = await ensureHelperBinary();
     if (!binary) {
-      this.setListener({ active: false, mode: null, error: 'The native helper is missing. Reinstall Yap.' });
+      this.setListener({ active: false, mode: null, error: 'helper-missing' });
       return false;
     }
 
@@ -179,16 +189,12 @@ export class MacHelperBridge extends NativeBridge {
     const now = Date.now();
     this.restarts = this.restarts.filter((time) => now - time < 60_000);
     if (this.restarts.length >= MAX_RESTARTS_PER_MINUTE) {
-      this.setListener({
-        active: false,
-        mode: null,
-        error: 'The native helper keeps stopping. Quit and reopen Yap.',
-      });
+      this.setListener({ active: false, mode: null, error: 'helper-crashing' });
       return;
     }
 
     this.restarts.push(now);
-    this.setListener({ active: false, mode: null, error: 'Reconnecting the keyboard listener…' });
+    this.setListener({ active: false, mode: null, error: 'reconnecting' });
     this.restartTimer = setTimeout(() => {
       this.restartTimer = null;
       void this.start();

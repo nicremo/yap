@@ -7,6 +7,8 @@ import log from 'electron-log/main.js';
 import electronUpdater from 'electron-updater';
 import type { ProgressInfo, UpdateInfo } from 'electron-updater';
 
+import { t } from './i18n';
+
 const { autoUpdater } = electronUpdater;
 
 const FIRST_CHECK_DELAY_MS = 3_000;
@@ -148,8 +150,8 @@ function notifyUpdateReady(version: string): void {
   }
 
   const notification = new Notification({
-    title: 'Yap update ready',
-    body: `Version ${version} will be installed the next time you quit Yap.`,
+    title: t().updater.ready,
+    body: t().updater.readyBody(version),
     silent: false,
   });
 

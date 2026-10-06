@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 
+import { formatSeconds } from '../../shared/i18n';
 import type { AppState } from '../../shared/types';
-import { formatSeconds } from '../lib/store';
+import { rich, useI18n } from '../lib/i18n';
 import { HotkeyCap } from './HotkeyCap';
 
 /** A text box to dictate into, with the live status underneath. */
 export function TryIt({ state, autoFocus = false }: { state: AppState; autoFocus?: boolean }) {
+  const { locale, t } = useI18n();
   const [text, setText] = useState('');
   const area = useRef<HTMLTextAreaElement>(null);
   const { status } = state;
@@ -16,22 +18,20 @@ export function TryIt({ state, autoFocus = false }: { state: AppState; autoFocus
 
   return (
     <div className="try-it">
-      <p className="muted">
-        Click into the box, hold <HotkeyCap state={state} />, say a sentence and let go.
-      </p>
+      <p className="muted">{rich(t.tryIt.hint, { key: <HotkeyCap state={state} /> })}</p>
       <textarea
         ref={area}
         className="input try-area"
         value={text}
         onChange={(event) => setText(event.target.value)}
-        placeholder="Your words land here…"
+        placeholder={t.tryIt.placeholder}
       />
       <div className="try-status" role="status" aria-live="polite">
         <span className={`status-dot status-dot-${status.phase}`} />
         <span>
           <strong>{status.title}</strong> {status.detail}
         </span>
-        {status.phase === 'done' && status.metrics && <span className="latency">{formatSeconds(status.metrics.totalMs)}</span>}
+        {status.phase === 'done' && status.metrics && <span className="latency">{formatSeconds(status.metrics.totalMs, locale)}</span>}
       </div>
     </div>
   );

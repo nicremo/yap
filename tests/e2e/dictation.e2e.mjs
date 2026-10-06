@@ -128,7 +128,18 @@ async function run(context) {
     JSON.stringify({ settingsVersion: 2, setupComplete: true, transcriptionMode: 'cloud', language: 'de', storageDirectory: storage }),
   );
 
-  const env = { ...process.env, HOME: home, XDG_CONFIG_HOME: path.join(home, '.config'), YAP_E2E: '1', YAP_GROQ_API_BASE: mock.base };
+  const env = {
+    ...process.env,
+    HOME: home,
+    XDG_CONFIG_HOME: path.join(home, '.config'),
+    YAP_E2E: '1',
+    YAP_GROQ_API_BASE: mock.base,
+    // The language setting starts at System, so the system decides: English.
+    LANGUAGE: 'en_US:en',
+    LANG: 'en_US.UTF-8',
+  };
+  delete env.LC_ALL;
+  delete env.LC_MESSAGES;
   delete env.ELECTRON_RENDERER_URL;
   delete env.ELECTRON_RUN_AS_NODE;
 
@@ -266,6 +277,31 @@ async function run(context) {
     return entries.length >= 3 && entries;
   }, 3_000);
   expect(history.every((entry) => entry.status === 'success'), 'every dictation is in the history', history.map((entry) => entry.status));
+
+  console.log('\nSwitching the language to German');
+  expect((await window.evaluate(() => document.documentElement.lang)) === 'en', 'System on an English system means English');
+  await window.getByRole('radio', { name: 'Deutsch' }).click();
+  await window.waitForSelector('.nav-item:has-text("Einstellungen")', { timeout: 5_000 });
+  expect((await window.evaluate(() => document.documentElement.lang)) === 'de', 'the main window speaks German');
+  expect(await window.getByRole('switch', { name: 'Automatisch einfügen' }).isVisible(), 'the settings are in German');
+  const overlay = app.windows().find((page) => page.url().includes('#overlay'));
+  expect((await overlay.evaluate(() => document.documentElement.lang)) === 'de', 'the dictation pill switches too');
+
+  since = await statusCount();
+  await hotkey('down');
+  await sleep(1_200);
+  await hotkey('up');
+  result = await waitForResult(since);
+  expect(result.phase === 'done' && result.title === 'Gespeichert' && /^Fertig in \d+,\d\d\u00a0s\./.test(result.detail), 'main words the result in German', result);
+  const pillLabel = await waitFor('the German pill label', () =>
+    overlay.evaluate(() => {
+      const text = document.querySelector('.pill-measure .pill-label')?.textContent ?? '';
+      return /^Gespeichert · \d+,\d\d\u00a0s$/.test(text) && text;
+    }),
+  );
+  console.log(`      pill: ${pillLabel}`);
+  const stored = JSON.parse(await readFile(path.join(userData, 'settings.json'), 'utf8'));
+  expect(stored.uiLanguage === 'de', 'the choice is saved', stored.uiLanguage);
 
   console.log('\nClosing the window keeps Yap running in the menu bar');
   const mainWindowVisible = () =>

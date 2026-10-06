@@ -72,8 +72,4 @@ export function useAction() {
   return { busy, error, run, clearError: () => setError(null) };
 }
 
-export function formatSeconds(ms: number): string {
-  return `${(ms / 1000).toFixed(ms < 10_000 ? 2 : 1)} s`;
-}
-
 export const isMac = navigator.userAgent.includes('Mac');

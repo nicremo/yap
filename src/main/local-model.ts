@@ -1,4 +1,5 @@
 import type { AppSettings, LocalModelDownload } from '../shared/types';
+import { t } from './i18n';
 import { isLocalModelReady, prepareLocalModel } from './local-whisper';
 import { getStoragePaths } from './storage';
 
@@ -43,7 +44,7 @@ export class LocalModelManager {
 
     const settings = this.getSettings();
     const model = settings.localModel;
-    this.download = { model, progress: 0, detail: 'Starting download…' };
+    this.download = { model, progress: 0, detail: t().local.starting };
     this.onChange();
 
     let lastReported = 0;

@@ -1,16 +1,18 @@
 import { useState } from 'react';
 
+import { formatNumber, formatSeconds, type Messages } from '../../shared/i18n';
 import type { AppState, HistoryEntry } from '../../shared/types';
 import type { Page } from '../App';
-import { appliedPolish, describeStatus, formatDate, HistoryList } from '../components/HistoryList';
+import { appliedPolish, formatDate, HistoryList } from '../components/HistoryList';
 import { FnKeyNotice } from '../components/HotkeyRecorder';
 import { HotkeyCap } from '../components/HotkeyCap';
 import { Icon } from '../components/Icon';
 import { TryIt } from '../components/TryIt';
 import { Button, Card, Notice, Segmented } from '../components/ui';
-import { describeIssueCount, findIssues, type Issue } from '../lib/issues';
-import { POLISH_OPTIONS, polishUpdate, polishValue, type PolishValue } from '../lib/polish';
-import { formatSeconds, useAction } from '../lib/store';
+import { rich, useI18n, useT } from '../lib/i18n';
+import { findIssues, type Issue } from '../lib/issues';
+import { POLISH_LEVELS, polishUpdate, polishValue, type PolishValue } from '../lib/polish';
+import { useAction } from '../lib/store';
 
 /** Typing speed a dictation is compared against for the time it saves. */
 const TYPING_WORDS_PER_MINUTE = 40;
@@ -28,28 +30,29 @@ function formatDuration(minutes: number): string {
 
 /* ── Status line and warnings ──────────────────────────────────────────── */
 
-function statusTitle(state: AppState, issues: Issue[]): string {
+function statusTitle(state: AppState, issues: Issue[], t: Messages): string {
   const { status } = state;
   switch (status.phase) {
     case 'listening':
-      return status.handsfree ? 'Listening, hands-free…' : 'Listening…';
+      return status.handsfree ? t.home.listeningHandsfree : t.home.listening;
     case 'transcribing':
     case 'rewriting':
     case 'pasting':
-      return 'Transcribing…';
+      return t.home.transcribing;
     case 'done':
       return `${status.title}.`;
     case 'error':
       return status.title;
     default:
       if (issues.length === 1) return issues[0].title;
-      if (issues.length > 1) return describeIssueCount(issues.length);
-      return 'Ready when you are.';
+      if (issues.length > 1) return t.home.issueCount(issues.length);
+      return t.home.ready;
   }
 }
 
 function StatusHead({ state, navigate }: { state: AppState; navigate: (page: Page) => void }) {
-  const issues = findIssues(state);
+  const t = useT();
+  const issues = findIssues(state, t);
   const [showIssues, setShowIssues] = useState(false);
   const idle = state.status.phase === 'idle';
   const single = idle && issues.length === 1 ? issues[0] : null;
@@ -57,7 +60,7 @@ function StatusHead({ state, navigate }: { state: AppState; navigate: (page: Pag
   return (
     <header className="status-head">
       <h1 className="status-title" role="status" aria-live="polite">
-        {statusTitle(state, issues)}
+        {statusTitle(state, issues, t)}
       </h1>
       {single && (
         <div className="issue-inline">
@@ -67,12 +70,10 @@ function StatusHead({ state, navigate }: { state: AppState; navigate: (page: Pag
           </Button>
         </div>
       )}
-      <p className="status-sub">
-        Hold <HotkeyCap state={state} />. Speak. Release. Double-tap for hands-free.
-      </p>
+      <p className="status-sub">{rich(t.home.holdHint, { key: <HotkeyCap state={state} /> })}</p>
       {idle && issues.length > 1 && (
         <button type="button" className="inline-link issue-toggle" aria-expanded={showIssues} onClick={() => setShowIssues((open) => !open)}>
-          {showIssues ? 'Hide' : 'Show what'} <Icon name={showIssues ? 'chevronDown' : 'chevronRight'} size={13} />
+          {showIssues ? t.home.hideIssues : t.home.showIssues} <Icon name={showIssues ? 'chevronDown' : 'chevronRight'} size={13} />
         </button>
       )}
       {idle && issues.length > 1 && showIssues && (
@@ -98,12 +99,12 @@ function StatusHead({ state, navigate }: { state: AppState; navigate: (page: Pag
 /* ── Last dictation ────────────────────────────────────────────────────── */
 
 function LastDictation({ entry }: { entry: HistoryEntry }) {
+  const { locale, t } = useI18n();
   const [version, setVersion] = useState<'final' | 'raw'>('final');
   const [copied, setCopied] = useState(false);
   const { busy, error, run } = useAction();
   const polished = entry.status === 'success' && entry.rawText !== '' && entry.rawText !== entry.finalText;
   const showing = version === 'raw' && polished ? entry.rawText : entry.finalText;
-  const failure = describeStatus(entry.status);
 
   const copy = () =>
     void navigator.clipboard.writeText(showing).then(() => {
@@ -114,15 +115,15 @@ function LastDictation({ entry }: { entry: HistoryEntry }) {
   return (
     <Card className="last-card">
       <div className="last-head">
-        <span className="last-label">Last dictation</span>
+        <span className="last-label">{t.home.lastDictation}</span>
         {polished && (
           <Segmented<'final' | 'raw'>
-            label="Show the text"
+            label={t.home.showText}
             size="sm"
             value={version}
             options={[
-              { value: 'final', label: 'Polished' },
-              { value: 'raw', label: 'Original' },
+              { value: 'final', label: t.home.polished },
+              { value: 'raw', label: t.home.original },
             ]}
             onChange={setVersion}
           />
@@ -133,7 +134,7 @@ function LastDictation({ entry }: { entry: HistoryEntry }) {
         <p className="last-text">{showing}</p>
       ) : (
         <Notice tone={entry.status === 'transcription-failed' ? 'danger' : 'warning'}>
-          {entry.errorMessage ?? (failure?.label === 'Failed' ? 'Transcription failed.' : 'The audio was saved but not transcribed.')}
+          {entry.errorMessage ?? (entry.status === 'transcription-failed' ? t.home.transcriptionFailed : t.home.notTranscribed)}
         </Notice>
       )}
       {error && <Notice tone="danger">{error}</Notice>}
@@ -141,26 +142,26 @@ function LastDictation({ entry }: { entry: HistoryEntry }) {
       <div className="last-foot">
         <div className="meta">
           {entry.appName && <span>{entry.appName}</span>}
-          <span>{formatDate(entry.createdAt)}</span>
-          {entry.status === 'success' && <span>Polish {appliedPolish(entry)}</span>}
-          {entry.appRule && <span>App rule for {entry.appRule}</span>}
-          {entry.latencyMs !== undefined && <span className="latency">{formatSeconds(entry.latencyMs)}</span>}
+          <span>{formatDate(entry.createdAt, locale, t)}</span>
+          {entry.status === 'success' && <span>{t.home.polishMeta(appliedPolish(entry, t))}</span>}
+          {entry.appRule && <span>{t.home.appRuleFor(entry.appRule)}</span>}
+          {entry.latencyMs !== undefined && <span className="latency">{formatSeconds(entry.latencyMs, locale)}</span>}
         </div>
         <div className="button-row">
           {entry.status === 'success' ? (
             <>
               <Button size="sm" icon={copied ? 'check' : 'copy'} variant="secondary" onClick={copy}>
-                {copied ? 'Copied' : 'Copy'}
+                {copied ? t.common.copied : t.common.copy}
               </Button>
               <Button
                 size="sm"
                 icon="paste"
                 variant="primary"
                 busy={busy === 'paste'}
-                title="Hides Yap and pastes into the app behind it"
+                title={t.home.pasteAgainHint}
                 onClick={() => void run('paste', () => window.yap.pasteHistoryEntry(entry.id, version === 'raw' && polished ? 'raw' : 'final'))}
               >
-                Paste again
+                {t.home.pasteAgain}
               </Button>
             </>
           ) : (
@@ -172,7 +173,7 @@ function LastDictation({ entry }: { entry: HistoryEntry }) {
               busy={busy === 'retry'}
               onClick={() => void run('retry', () => window.yap.retranscribe(entry.id, 'transcribe-and-stylize'))}
             >
-              Transcribe again
+              {t.home.transcribeAgain}
             </Button>
           )}
         </div>
@@ -184,6 +185,7 @@ function LastDictation({ entry }: { entry: HistoryEntry }) {
 /* ── Statistics and polish ─────────────────────────────────────────────── */
 
 function Stats({ history }: { history: HistoryEntry[] }) {
+  const { locale, t } = useI18n();
   const today = new Date().toDateString();
   const succeeded = history.filter((entry) => entry.status === 'success');
   const todays = succeeded.filter((entry) => new Date(entry.createdAt).toDateString() === today);
@@ -200,21 +202,21 @@ function Stats({ history }: { history: HistoryEntry[] }) {
     <Card className="stats-card">
       <dl className="stats">
         <div className="stat">
-          <dt>Words today</dt>
-          <dd>{words.toLocaleString()}</dd>
+          <dt>{t.home.wordsToday}</dt>
+          <dd>{formatNumber(words, locale)}</dd>
         </div>
         <div className="stat">
-          <dt>Dictations today</dt>
-          <dd>{todays.length}</dd>
+          <dt>{t.home.dictationsToday}</dt>
+          <dd>{formatNumber(todays.length, locale)}</dd>
         </div>
         <div className="stat">
-          <dt>Typing time saved</dt>
+          <dt>{t.home.timeSaved}</dt>
           <dd>{formatDuration(words / TYPING_WORDS_PER_MINUTE)}</dd>
         </div>
         {average !== null && (
           <div className="stat">
-            <dt>Average speed</dt>
-            <dd className="mono">{formatSeconds(average)}</dd>
+            <dt>{t.home.averageSpeed}</dt>
+            <dd className="mono">{formatSeconds(average, locale)}</dd>
           </div>
         )}
       </dl>
@@ -223,21 +225,21 @@ function Stats({ history }: { history: HistoryEntry[] }) {
 }
 
 function PolishControl({ state, onState }: { state: AppState; onState: (next: AppState) => void }) {
+  const t = useT();
   const { run } = useAction();
   const current = polishValue(state.settings);
-  const caption = POLISH_OPTIONS.find((option) => option.value === current)?.caption ?? '';
 
   return (
     <div className="polish-control">
       <div className="row-text">
-        <strong>Polish</strong>
-        <span>{state.engine.groqKeySet || current === 'off' ? caption : 'Needs a Groq key, dictations stay as transcribed.'}</span>
+        <strong>{t.home.polish}</strong>
+        <span>{state.engine.groqKeySet || current === 'off' ? t.polish.captions[current] : t.home.polishNeedsKey}</span>
       </div>
       <Segmented<PolishValue>
-        label="Polish"
+        label={t.home.polish}
         size="sm"
         value={current}
-        options={POLISH_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
+        options={POLISH_LEVELS.map(({ value }) => ({ value, label: t.polish.levels[value] }))}
         onChange={(value) => void run('polish', async () => onState(await window.yap.updateSettings(polishUpdate(value))))}
       />
     </div>
@@ -245,6 +247,7 @@ function PolishControl({ state, onState }: { state: AppState; onState: (next: Ap
 }
 
 export function HomePage({ state, onState, navigate }: { state: AppState; onState: (next: AppState) => void; navigate: (page: Page) => void }) {
+  const t = useT();
   const history = state.history;
 
   return (
@@ -262,12 +265,12 @@ export function HomePage({ state, onState, navigate }: { state: AppState; onStat
           <Stats history={history} />
           <PolishControl state={state} onState={onState} />
 
-          <section className="history-section" aria-label="Recent dictations">
+          <section className="history-section" aria-label={t.home.recentLabel}>
             <div className="history-tools">
-              <h2 className="section-title">Recent</h2>
+              <h2 className="section-title">{t.home.recent}</h2>
               {history.length > RECENT_COUNT && (
                 <button type="button" className="inline-link" onClick={() => navigate('history')}>
-                  All {history.length} dictations <Icon name="chevronRight" size={13} />
+                  {t.home.allDictations(history.length)} <Icon name="chevronRight" size={13} />
                 </button>
               )}
             </div>

@@ -5,18 +5,13 @@ import type { Page } from '../App';
 import { Icon } from '../components/Icon';
 import { InfoTip, Tooltip } from '../components/Tooltip';
 import { Button, Card, Notice, RadioCards, Segmented } from '../components/ui';
-import { POLISH_OPTIONS, polishLabel, polishUpdate, polishValue, type PolishValue } from '../lib/polish';
+import { useT } from '../lib/i18n';
+import { POLISH_LEVELS, polishUpdate, polishValue, type PolishValue } from '../lib/polish';
 import { useAction } from '../lib/store';
-import { CUSTOM_CAPTIONS, exampleFor, STYLE_LABELS, STYLE_TABS, VOICE_LABELS } from '../lib/style-content';
+import { exampleFor, STYLE_MODES } from '../lib/style-content';
 
 /** The built-in rules cover thirty developer tools; a few are enough to see the pattern. */
 const COLLAPSED_RULES = 6;
-
-/** A rule picks a level for its app, or Off to leave that app unpolished. */
-const RULE_LEVELS: ReadonlyArray<{ value: RuleLevel; label: string }> = POLISH_OPTIONS.map((option) => ({
-  value: option.value,
-  label: option.label,
-}));
 
 /** Off is the bar below the grid, the four levels sit above it. */
 const POLISH_ORDER: ReadonlyArray<{ value: PolishValue; className?: string }> = [
@@ -27,8 +22,6 @@ const POLISH_ORDER: ReadonlyArray<{ value: PolishValue; className?: string }> = 
   { value: 'off', className: 'level-card-off' },
 ];
 
-const OFF_CAPTION = 'Nothing is polished: every dictation goes out exactly as transcribed, also in apps with a rule.';
-
 interface SelectProps<T> {
   value: T;
   onChange: (value: T) => void;
@@ -38,6 +31,7 @@ interface SelectProps<T> {
 }
 
 function StyleSelect({ value, onChange, label, ...rest }: SelectProps<StyleMode>) {
+  const t = useT();
   return (
     <select
       className="select select-sm"
@@ -46,16 +40,18 @@ function StyleSelect({ value, onChange, label, ...rest }: SelectProps<StyleMode>
       value={value}
       onChange={(event) => onChange(event.target.value as StyleMode)}
     >
-      {Object.entries(STYLE_LABELS).map(([style, name]) => (
+      {STYLE_MODES.map((style) => (
         <option key={style} value={style}>
-          {name}
+          {t.style.names[style]}
         </option>
       ))}
     </select>
   );
 }
 
+/** A rule picks a level for its app, or Off to leave that app unpolished. */
 function LevelSelect({ value, onChange, label, ...rest }: SelectProps<RuleLevel>) {
+  const t = useT();
   return (
     <select
       className="select select-sm"
@@ -64,9 +60,9 @@ function LevelSelect({ value, onChange, label, ...rest }: SelectProps<RuleLevel>
       value={value}
       onChange={(event) => onChange(event.target.value as RuleLevel)}
     >
-      {RULE_LEVELS.map((level) => (
-        <option key={level.value} value={level.value}>
-          {level.label}
+      {POLISH_LEVELS.map(({ value: level }) => (
+        <option key={level} value={level}>
+          {t.polish.levels[level]}
         </option>
       ))}
     </select>
@@ -74,6 +70,7 @@ function LevelSelect({ value, onChange, label, ...rest }: SelectProps<RuleLevel>
 }
 
 function AppRules({ state }: { state: AppState }) {
+  const t = useT();
   const { error, run } = useAction();
   const [adding, setAdding] = useState(false);
   const [showAll, setShowAll] = useState(false);
@@ -105,9 +102,9 @@ function AppRules({ state }: { state: AppState }) {
     });
 
   const addButton = (
-    <Tooltip text="Give an app you have dictated into its own writing style and polish." align="end">
+    <Tooltip text={t.rules.addTip} align="end">
       <Button size="sm" variant="secondary" icon="plus" onClick={() => setAdding(true)} disabled={adding}>
-        Add rule
+        {t.rules.addRule}
       </Button>
     </Tooltip>
   );
@@ -116,25 +113,22 @@ function AppRules({ state }: { state: AppState }) {
     <Card
       title={
         <>
-          App rules
-          <InfoTip
-            label="About app rules"
-            text="When you finish a dictation, Yap checks which app has the focus. If that app has a rule, its writing style and polish replace the settings above for that dictation."
-          />
+          {t.rules.title}
+          <InfoTip label={t.rules.about} text={t.rules.aboutTip} />
         </>
       }
-      description="Different apps want different writing: exact words in a terminal, careful prose in mail. A rule gives one app its own style and polish."
+      description={t.rules.description}
       action={state.appRules.length > 0 ? addButton : undefined}
     >
       <ul className="explainer">
-        <li>A rule applies to the app you are in when you let go of the key, wherever the dictation started.</li>
-        <li>Off in a rule leaves that app unpolished. Off at the top of this page turns polishing off everywhere, rules included.</li>
-        <li>Yap comes with rules for common developer tools. History shows which rule a dictation used.</li>
+        {t.rules.explainer.map((line) => (
+          <li key={line}>{line}</li>
+        ))}
       </ul>
       {error && <Notice tone="danger">{error}</Notice>}
       {state.appRules.length === 0 && !adding ? (
         <div className="row">
-          <span className="muted">No app rules yet.</span>
+          <span className="muted">{t.rules.none}</span>
           {addButton}
         </div>
       ) : (
@@ -142,25 +136,25 @@ function AppRules({ state }: { state: AppState }) {
           {rules.map((rule) => (
             <div key={rule.appIdentifier} className="rule-row">
               <span className="rule-name">{rule.label}</span>
-              <Tooltip text={`The writing style for dictations into ${rule.label}.`}>
+              <Tooltip text={t.rules.styleTip(rule.label)}>
                 <StyleSelect
-                  label={`Style for ${rule.label}`}
+                  label={t.rules.styleFor(rule.label)}
                   value={rule.styleMode}
                   onChange={(styleMode) => void run('rule', () => window.yap.updateAppRule(rule.appIdentifier, styleMode, rule.enhancementLevel))}
                 />
               </Tooltip>
-              <Tooltip text={`How much Yap polishes in ${rule.label}. Off keeps your exact words.`}>
+              <Tooltip text={t.rules.polishTip(rule.label)}>
                 <LevelSelect
-                  label={`Polish for ${rule.label}`}
+                  label={t.rules.polishFor(rule.label)}
                   value={rule.enhancementLevel}
                   onChange={(enhancementLevel) => void run('rule', () => window.yap.updateAppRule(rule.appIdentifier, rule.styleMode, enhancementLevel))}
                 />
               </Tooltip>
-              <Tooltip text={`Remove the rule. ${rule.label} then uses the settings above.`} align="end">
+              <Tooltip text={t.rules.removeTip(rule.label)} align="end">
                 <button
                   type="button"
                   className="icon-button"
-                  aria-label={`Remove the rule for ${rule.label}`}
+                  aria-label={t.rules.removeFor(rule.label)}
                   onClick={() => void run('rule', () => window.yap.removeAppRule(rule.appIdentifier))}
                 >
                   <Icon name="x" size={14} />
@@ -170,7 +164,7 @@ function AppRules({ state }: { state: AppState }) {
           ))}
           {state.appRules.length > COLLAPSED_RULES && (
             <button type="button" className="inline-link rule-more" onClick={() => setShowAll((value) => !value)}>
-              {showAll ? 'Show fewer' : `Show all ${state.appRules.length} rules`}
+              {showAll ? t.rules.showFewer : t.rules.showAll(state.appRules.length)}
             </button>
           )}
         </div>
@@ -179,11 +173,11 @@ function AppRules({ state }: { state: AppState }) {
       {adding &&
         (candidates.length === 0 ? (
           <div className="rule-add">
-            <span className="muted">Dictate into an app once, then it can get a rule here.</span>
+            <span className="muted">{t.rules.noCandidates}</span>
             <span />
             <span />
             <Button size="sm" variant="ghost" onClick={() => setAdding(false)}>
-              Close
+              {t.common.close}
             </Button>
           </div>
         ) : (
@@ -194,21 +188,21 @@ function AppRules({ state }: { state: AppState }) {
               void add();
             }}
           >
-            <select className="select select-sm" aria-label="App" value={chosen?.id ?? ''} onChange={(event) => setApp(event.target.value)}>
+            <select className="select select-sm" aria-label={t.rules.app} value={chosen?.id ?? ''} onChange={(event) => setApp(event.target.value)}>
               {candidates.map((candidate) => (
                 <option key={candidate.id} value={candidate.id}>
                   {candidate.name}
                 </option>
               ))}
             </select>
-            <StyleSelect label="Style for the new rule" value={style} onChange={setStyle} />
-            <LevelSelect label="Polish for the new rule" value={level} onChange={setLevel} />
+            <StyleSelect label={t.rules.newStyle} value={style} onChange={setStyle} />
+            <LevelSelect label={t.rules.newPolish} value={level} onChange={setLevel} />
             <div className="button-row">
               <Button size="sm" variant="ghost" onClick={() => setAdding(false)}>
-                Cancel
+                {t.common.cancel}
               </Button>
               <Button size="sm" variant="primary" type="submit">
-                Add
+                {t.common.add}
               </Button>
             </div>
           </form>
@@ -218,103 +212,104 @@ function AppRules({ state }: { state: AppState }) {
 }
 
 export function StylePage({ state, onState, navigate }: { state: AppState; onState: (next: AppState) => void; navigate: (page: Page) => void }) {
+  const t = useT();
   const { settings } = state;
   const { error, run } = useAction();
   const update = (patch: UpdateSettingsInput) => run('settings', async () => onState(await window.yap.updateSettings(patch)));
 
   const polish = polishValue(settings);
-  const tab = STYLE_TABS.find((candidate) => candidate.value === settings.styleMode) ?? STYLE_TABS[0];
   const custom = settings.styleMode === 'custom-plus';
-  const example = exampleFor(settings.styleMode, settings.customPlusVoice, polish);
+  const example = exampleFor(settings.styleMode, settings.customPlusVoice, polish, t);
 
   return (
     <>
       <header className="page-header">
-        <h1>Style</h1>
-        <p>How much Yap reworks what you say, and in which voice.</p>
+        <h1>{t.style.title}</h1>
+        <p>{t.style.lead}</p>
       </header>
       {error && <Notice tone="danger">{error}</Notice>}
 
-      <Card title="Polish">
+      <Card title={t.polish.label}>
         <div className="stack">
           {!state.engine.groqKeySet && polish !== 'off' && (
             <Notice
               tone="warning"
               action={
                 <Button size="sm" variant="secondary" onClick={() => navigate('engine')}>
-                  Open Engine
+                  {t.common.openEngine}
                 </Button>
               }
             >
-              Polishing runs on Groq and needs a key. Until then dictations go out as transcribed.
+              {t.style.needsKey}
             </Notice>
           )}
           <RadioCards<PolishValue>
-            label="Polish"
+            label={t.polish.label}
             className="level-grid"
             cardClassName="level-card"
             value={polish}
             options={POLISH_ORDER}
             onChange={(value) => void update(polishUpdate(value))}
             render={(value) => {
-              const option = POLISH_OPTIONS.find((candidate) => candidate.value === value)!;
+              const label = t.polish.levels[value];
               if (value === 'off') {
                 return (
                   <>
-                    <strong>{option.label}</strong>
-                    <span className="level-caption">{OFF_CAPTION}</span>
+                    <strong>{label}</strong>
+                    <span className="level-caption">{t.style.offCaption}</span>
                   </>
                 );
               }
+              const intensity = POLISH_LEVELS.find((level) => level.value === value)?.intensity ?? 0;
               return (
                 <>
                   <span className="level-card-top">
-                    <strong>{option.label}</strong>
+                    <strong>{label}</strong>
                     <span className="intensity" aria-hidden="true">
                       {[1, 2, 3, 4].map((step) => (
-                        <i key={step} className={step <= option.intensity ? 'on' : ''} />
+                        <i key={step} className={step <= intensity ? 'on' : ''} />
                       ))}
                     </span>
                   </span>
-                  <span className="level-caption">{custom ? CUSTOM_CAPTIONS[value] : option.caption}</span>
+                  <span className="level-caption">{custom ? t.style.customCaptions[value] : t.polish.captions[value]}</span>
                 </>
               );
             }}
           />
-          <dl className="example" aria-label={`Example at ${polishLabel(polish)}`}>
-            <dt>You say</dt>
+          <dl className="example" aria-label={t.style.exampleLabel(t.polish.levels[polish])}>
+            <dt>{t.style.youSay}</dt>
             <dd>{example.spoken}</dd>
-            <dt>Yap writes</dt>
+            <dt>{t.style.yapWrites}</dt>
             <dd className="example-after">{example.written}</dd>
           </dl>
         </div>
       </Card>
 
-      <Card title="Writing style">
+      <Card title={t.style.writingStyle}>
         <div className="stack">
           <div className="style-row">
             <Segmented<StyleMode>
-              label="Writing style"
+              label={t.style.writingStyle}
               value={settings.styleMode}
-              options={STYLE_TABS.map((candidate) => ({ value: candidate.value, label: candidate.label }))}
+              options={STYLE_MODES.map((style) => ({ value: style, label: t.style.names[style] }))}
               onChange={(styleMode) => void update({ styleMode })}
             />
             {custom && (
               <>
-                <span className="field-label">Base</span>
+                <span className="field-label">{t.style.base}</span>
                 <Segmented<CustomPlusVoice>
-                  label="Base voice"
+                  label={t.style.baseVoice}
                   value={settings.customPlusVoice}
                   options={[
-                    { value: 'conversation', label: VOICE_LABELS.conversation },
-                    { value: 'developer', label: VOICE_LABELS.developer },
+                    { value: 'conversation', label: t.style.voices.conversation },
+                    { value: 'developer', label: t.style.voices.developer },
                   ]}
                   onChange={(customPlusVoice) => void update({ customPlusVoice })}
                 />
               </>
             )}
           </div>
-          <p className="style-description">{tab.description}</p>
+          <p className="style-description">{t.style.descriptions[settings.styleMode]}</p>
         </div>
       </Card>
 

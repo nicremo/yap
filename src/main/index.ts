@@ -10,6 +10,7 @@ log.transports.file.maxSize = 5 * 1024 * 1024;
 log.transports.console.level = 'info';
 Object.assign(console, log.functions);
 
+import { resolveLocale } from '../shared/i18n';
 import type { AppSettings, AppState, AppStatus, PermissionsState, PublicSettings, UpdateSettingsInput } from '../shared/types';
 import { loadAppRules } from './app-rules';
 import { sweepAudioStore } from './audio-store';
@@ -24,6 +25,7 @@ import {
   storeGroqModelList,
 } from './groq-models';
 import { clearAudioReferences, flushHistory, loadHistory } from './history';
+import { currentLocale, setLocale, t } from './i18n';
 import { registerIpcHandlers } from './ipc';
 import { flushJsonWrites } from './json-file';
 import { migrateLegacyUserData } from './legacy-migration';
@@ -137,7 +139,7 @@ function ensureOverlayWindow(): Promise<BrowserWindow | null> {
   }
   overlayWindow = null;
 
-  overlayPromise = createOverlayWindow()
+  overlayPromise = createOverlayWindow(currentLocale())
     .then((window) => {
       overlayWindow = window;
       window.webContents.on('render-process-gone', (_event, details) => {
@@ -304,7 +306,7 @@ function updateMicPolling(): void {
 }
 
 async function createMain(showOnReady: boolean): Promise<void> {
-  const window = await createMainWindow(settings.theme);
+  const window = await createMainWindow(settings.theme, currentLocale());
   mainWindow = window;
 
   window.on('ready-to-show', () => {
@@ -339,17 +341,55 @@ async function createMain(showOnReady: boolean): Promise<void> {
   if (showOnReady) showMainWindow();
 }
 
+/* Spelled out instead of Electron's role menus, whose labels are English
+   only. The roles still do the work, so macOS keeps its own behaviour. */
 function createAppMenu(): void {
   if (process.platform !== 'darwin') return;
+  const { menu } = t();
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
-      { role: 'appMenu' },
+      {
+        label: app.name,
+        submenu: [
+          { role: 'about', label: menu.about },
+          { type: 'separator' },
+          { role: 'services', label: menu.services },
+          { type: 'separator' },
+          { role: 'hide', label: menu.hide },
+          { role: 'hideOthers', label: menu.hideOthers },
+          { role: 'unhide', label: menu.showAll },
+          { type: 'separator' },
+          { role: 'quit', label: menu.quit },
+        ],
+      },
       // Close Window (Cmd+W) hides to the menu bar through the close handler.
-      { role: 'fileMenu' },
+      { label: menu.file, submenu: [{ role: 'close', label: menu.closeWindow }] },
       // Copy and paste in the API key field.
-      { role: 'editMenu' },
+      {
+        label: menu.edit,
+        submenu: [
+          { role: 'undo', label: menu.undo },
+          { role: 'redo', label: menu.redo },
+          { type: 'separator' },
+          { role: 'cut', label: menu.cut },
+          { role: 'copy', label: menu.copy },
+          { role: 'paste', label: menu.paste },
+          { role: 'pasteAndMatchStyle', label: menu.pasteAndMatchStyle },
+          { role: 'delete', label: menu.delete },
+          { role: 'selectAll', label: menu.selectAll },
+        ],
+      },
       ...(app.isPackaged ? [] : [{ role: 'viewMenu' } as const]),
-      { role: 'windowMenu' },
+      {
+        label: menu.window,
+        role: 'window',
+        submenu: [
+          { role: 'minimize', label: menu.minimize },
+          { role: 'zoom', label: menu.zoom },
+          { type: 'separator' },
+          { role: 'front', label: menu.front },
+        ],
+      },
     ]),
   );
 }
@@ -360,17 +400,14 @@ function getTrayIconPath(): string {
     : path.join(projectRoot, 'build', 'icons', 'trayTemplate.png');
 }
 
-function createTray(): void {
-  const icon = nativeImage.createFromPath(getTrayIconPath());
-  icon.setTemplateImage(true);
-  tray = new Tray(icon);
-  tray.setToolTip('Yap');
+function updateTrayMenu(): void {
+  if (!tray) return;
   tray.setContextMenu(
     Menu.buildFromTemplate([
-      { label: 'Open Yap', click: () => showMainWindow() },
+      { label: t().tray.open, click: () => showMainWindow() },
       { type: 'separator' },
       {
-        label: 'Quit Yap',
+        label: t().tray.quit,
         click: () => {
           isQuitting = true;
           app.quit();
@@ -378,7 +415,32 @@ function createTray(): void {
       },
     ]),
   );
+}
+
+function createTray(): void {
+  const icon = nativeImage.createFromPath(getTrayIconPath());
+  icon.setTemplateImage(true);
+  tray = new Tray(icon);
+  tray.setToolTip('Yap');
+  updateTrayMenu();
   tray.on('click', () => showMainWindow());
+}
+
+/* ── Language ───────────────────────────────────────────────────────────── */
+
+/** Follows the setting, or for System the first preferred language of the computer that Yap speaks. */
+function applyLocale(): boolean {
+  return setLocale(resolveLocale(settings.uiLanguage, app.getPreferredSystemLanguages()));
+}
+
+/** Everything that shows text picks up a language change right away. */
+function broadcastLocale(): void {
+  const locale = currentLocale();
+  for (const window of [liveWindow(mainWindow), liveWindow(overlayWindow)]) {
+    window?.webContents.send('app:locale', locale);
+  }
+  createAppMenu();
+  updateTrayMenu();
 }
 
 /* ── Engine ─────────────────────────────────────────────────────────────── */
@@ -455,6 +517,9 @@ async function updateSettings(updates: UpdateSettingsInput): Promise<AppState> {
   }
   if (previous.theme !== settings.theme) {
     nativeTheme.themeSource = settings.theme;
+  }
+  if (previous.uiLanguage !== settings.uiLanguage && applyLocale()) {
+    broadcastLocale();
   }
   if (previous.storageDirectory !== settings.storageDirectory) {
     await ensureStorage(settings);
@@ -535,6 +600,8 @@ async function bootstrap(): Promise<void> {
   }
 
   settings = await loadSettings();
+  // Before any window or menu exists, so the first one is already in the right language.
+  applyLocale();
   // Before any window exists: the renderer's prefers-color-scheme, native
   // scrollbars, select popups and menus all follow it.
   nativeTheme.themeSource = settings.theme;
@@ -602,7 +669,7 @@ async function bootstrap(): Promise<void> {
     pasteHistoryEntry: async (id, version) => {
       const entry = (await loadHistory()).find((candidate) => candidate.id === id);
       const text = version === 'raw' ? entry?.rawText : entry?.finalText;
-      if (!text) throw new Error('This dictation has no text to paste.');
+      if (!text) throw new Error(t().status.noTextToPaste);
       // The user asked for it: Yap steps aside, and macOS gives the focus back
       // to the app behind it. Yap itself activates nothing.
       const window = liveWindow(mainWindow);

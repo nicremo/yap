@@ -1,9 +1,11 @@
 import type { AppState, LocalWhisperModel } from '../../shared/types';
 import { LOCAL_MODELS } from '../../shared/models';
+import { useT } from '../lib/i18n';
 import { useAction } from '../lib/store';
 import { Button, Chip, Notice, Progress } from './ui';
 
 export function LocalModelPicker({ state, onState }: { state: AppState; onState: (next: AppState) => void }) {
+  const t = useT();
   const { busy, error, run } = useAction();
   const download = state.engine.localModelDownload;
   const selected = state.settings.localModel;
@@ -26,7 +28,7 @@ export function LocalModelPicker({ state, onState }: { state: AppState; onState:
               {model.label}
               <span className="choice-meta">{model.size}</span>
             </span>
-            <span className="choice-text">{model.note}</span>
+            <span className="choice-text">{t.modelNotes[model.id]}</span>
           </button>
         ))}
       </div>
@@ -35,13 +37,15 @@ export function LocalModelPicker({ state, onState }: { state: AppState; onState:
         {download ? (
           <div className="download">
             <div className="download-text">
-              <span>Downloading {LOCAL_MODELS.find((model) => model.id === download.model)?.label}</span>
+              <span>{t.localModel.downloading(LOCAL_MODELS.find((model) => model.id === download.model)?.label ?? download.model)}</span>
               <span className="mono">{download.detail}</span>
             </div>
             <Progress value={download.progress} />
           </div>
         ) : state.engine.localModelReady ? (
-          <Chip tone="success" icon="check">Downloaded and ready</Chip>
+          <Chip tone="success" icon="check">
+            {t.localModel.ready}
+          </Chip>
         ) : (
           <Button
             variant="primary"
@@ -49,7 +53,7 @@ export function LocalModelPicker({ state, onState }: { state: AppState; onState:
             busy={busy === 'download'}
             onClick={() => void run('download', async () => onState(await window.yap.downloadLocalModel()))}
           >
-            Download model
+            {t.localModel.download}
           </Button>
         )}
       </div>

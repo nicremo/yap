@@ -7,8 +7,11 @@ import './styles.css';
 import { StrictMode, type ComponentType } from 'react';
 import { createRoot } from 'react-dom/client';
 
+import { I18nProvider } from './lib/i18n';
+
 const isOverlay = window.location.hash === '#overlay';
 document.documentElement.classList.toggle('overlay-route', isOverlay);
+document.documentElement.lang = window.yap.initialLocale;
 if (!isOverlay && window.yap.initialTheme !== 'system') {
   document.documentElement.dataset.theme = window.yap.initialTheme;
 }
@@ -22,7 +25,9 @@ async function mount(): Promise<void> {
 
   createRoot(document.getElementById('root') as HTMLElement).render(
     <StrictMode>
-      <Root />
+      <I18nProvider>
+        <Root />
+      </I18nProvider>
     </StrictMode>,
   );
 }
