@@ -51,7 +51,8 @@ describe('migrateSettings', () => {
     expect(migrated.styleMode).toBe('custom-plus');
     expect(migrated.customPlusVoice).toBe('developer');
     expect(migrated.enhancementLevel).toBe('high');
-    expect(migrated.hotkey).toEqual({ keyCode: 61, modifiers: 0, label: 'Right ⌥' });
+    // The stored label is recomputed in the current wording.
+    expect(migrated.hotkey).toEqual({ keyCode: 61, modifiers: 0, label: 'Right Option (⌥)' });
     expect(migrated.showOverlay).toBe(false);
     expect(migrated.launchAtLogin).toBe(true);
     expect(migrated.setupComplete).toBe(true);

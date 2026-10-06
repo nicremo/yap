@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 import { SETUP_STEPS, type SetupStep } from '../../shared/setup';
 import type { AppState, TranscriptionMode } from '../../shared/types';
@@ -6,10 +6,11 @@ import { GroqKeyField } from '../components/GroqKeyField';
 import { HotkeySettings } from '../components/HotkeyRecorder';
 import { Icon } from '../components/Icon';
 import { LocalModelPicker } from '../components/LocalModelPicker';
-import { LogoTile } from '../components/Logo';
+import { LogoImage } from '../components/Logo';
 import { PermissionList } from '../components/PermissionList';
-import { Button, Chip, KeyCap, Notice } from '../components/ui';
-import { formatSeconds, useAction } from '../lib/store';
+import { TryIt } from '../components/TryIt';
+import { Button, KeyCap, Notice, Progress, RadioCards } from '../components/ui';
+import { useAction } from '../lib/store';
 
 const STEPS = SETUP_STEPS;
 type Step = SetupStep;
@@ -47,27 +48,35 @@ export function SetupWizard({ state, onState }: { state: AppState; onState: (nex
   const back = () => goTo(STEPS[Math.max(0, index - 1)]);
   const { busy, error, run } = useAction();
 
-  const finish = () =>
-    run('finish', async () => onState(await window.yap.updateSettings({ setupComplete: true, setupStep: 'welcome' })));
+  // Leaving early is fine: History lists whatever still needs a fix.
+  const leave = (label: string) =>
+    run(label, async () => onState(await window.yap.updateSettings({ setupComplete: true, setupStep: 'welcome' })));
 
   return (
     <main className="setup">
       <div className="titlebar" />
-      <ol className="setup-steps">
-        {STEPS.map((item, position) => (
-          <li key={item} className={position < index ? 'done' : position === index ? 'current' : ''}>
-            <span className="setup-step-dot">{position < index ? <Icon name="check" size={11} strokeWidth={3} /> : position + 1}</span>
-            <span className="setup-step-label">{STEP_LABELS[item]}</span>
-          </li>
-        ))}
-      </ol>
+      <div className="setup-top">
+        <div className="setup-progress">
+          <span>
+            Step {index + 1} of {STEPS.length}, {STEP_LABELS[step]}
+          </span>
+          <Progress value={(index + 1) / STEPS.length} label="Setup progress" />
+        </div>
+        {step !== 'try' && (
+          <Button size="sm" variant="ghost" busy={busy === 'cancel'} onClick={() => void leave('cancel')}>
+            Cancel setup
+          </Button>
+        )}
+      </div>
 
       <div className="setup-panel" key={step}>
         {step === 'welcome' && (
           <div className="setup-welcome">
-            <LogoTile size={76} />
-            <h1>Welcome to Yap</h1>
-            <p>Hold a key, speak, release. Your words appear wherever you are typing, cleaned up and in well under a second.</p>
+            <LogoImage className="welcome-logo" size={88} />
+            <h1 className="setup-title">Welcome to Yap</h1>
+            <p className="setup-lead">
+              Hold a key, speak, release. Your words appear wherever you are typing, cleaned up and in well under a second.
+            </p>
             <Button variant="primary" size="lg" onClick={next}>
               Set up Yap <Icon name="arrowRight" size={16} />
             </Button>
@@ -78,9 +87,12 @@ export function SetupWizard({ state, onState }: { state: AppState; onState: (nex
 
         {step === 'connect' && (
           <div className="setup-body">
-            <h1>{state.settings.transcriptionMode === 'cloud' ? 'Connect Groq' : 'Download a model'}</h1>
+            <h1 className="setup-title">{state.settings.transcriptionMode === 'cloud' ? 'Connect Groq' : 'Download a model'}</h1>
             {state.settings.transcriptionMode === 'cloud' ? (
               <>
+                <p className="setup-lead">
+                  Groq runs open speech and language models on very fast hardware. Not to be confused with Grok, the chatbot.
+                </p>
                 <ol className="howto">
                   <li>
                     Open{' '}
@@ -110,7 +122,7 @@ export function SetupWizard({ state, onState }: { state: AppState; onState: (nex
 
         {step === 'permissions' && (
           <div className="setup-body">
-            <h1>Allow access</h1>
+            <h1 className="setup-title">Allow access</h1>
             <p className="setup-lead">Yap needs to hear you and to paste into other apps. Each switch updates here live.</p>
             <PermissionList state={state} onState={onState} />
             {state.permissions.nativePermissionsRequired && (
@@ -134,7 +146,7 @@ export function SetupWizard({ state, onState }: { state: AppState; onState: (nex
 
         {step === 'shortcut' && (
           <div className="setup-body">
-            <h1>Pick your key</h1>
+            <h1 className="setup-title">Pick your key</h1>
             <p className="setup-lead">Hold it while you talk. Tap it twice to dictate hands-free, tap once more to finish.</p>
             <HotkeySettings state={state} onSave={(hotkey) => void run('hotkey', async () => onState(await window.yap.updateSettings({ hotkey })))} />
             <HotkeyTester state={state} />
@@ -148,11 +160,11 @@ export function SetupWizard({ state, onState }: { state: AppState; onState: (nex
 
         {step === 'try' && (
           <div className="setup-body">
-            <h1>Try it</h1>
-            <TryIt state={state} />
+            <h1 className="setup-title">Try it</h1>
+            <TryIt state={state} autoFocus />
             {error && <Notice tone="danger">{error}</Notice>}
             <SetupNav onBack={back}>
-              <Button variant="primary" busy={busy === 'finish'} onClick={() => void finish()}>
+              <Button variant="primary" busy={busy === 'finish'} onClick={() => void leave('finish')}>
                 Start using Yap
               </Button>
             </SetupNav>
@@ -193,32 +205,42 @@ function EngineStep({ state, onState, onNext, onBack }: { state: AppState; onSta
 
   return (
     <div className="setup-body">
-      <h1>How should Yap transcribe?</h1>
-      <p className="setup-lead">You can switch any time in Engine settings.</p>
-      <div className="choice-grid">
-        <button type="button" className={`choice choice-large${mode === 'cloud' ? ' choice-active' : ''}`} onClick={() => void choose('cloud')}>
-          <span className="choice-icon">
-            <Icon name="cloud" size={22} />
-          </span>
-          <span className="choice-title">
-            Groq cloud <Chip tone="accent">Recommended</Chip>
-          </span>
-          <span className="choice-text">
-            Fastest and most accurate: Whisper Large v3 answers in a fraction of a second. Free API key, about two hours
-            of audio a day.
-          </span>
-        </button>
-        <button type="button" className={`choice choice-large${mode === 'local' ? ' choice-active' : ''}`} onClick={() => void choose('local')}>
-          <span className="choice-icon">
-            <Icon name="laptop" size={22} />
-          </span>
-          <span className="choice-title">{localName}</span>
-          <span className="choice-text">
-            Private and offline: a Whisper model runs on your computer. Slower and less accurate, nothing leaves the
-            device.
-          </span>
-        </button>
-      </div>
+      <h1 className="setup-title">How should Yap transcribe?</h1>
+      <p className="setup-lead">You can switch any time under Engine.</p>
+      <RadioCards<TranscriptionMode>
+        label="Transcription"
+        className="choice-grid"
+        cardClassName="choice"
+        value={mode}
+        options={[{ value: 'cloud' }, { value: 'local' }]}
+        onChange={(value) => void choose(value)}
+        render={(value) =>
+          value === 'cloud' ? (
+            <>
+              <span className="choice-icon">
+                <Icon name="cloud" size={20} />
+              </span>
+              <span className="choice-title">
+                Groq cloud <span className="choice-meta">Recommended</span>
+              </span>
+              <span className="choice-text">
+                Fastest and most accurate: Whisper Large v3 answers in a fraction of a second. Free API key, about two hours of
+                audio a day.
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="choice-icon">
+                <Icon name="laptop" size={20} />
+              </span>
+              <span className="choice-title">{localName}</span>
+              <span className="choice-text">
+                Private and offline: a Whisper model runs on your computer. Slower and less accurate, nothing leaves the device.
+              </span>
+            </>
+          )
+        }
+      />
       {error && <Notice tone="danger">{error}</Notice>}
       <SetupNav onBack={onBack}>
         <Button variant="primary" busy={busy === 'mode'} onClick={onNext}>
@@ -243,8 +265,10 @@ function HotkeyTester({ state }: { state: AppState }) {
   );
 
   return (
-    <div className={`hotkey-tester${pressed ? ' hotkey-tester-active' : ''}${seen ? ' hotkey-tester-seen' : ''}`}>
-      <KeyCap large>{state.settings.hotkey.label}</KeyCap>
+    <div className={`hotkey-tester${pressed ? ' hotkey-tester-active' : ''}`} role="status" aria-live="polite">
+      <KeyCap large pressed={pressed}>
+        {state.settings.hotkey.label}
+      </KeyCap>
       <span>
         {!state.permissions.hotkeyActive
           ? 'The shortcut listener is not running yet. Check the access step.'
@@ -253,38 +277,6 @@ function HotkeyTester({ state }: { state: AppState }) {
             : `Press ${state.settings.hotkey.label} to test it.`}
       </span>
       {seen && <Icon name="check" size={18} strokeWidth={2.5} />}
-    </div>
-  );
-}
-
-function TryIt({ state }: { state: AppState }) {
-  const [text, setText] = useState('');
-  const area = useRef<HTMLTextAreaElement>(null);
-  const { status, settings } = state;
-
-  useEffect(() => {
-    area.current?.focus();
-  }, []);
-
-  return (
-    <div className="try-it">
-      <p className="setup-lead">
-        Click into the box, hold <KeyCap>{settings.hotkey.label}</KeyCap>, say a sentence and let go.
-      </p>
-      <textarea
-        ref={area}
-        className="input try-area"
-        value={text}
-        onChange={(event) => setText(event.target.value)}
-        placeholder="Your words land here…"
-      />
-      <div className="try-status">
-        <span className={`status-dot status-dot-${status.phase}`} />
-        <span>
-          <strong>{status.title}</strong> {status.detail}
-        </span>
-        {status.phase === 'done' && status.metrics && <Chip tone="success">{formatSeconds(status.metrics.totalMs)}</Chip>}
-      </div>
     </div>
   );
 }

@@ -152,6 +152,83 @@ export function Segmented<T extends string>({
   );
 }
 
+/**
+ * Cards that pick one value, e.g. the polish levels. A radio group for
+ * assistive tech: one tab stop, arrow keys move the selection.
+ */
+export function RadioCards<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+  className,
+  cardClassName,
+  disabled,
+  render,
+}: {
+  label: string;
+  value: T;
+  options: ReadonlyArray<{ value: T; disabled?: boolean; className?: string }>;
+  onChange: (value: T) => void;
+  className: string;
+  cardClassName: string;
+  disabled?: boolean;
+  render: (value: T, active: boolean) => ReactNode;
+}) {
+  const cards = useRef<Array<HTMLButtonElement | null>>([]);
+  const selected = options.findIndex((option) => option.value === value);
+
+  const move = (delta: number) => {
+    const count = options.length;
+    let next = selected < 0 ? 0 : selected;
+    for (let step = 0; step < count; step += 1) {
+      next = (next + delta + count) % count;
+      if (!options[next].disabled) break;
+    }
+    onChange(options[next].value);
+    cards.current[next]?.focus();
+  };
+
+  return (
+    <div
+      className={className}
+      role="radiogroup"
+      aria-label={label}
+      onKeyDown={(event) => {
+        if (disabled) return;
+        if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+          event.preventDefault();
+          move(1);
+        } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+          event.preventDefault();
+          move(-1);
+        }
+      }}
+    >
+      {options.map((option, index) => {
+        const active = index === selected;
+        return (
+          <button
+            key={option.value}
+            ref={(element) => {
+              cards.current[index] = element;
+            }}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            tabIndex={active || (selected < 0 && index === 0) ? 0 : -1}
+            className={`${cardClassName}${active ? ` ${cardClassName}-active` : ''}${option.className ? ` ${option.className}` : ''}`}
+            disabled={disabled || option.disabled}
+            onClick={() => onChange(option.value)}
+          >
+            {render(option.value, active)}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export type Tone = 'success' | 'warning' | 'danger' | 'neutral' | 'accent';
 
 export function Chip({ tone = 'neutral', icon, children }: { tone?: Tone; icon?: IconName; children: ReactNode }) {
@@ -212,8 +289,8 @@ export function Notice({ tone = 'neutral', icon, children, action }: { tone?: To
   );
 }
 
-export function KeyCap({ children, large }: { children: ReactNode; large?: boolean }) {
-  return <kbd className={`keycap${large ? ' keycap-large' : ''}`}>{children}</kbd>;
+export function KeyCap({ children, large, pressed }: { children: ReactNode; large?: boolean; pressed?: boolean }) {
+  return <kbd className={`keycap${large ? ' keycap-large' : ''}${pressed ? ' keycap-pressed' : ''}`}>{children}</kbd>;
 }
 
 export function Progress({ value, label }: { value: number; label?: string }) {

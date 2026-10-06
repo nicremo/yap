@@ -2,6 +2,8 @@ import { fileURLToPath } from 'node:url';
 
 import { BrowserWindow, nativeTheme, screen } from 'electron';
 
+import type { ThemePreference } from '../shared/types';
+
 const isMac = process.platform === 'darwin';
 
 const preloadPath = fileURLToPath(new URL('../preload/index.cjs', import.meta.url));
@@ -24,7 +26,7 @@ async function loadRenderer(window: BrowserWindow, hash = ''): Promise<void> {
   await window.loadFile(rendererFilePath, { hash });
 }
 
-export async function createMainWindow(): Promise<BrowserWindow> {
+export async function createMainWindow(theme: ThemePreference): Promise<BrowserWindow> {
   const window = new BrowserWindow({
     width: 1080,
     height: 740,
@@ -41,6 +43,8 @@ export async function createMainWindow(): Promise<BrowserWindow> {
       preload: preloadPath,
       contextIsolation: true,
       spellcheck: false,
+      // Read by the preload, so the first frame already has the right theme.
+      additionalArguments: [`--yap-theme=${theme}`],
     },
   });
 

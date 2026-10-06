@@ -16,15 +16,15 @@ export const MODIFIER_LABELS: Record<string, string> = {
 
 export const KEY_LABELS: Record<number, string> = {
   // Modifier-only keys (right-side variants)
-  54: 'Right \u2318',
-  61: 'Right \u2325',
-  60: 'Right \u21E7',
-  62: 'Right \u2303',
+  54: 'Right Command (\u2318)',
+  61: 'Right Option (\u2325)',
+  60: 'Right Shift (\u21E7)',
+  62: 'Right Control (\u2303)',
   // Modifier-only keys (left-side variants)
-  55: 'Left \u2318',
-  58: 'Left \u2325',
-  56: 'Left \u21E7',
-  59: 'Left \u2303',
+  55: 'Left Command (\u2318)',
+  58: 'Left Option (\u2325)',
+  56: 'Left Shift (\u21E7)',
+  59: 'Left Control (\u2303)',
   // Function keys
   63: 'Fn',
   122: 'F1',
@@ -93,7 +93,7 @@ export const FN_HOTKEY: HotkeyConfig = {
 export const RIGHT_ALT_HOTKEY: HotkeyConfig = {
   keyCode: 61,
   modifiers: 0,
-  label: 'Right \u2325',
+  label: 'Right Option (\u2325)',
 };
 
 export const DEFAULT_HOTKEY: HotkeyConfig = FN_HOTKEY;

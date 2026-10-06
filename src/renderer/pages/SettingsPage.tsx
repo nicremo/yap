@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 import type { AppState, ThemePreference, UpdateSettingsInput } from '../../shared/types';
 import { HotkeySettings } from '../components/HotkeyRecorder';
 import { PermissionList } from '../components/PermissionList';
@@ -8,6 +10,7 @@ import { useAction } from '../lib/store';
 export function SettingsPage({ state, onState }: { state: AppState; onState: (next: AppState) => void }) {
   const { settings } = state;
   const { busy, error, run } = useAction();
+  const [confirmingSetup, setConfirmingSetup] = useState(false);
   const update = (patch: UpdateSettingsInput) => run('settings', async () => onState(await window.yap.updateSettings(patch)));
 
   return (
@@ -98,23 +101,41 @@ export function SettingsPage({ state, onState }: { state: AppState; onState: (ne
         <code className="path">{settings.storageDirectory}</code>
       </Card>
 
+      <Card title="Troubleshooting">
+        <div className="row">
+          <div className="row-text">
+            <strong>Run setup again</strong>
+            <span>Walks through engine, permissions and shortcut once more. Your settings stay.</span>
+          </div>
+          {confirmingSetup ? (
+            <div className="confirm">
+              <Button size="sm" variant="ghost" onClick={() => setConfirmingSetup(false)}>
+                Cancel
+              </Button>
+              <Button size="sm" variant="primary" onClick={() => void update({ setupComplete: false, setupStep: 'welcome' })}>
+                Run setup
+              </Button>
+            </div>
+          ) : (
+            <Button size="sm" variant="secondary" onClick={() => setConfirmingSetup(true)}>
+              Run setup again
+            </Button>
+          )}
+        </div>
+      </Card>
+
       <Card title="About">
         <div className="about">
           <span>
-            Yap {state.version}. Free and open source under the MIT licence, made by{' '}
+            Yap {state.version}, free and open source under the MIT licence, made by{' '}
             <button type="button" className="inline-link" onClick={() => void window.yap.openExternal('https://github.com/nicremo')}>
               Fabian Bitzer
             </button>
             .
           </span>
-          <div className="button-row">
-            <Button size="sm" variant="ghost" icon="external" onClick={() => void window.yap.openExternal('https://github.com/nicremo/yap')}>
-              GitHub
-            </Button>
-            <Button size="sm" variant="ghost" icon="refresh" onClick={() => void update({ setupComplete: false })}>
-              Run setup again
-            </Button>
-          </div>
+          <Button size="sm" variant="ghost" icon="external" onClick={() => void window.yap.openExternal('https://github.com/nicremo/yap')}>
+            GitHub
+          </Button>
         </div>
       </Card>
     </>

@@ -24,7 +24,11 @@ function subscribe<T>(channel: string, listener: (payload: T) => void): () => vo
   };
 }
 
+const themeArgument = process.argv.find((argument) => argument.startsWith('--yap-theme='))?.slice('--yap-theme='.length);
+
 const api = {
+  /** The theme the window was opened with, before the state arrives. */
+  initialTheme: themeArgument === 'light' || themeArgument === 'dark' ? themeArgument : 'system',
   getState: () => ipcRenderer.invoke('app:getState') as Promise<AppState>,
   updateSettings: (updates: UpdateSettingsInput) => ipcRenderer.invoke('settings:update', updates) as Promise<AppState>,
   chooseStorage: () => ipcRenderer.invoke('settings:chooseStorage') as Promise<AppState>,

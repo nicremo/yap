@@ -3,10 +3,19 @@ import { CLOUD_MODELS, DEFAULT_REWRITE_MODEL, findRewriteModel, LANGUAGES, REWRI
 import { GroqKeyField } from '../components/GroqKeyField';
 import { Icon } from '../components/Icon';
 import { LocalModelPicker } from '../components/LocalModelPicker';
-import { Card, Field, Notice, Segmented, ToggleRow } from '../components/ui';
+import { Button, Card, Field, Notice, Segmented } from '../components/ui';
+import type { Page } from '../App';
 import { useAction } from '../lib/store';
 
-export function EnginePage({ state, onState }: { state: AppState; onState: (next: AppState) => void }) {
+export function EnginePage({
+  state,
+  onState,
+  navigate,
+}: {
+  state: AppState;
+  onState: (next: AppState) => void;
+  navigate: (page: Page) => void;
+}) {
   const { settings, engine } = state;
   const { error, run } = useAction();
   const update = (patch: UpdateSettingsInput) => run('settings', async () => onState(await window.yap.updateSettings(patch)));
@@ -16,11 +25,14 @@ export function EnginePage({ state, onState }: { state: AppState; onState: (next
     <>
       <header className="page-header">
         <h1>Engine</h1>
-        <p>Where your voice turns into text, and how it gets polished.</p>
+        <p>Where your voice turns into text, and which model polishes it.</p>
       </header>
       {error && <Notice tone="danger">{error}</Notice>}
 
-      <Card title="Groq" description="One free key powers cloud transcription and text polishing.">
+      <Card
+        title="Groq"
+        description="Groq runs open speech and language models on very fast hardware. Not to be confused with Grok, the chatbot. One free key powers cloud transcription and polishing."
+      >
         <GroqKeyField state={state} onState={onState} />
       </Card>
 
@@ -33,7 +45,7 @@ export function EnginePage({ state, onState }: { state: AppState; onState: (next
               value: 'cloud',
               label: (
                 <>
-                  <Icon name="cloud" size={15} /> Cloud (Groq)
+                  <Icon name="cloud" size={15} /> Groq cloud
                 </>
               ),
             },
@@ -90,20 +102,22 @@ export function EnginePage({ state, onState }: { state: AppState; onState: (next
         </Field>
       </Card>
 
-      <Card title="Text enhancement">
-        <ToggleRow
-          title="Polish with AI"
-          description={
-            engine.groqKeySet
-              ? 'Removes fillers, fixes grammar and applies your style. Adds a few hundred milliseconds.'
-              : 'Needs a Groq key. Without it, dictations are pasted exactly as transcribed.'
-          }
-          checked={settings.enhancementEnabled}
-          onChange={(enhancementEnabled) => void update({ enhancementEnabled })}
-        />
-        {settings.enhancementEnabled && <RewriteModelField state={state} onChange={(rewriteModel) => void update({ rewriteModel })} />}
+      <Card title="Polishing" description="The model that cleans up your dictation. How much it changes is set in Style.">
+        <RewriteModelField state={state} onChange={(rewriteModel) => void update({ rewriteModel })} />
+        {!settings.enhancementEnabled && (
+          <Notice
+            tone="neutral"
+            action={
+              <Button size="sm" variant="secondary" onClick={() => navigate('style')}>
+                Open Style
+              </Button>
+            }
+          >
+            Polishing is off, dictations go out exactly as transcribed.
+          </Notice>
+        )}
         {settings.enhancementEnabled && settings.transcriptionMode === 'local' && engine.groqKeySet && (
-          <Notice tone="neutral">Polishing sends the transcribed text to Groq. Turn it off to keep everything local.</Notice>
+          <Notice tone="neutral">Polishing sends the transcribed text to Groq. Turn polish off in Style to keep everything local.</Notice>
         )}
       </Card>
     </>

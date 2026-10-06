@@ -267,7 +267,7 @@ function updateMicPolling(): void {
 }
 
 async function createMain(showOnReady: boolean): Promise<void> {
-  const window = await createMainWindow();
+  const window = await createMainWindow(settings.theme);
   mainWindow = window;
 
   window.on('ready-to-show', () => {

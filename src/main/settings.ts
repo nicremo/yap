@@ -13,6 +13,7 @@ import type {
   TranscriptionMode,
   UpdateSettingsInput,
 } from '../shared/types';
+import { buildHotkeyLabel } from '../shared/hotkeys';
 import { CLOUD_MODELS, LANGUAGES, LOCAL_MODELS, REWRITE_MODELS } from '../shared/models';
 import { SETUP_STEPS } from '../shared/setup';
 import { createDefaultSettings, SETTINGS_VERSION } from './defaults';
@@ -130,7 +131,10 @@ export function migrateSettings(raw: unknown, defaults: AppSettings): AppSetting
     styleMode: pick(source.styleMode, STYLE_MODES, defaults.styleMode),
     customPlusVoice: pick(source.customPlusVoice, VOICES, defaults.customPlusVoice),
     enhancementLevel: pick(source.enhancementLevel, LEVELS, defaults.enhancementLevel),
-    hotkey: isHotkey(source.hotkey) ? source.hotkey : defaults.hotkey,
+    // Labels are derived, so older wordings (Right ⌥) follow the current one.
+    hotkey: isHotkey(source.hotkey)
+      ? { ...source.hotkey, label: buildHotkeyLabel(source.hotkey.keyCode, source.hotkey.modifiers) }
+      : defaults.hotkey,
     autoPaste: bool(source.autoPaste, defaults.autoPaste),
     copyToClipboard: bool(source.copyToClipboard, defaults.copyToClipboard),
     showOverlay: bool(source.showOverlay, defaults.showOverlay),
