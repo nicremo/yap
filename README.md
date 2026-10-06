@@ -56,6 +56,14 @@ leaves the device unless you turn it on.
    - **Shortcut**: fn or any key combination, with a live test.
    - **Try it**: dictate into a test box to see the whole pipeline work.
 
+## Language
+
+Yap speaks English and German. *Settings, Appearance, Language* offers
+**System**, which follows the language order of macOS (the first language Yap
+knows wins, otherwise English), or a fixed choice. It changes Yap itself: the
+app, the dictation pill, menus and notifications. The language you dictate in
+is a separate setting under *Engine*.
+
 ## Permissions
 
 | Permission | Why | Required |
