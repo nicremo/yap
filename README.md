@@ -1,194 +1,199 @@
-# yap
+<p align="center">
+  <img src="assets/cover.png" alt="Yap: a sculptural black Y on an ice-blue tile. Hold a key, speak, release." width="960" />
+</p>
 
-![yap](assets/cover.png)
+<h1 align="center">Your voice. Your apps. No subscription.</h1>
 
-**Fast, free dictation for macOS.** Hold a key, speak, release. Your words are
-transcribed, cleaned up and pasted where your cursor is, usually in well under
-a second. No subscription, no account, no telemetry.
+<p align="center">
+  <strong>Yap is a free, open source alternative to Wispr Flow and other desktop dictation apps.</strong><br />
+  Hold a key, speak naturally, and let your words land where your cursor is.<br />
+  Fast Groq APIs when you want speed. Local Whisper when you want offline transcription.
+</p>
 
-## How it works
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-79b8ed?style=flat-square" alt="MIT license" /></a>
+  <a href="https://github.com/nicremo/yap/actions/workflows/ci.yml"><img src="https://github.com/nicremo/yap/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI status" /></a>
+  <a href="package.json"><img src="https://img.shields.io/github/package-json/v/nicremo/yap?style=flat-square" alt="Source version" /></a>
+  <img src="https://img.shields.io/badge/platforms-macOS%20%7C%20Windows-24292f?style=flat-square" alt="macOS and Windows" />
+  <img src="https://img.shields.io/badge/app_price-free-3a8d71?style=flat-square" alt="The app is free" />
+</p>
 
-1. **Hold your key** (fn by default). The microphone opens on the very first
-   press, and Yap opens its connection to Groq while you are still speaking.
-2. **Speak.** Double tap instead of holding to dictate hands-free, tap once more
-   to finish.
-3. **Release.** The recording goes to Groq as compact Opus audio, Whisper Large
-   v3 transcribes it, a fast language model polishes it in your style, and the
-   text is pasted into the app you were typing in.
+<p align="center">
+  <a href="#get-started">Get started</a> ·
+  <a href="#why-yap">Why Yap</a> ·
+  <a href="#fast-by-design">How it stays fast</a> ·
+  <a href="docs/PRIVACY.md">Privacy</a> ·
+  <a href="CONTRIBUTING.md">Contribute</a>
+</p>
 
-```
-fn down ──► mic open, TLS warm-up, clipboard snapshot   (while you speak)
-fn up   ──► Opus upload ──► Whisper Large v3 (Groq) ──► polish (Groq) ──► paste
-```
+![Yap home screen, light appearance, with an empty demo profile](assets/screenshots/home-light.png)
 
-Every dictation shows its timing on the Home page, for example
-`Total 0.64 s · Transcribe 0.31 s · Polish 0.24 s`.
+<p align="center"><sub>The real app renderer, captured with a clean demo profile. No personal dictations, API keys or invented speed results.</sub></p>
 
-### Two engines, pick one
+## Why Yap
 
-| | Cloud (Groq) | Local |
-|---|---|---|
-| Speed | A fraction of a second | Seconds, depends on the Mac |
-| Accuracy | Whisper Large v3 | Whisper Base or Small |
-| Privacy | Audio goes to Groq | Nothing leaves the device |
-| Cost | Free tier, about two hours of audio a day | Free |
+Dictation should be something you can use, inspect and make your own.
 
-Polishing (removing fillers, fixing grammar, applying your style) runs on Groq
-and can be switched off. In local mode it starts switched off, so nothing
-leaves the device unless you turn it on.
+- **Free and open source.** MIT licensed. No Yap subscription, paid feature gate or Yap account.
+- **Type with your voice across apps.** Hold your shortcut to talk and release to paste. Double tap for hands-free dictation.
+- **Fast cloud transcription.** Groq runs Whisper Large v3 or Large v3 Turbo, with optional text cleanup through its language models.
+- **An offline option.** Run Whisper Base or Small on your own computer after the initial model download. Leave cloud polishing off to keep dictation local.
+- **Your words, your style.** Conversation and coding styles, custom instructions, a personal dictionary, corrections and per-app rules.
+- **A clipboard that stays yours.** Automatic paste restores the previous clipboard by default. Keep dictated text on it only when you choose to.
+- **English and German interface.** Light, dark and system appearance. Dictation language is configured separately from the interface.
+- **Visible timing.** The app reports transcription, cleanup and delivery timing for your own dictations.
 
-## Install
+Yap is an independent project. It is not affiliated with Wispr Flow, Superwhisper or Groq. It offers the core desktop dictation workflow; it does not claim feature-for-feature parity with every competing product.
 
-1. Download the latest `.dmg` from [Releases](https://github.com/nicremo/yap/releases)
-   and drag Yap to Applications.
-2. The build is not notarised by Apple, so clear the quarantine flag once:
+## Free means free software
 
-   ```bash
-   xattr -cr /Applications/Yap.app
-   ```
+**Yap itself costs nothing.** Every feature in this repository is included, and you can modify or redistribute the app under the MIT license.
 
-3. Open Yap. The setup walks you through:
-   - **Engine**: Groq cloud (recommended) or local.
-   - **Connect**: paste a free key from [console.groq.com/keys](https://console.groq.com/keys),
-     or download the local model. Everything happens inside the app.
-   - **Access**: microphone and Accessibility. The list updates live while you
-     flip the switches in System Settings.
-   - **Shortcut**: fn or any key combination, with a live test.
-   - **Try it**: dictate into a test box to see the whole pipeline work.
+| Mode | What you need | Cost and data flow |
+| --- | --- | --- |
+| Groq cloud | Your own Groq account and API key | Can run on Groq's free tier within its limits. Audio is sent directly to Groq. Paid API plans can incur charges. |
+| Local Whisper | Download a Base or Small model once | No API bill for transcription. Runs on your computer after the model download. |
+| Optional cloud polishing | Your Groq key | Sends the transcript and style instructions to Groq, including when enabled alongside local transcription. |
 
-## Language
+Groq controls its [free-tier limits](https://console.groq.com/docs/rate-limits), model availability and [speech-to-text pricing](https://console.groq.com/docs/speech-to-text). Those can change. Yap does not promise unlimited third-party API usage.
 
-Yap speaks English and German. *Settings, Appearance, Language* offers
-**System**, which follows the language order of macOS (the first language Yap
-knows wins, otherwise English), or a fixed choice. It changes Yap itself: the
-app, the dictation pill, menus and notifications. The language you dictate in
-is a separate setting under *Engine*.
+## Get started
 
-## Permissions
+The repository currently provides the source. Prebuilt installers will be listed on the [Releases page](https://github.com/nicremo/yap/releases) when published. If that page has no downloads, use the source setup below.
 
-| Permission | Why | Required |
-|---|---|---|
-| Microphone | Recording while the key is held | Yes |
-| Accessibility | Pasting into other apps and watching the shortcut | Yes |
-| Input Monitoring | Watching the shortcut passively | No, only if the shortcut does not react |
+### Run from source
 
-Yap checks them continuously and shows the live state in Settings. If System
-Settings shows Yap as allowed but Yap still reports a permission as missing,
-macOS is holding on to an entry from an older build: press **Repair
-permissions** in Settings (it clears Yap's entries with `tccutil`) and allow
-access once more.
-
-If you use **fn** as the shortcut, set *System Settings → Keyboard → Press 🌐
-key to* → **Do Nothing**, otherwise macOS also opens the emoji picker or
-switches the input source. Yap detects this and tells you.
-
-## Clipboard
-
-- **Paste automatically** on, **Keep on clipboard** off (default): Yap pastes,
-  then puts back exactly what you had copied before. The dictation is marked
-  as transient, so clipboard managers such as Raycast, Maccy or Paste do not
-  record it.
-- **Keep on clipboard** on: every dictation stays on the clipboard.
-- **Paste automatically** off: the text is copied (if *Keep on clipboard* is
-  on) or only saved to History.
-
-If pasting is impossible (Accessibility off), the text lands on the clipboard
-so it is never lost.
-
-**Copy last dictation** (*Settings, Shortcuts*) is a shortcut of your own, up
-to four modifiers plus a key, for example ⌃⌥⇧⌘6. Pressed in any app, it puts
-your most recent dictation on the clipboard, also while a new one is still
-being transcribed. It goes through the system's hotkey API, so it needs no
-extra permission. Yap asks for at least two modifiers, one of them ⌃ or ⌘ (or
-a function key), so the shortcut cannot swallow characters you type.
-
-## Build from source
+Install Node.js 22 and Git. For the native helper, macOS needs the Xcode Command Line Tools; Windows needs Visual Studio Build Tools with the C++ workload.
 
 ```bash
 git clone https://github.com/nicremo/yap.git
 cd yap
-npm install
+npm ci
+npm run build:native
 npm run dev
 ```
 
-The native helper compiles itself on the first `npm run dev`. During
-development macOS attributes permissions to the terminal that started Yap, so
-grant them to your terminal app.
+The setup wizard guides you through choosing an engine, connecting Groq or downloading a local model, granting permissions and testing your shortcut. Create your own Groq key at [console.groq.com/keys](https://console.groq.com/keys). Never paste it into a GitHub issue.
 
-### Distributable build
+![Yap welcome screen with the Y logo and first-run setup](assets/screenshots/welcome-light.png)
 
-```bash
-scripts/create-signing-identity.sh   # once per build machine
-npm run package:mac
-```
+On macOS, development builds may attribute permissions to the terminal that launched them. A packaged app gets its own permission entry.
 
-`create-signing-identity.sh` creates a self-signed code signing certificate.
-macOS ties privacy permissions to the code signature: with an ad-hoc signature
-every new build counts as a different app, and users have to grant
-Accessibility again after each update. Builds signed with the same certificate
-keep their permissions. A `Developer ID Application` certificate in the
-keychain is picked up automatically instead; `YAP_SIGN_IDENTITY` overrides both.
-
-The native helper is built as a universal binary, the app for the architecture
-of the build machine (`npx electron-builder --mac --x64` or `--universal` for
-others).
-
-## Architecture
-
-```
-src/
-  main/
-    index.ts            App lifecycle, windows, tray, state broadcasting
-    dictation/
-      engine.ts         Key press to pasted text, pipelined and ordered
-      gesture.ts        Hold, tap and double-tap handling
-      pipeline.ts       Transcription and polishing, silence and hallucination filters
-    groq.ts             Groq client on Chromium's network stack, connection pre-warming
-    rewrite.ts          Polishing prompts and output cleanup
-    local-whisper.ts    On-device Whisper via transformers.js
-    native/             Bridge to the native helper (persistent on macOS)
-    permissions.ts      Live permission state, requests and repair
-    settings.ts         Settings with migration from older versions
-    prompts/            Prompt families for Conversation, Vibe Coding and Custom +
-  renderer/
-    App.tsx, pages/     Settings app
-    setup/              First-run setup
-    overlay/            Dictation pill and the recorder host
-    recorder/           AudioWorklet capture at 16 kHz, Opus via MediaRecorder
-swift/YapHelper.swift   Hotkey tap, focus, clipboard and paste (one long-lived process)
-windows/YapHelper.cpp   Windows helper
-```
-
-What makes it fast:
-
-- Recording starts on the first key press, no waiting to tell a tap from a hold.
-- The connection to Groq is opened while you speak (`session.preconnect`), and
-  requests use Chromium's HTTP/2 connection pool.
-- Audio is uploaded as Opus, about a tenth of the WAV size; WAV is the fallback.
-- No disk access between key release and paste; history and audio are saved
-  in the background.
-- One persistent native helper instead of a process launch per paste, and no
-  fixed delays before pasting.
-- Reasoning models run with minimal reasoning effort.
-
-## Tests
+### Build an installer locally
 
 ```bash
-npm test             # unit tests
+npm run build:native
+npm run build
+npx electron-builder --mac --publish never
+```
+
+On Windows, run the equivalent in a Developer Command Prompt:
+
+```bash
+npm run build:native
+npm run build
+npx electron-builder --win --publish never
+```
+
+The app and installers are written to `release/`. On macOS, the app is normally `release/mac-arm64/Yap.app` on Apple Silicon or `release/mac/Yap.app` on Intel. You can copy that `.app` into `/Applications`.
+
+The macOS helper is built for both arm64 and x86_64. Electron packages the app for the build machine's architecture unless you request another architecture. A Developer ID certificate is selected automatically when available; `YAP_SIGN_IDENTITY` can choose an identity explicitly. See [development and signing](CONTRIBUTING.md#packaging-and-signing).
+
+**macOS builds are not currently notarized by Apple.** A valid code signature and notarization are separate things. Review [Apple's guidance on opening apps](https://support.apple.com/en-us/102445) if macOS blocks a downloaded build.
+
+## Fast by design
+
+Yap does useful work while you are still speaking, so less is left to do after you release the key.
+
+```mermaid
+flowchart LR
+    A[Hold your shortcut] --> B[Record audio]
+    B --> C[Release]
+    B -. Prepare connection .-> D[Groq]
+    C --> E{Engine}
+    E -->|Compact Opus upload| D
+    E -->|Offline| F[Local Whisper]
+    D --> G[Optional text polishing]
+    F --> G
+    G --> H[Paste into your app]
+```
+
+- **Recording starts on the first press.** It does not wait to decide between a hold and a double tap.
+- **The Groq connection is prepared while you speak.** Requests reuse Chromium's connection pool.
+- **Opus keeps uploads compact.** WAV is available as a fallback.
+- **A persistent native helper handles shortcuts and paste.** No new helper process for every dictation.
+- **History and audio save in the background.** Disk writes stay out of the delivery path.
+- **You see your own results.** Timing is measured in the app, rather than promised as a universal benchmark.
+
+Latency depends on the recording length, selected models, network, service load and computer. Local Whisper trades cloud speed for offline operation. See [Groq's speech-to-text documentation](https://console.groq.com/docs/speech-to-text) for its model capabilities.
+
+## Built for everyday use
+
+| Capability | What it does |
+| --- | --- |
+| Hold or double tap | Push-to-talk or hands-free recording |
+| Automatic paste | Inserts text in the app you were using |
+| Text polishing | Removes filler words and applies the selected writing style |
+| Dictionary and corrections | Keeps recurring names and terms consistent |
+| Per-app rules | Selects style and cleanup level for individual apps |
+| History | Keeps recent dictations locally, with copy and retry actions |
+| Copy last shortcut | Copies the latest result without opening Yap |
+| Local models | Whisper Base or Small through Transformers.js |
+| Appearance | English/German UI, light/dark/system theme |
+
+<details>
+<summary>Dark appearance</summary>
+
+![Yap home screen in dark appearance, with an empty demo profile](assets/screenshots/home-dark.png)
+
+</details>
+
+### Permissions and shortcuts
+
+| Permission | Why Yap needs it |
+| --- | --- |
+| Microphone | Records only while dictation is active |
+| Accessibility, macOS | Pastes into other apps and supports the global shortcut |
+| Input Monitoring, macOS | May be needed if the shortcut does not respond |
+
+For the default fn shortcut, set **System Settings → Keyboard → Press 🌐 key to → Do Nothing**. Otherwise macOS can also open the emoji picker or switch the input language.
+
+Permission status is visible in Settings. **Repair permissions** resets Yap's macOS permission entries if an older build left them inconsistent. You will need to allow access again afterward.
+
+### Clipboard and local storage
+
+By default, automatic paste restores what you copied before. **Keep on clipboard** leaves the dictation available for reuse; **Copy last dictation** offers a separate shortcut. If pasting is unavailable, the result falls back to the clipboard.
+
+History is stored locally. Audio is retained locally for retry and is cleaned up by the app after seven days. This is not a memory-only recorder. Read the [privacy guide](docs/PRIVACY.md) for network requests, local files and sharing diagnostics safely.
+
+## For developers
+
+Electron, React, TypeScript, a Swift helper on macOS and a C++ helper on Windows.
+
+```text
+src/main/          App lifecycle, dictation pipeline, APIs and local models
+src/preload/       Typed bridge between main and renderer
+src/renderer/      Setup, home, history, settings and recorder
+src/shared/        Types, model options, shortcuts and translations
+swift/             macOS native helper
+windows/           Windows native helper
+tests/             Unit tests and Linux end-to-end dictation test
+```
+
+```bash
 npm run typecheck
-npm run test:helper  # macOS: protocol test of the compiled native helper
-npm run build && xvfb-run -a npm run test:e2e
-                     # Linux: the built app against a mock Groq server
+npm test
+npm run build
+npm run build:native
+npm run test:helper
 ```
 
-The end-to-end test launches the real app with Chromium's fake microphone,
-drives the hotkey and checks the whole path: key setup, Opus upload, rewrite,
-delivery, clipboard behaviour and history.
+The Linux end-to-end test uses a mock Groq server and Chromium's fake microphone. It does not use a real API key or produce a provider speed benchmark.
 
-## Credits
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development, screenshot capture and pull requests, [SUPPORT.md](SUPPORT.md) for help and [SECURITY.md](SECURITY.md) for vulnerability reports.
 
-Based on [OpenWhisp](https://github.com/giusmarci/openwhisp), MIT licensed.
+## Credits and license
 
-## License
+Yap builds on [OpenWhisp](https://github.com/giusmarci/openwhisp). The original copyright notice is preserved in [LICENSE](LICENSE).
 
-MIT. See [LICENSE](LICENSE).
+**MIT licensed. Free to use, study, modify and share.**

@@ -226,7 +226,7 @@ export const de: Messages = {
       'Groq betreibt offene Sprach- und Textmodelle auf sehr schneller Hardware. Nicht zu verwechseln mit Grok, dem Chatbot. Ein kostenloser Key reicht für Transkription in der Cloud und für den Feinschliff.',
     transcription: 'Transkription',
     cloudText:
-      'Whisper läuft auf der Hardware von Groq und antwortet in Sekundenbruchteilen. Die kostenlose Stufe reicht für etwa zwei Stunden Audio am Tag.',
+      'Whisper läuft für schnelle Cloud-Transkription auf der Hardware von Groq. Gratis-Limits und mögliche API-Kosten hängen von deinem Groq-Tarif ab.',
     cloudNeedsKey: 'Füge oben einen Groq-Key hinzu, um in der Cloud zu transkribieren.',
     localText: 'Whisper läuft auf diesem Computer. Nichts, was du sagst, verlässt das Gerät, dafür ist es langsamer und ungenauer.',
     language: 'Sprache',
@@ -314,13 +314,13 @@ export const de: Messages = {
     cancel: 'Einrichtung abbrechen',
     welcomeTitle: 'Willkommen bei Yap',
     welcomeLead:
-      'Taste halten, sprechen, loslassen. Deine Worte erscheinen dort, wo du gerade schreibst, aufgeräumt und in deutlich unter einer Sekunde.',
+      'Taste halten, sprechen, loslassen. Deine Worte erscheinen dort, wo du gerade schreibst, mit optionaler Textüberarbeitung.',
     start: 'Yap einrichten',
     engineTitle: 'Wie soll Yap transkribieren?',
     engineLead: 'Du kannst das jederzeit unter Engine ändern.',
     recommended: 'Empfohlen',
     cloudChoice:
-      'Am schnellsten und genauesten: Whisper Large v3 antwortet in Sekundenbruchteilen. Kostenloser API-Key, etwa zwei Stunden Audio am Tag.',
+      'Schnelle Cloud-Transkription mit Whisper Large v3. Nutze deinen eigenen API-Key innerhalb von Groqs Gratis-Limits oder mit einem bezahlten Tarif.',
     localChoice:
       'Privat und offline: Ein Whisper-Modell läuft auf deinem Computer. Langsamer und ungenauer, nichts verlässt das Gerät.',
     connectGroq: 'Groq verbinden',

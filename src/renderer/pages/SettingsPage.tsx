@@ -149,8 +149,8 @@ export function SettingsPage({ state, onState }: { state: AppState; onState: (ne
           <span>
             {rich(t.settings.aboutText(state.version), {
               author: (
-                <button type="button" className="inline-link" onClick={() => void window.yap.openExternal('https://github.com/nicremo')}>
-                  Fabian Bitzer
+                <button type="button" className="inline-link" onClick={() => void window.yap.openExternal('https://github.com/nicremo/yap/graphs/contributors')}>
+                  Yap contributors
                 </button>
               ),
             })}

@@ -234,7 +234,7 @@ export const en = {
       'Groq runs open speech and language models on very fast hardware. Not to be confused with Grok, the chatbot. One free key powers cloud transcription and polishing.',
     transcription: 'Transcription',
     cloudText:
-      "Whisper runs on Groq's hardware and answers in a fraction of a second. The free tier covers about two hours of audio a day.",
+      "Whisper runs on Groq's hardware for fast cloud transcription. Free-tier limits and paid API charges depend on your Groq plan.",
     cloudNeedsKey: 'Add a Groq key above to use cloud transcription.',
     localText: 'Whisper runs on this computer. Nothing you say leaves the device, at the cost of speed and accuracy.',
     language: 'Language',
@@ -323,13 +323,13 @@ export const en = {
     progressLabel: 'Setup progress',
     cancel: 'Cancel setup',
     welcomeTitle: 'Welcome to Yap',
-    welcomeLead: 'Hold a key, speak, release. Your words appear wherever you are typing, cleaned up and in well under a second.',
+    welcomeLead: 'Hold a key, speak, release. Your words appear wherever you are typing, with optional text cleanup.',
     start: 'Set up Yap',
     engineTitle: 'How should Yap transcribe?',
     engineLead: 'You can switch any time under Engine.',
     recommended: 'Recommended',
     cloudChoice:
-      'Fastest and most accurate: Whisper Large v3 answers in a fraction of a second. Free API key, about two hours of audio a day.',
+      "Fast cloud transcription with Whisper Large v3. Use your own API key within Groq's free-tier limits or paid plan.",
     localChoice:
       'Private and offline: a Whisper model runs on your computer. Slower and less accurate, nothing leaves the device.',
     connectGroq: 'Connect Groq',
