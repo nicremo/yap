@@ -59,17 +59,9 @@ Groq controls its [free-tier limits](https://console.groq.com/docs/rate-limits),
 
 ## Get started
 
-Download the latest app directly from [GitHub Releases](https://github.com/nicremo/yap/releases/latest):
+The first notarized release is being prepared. Installers for Apple Silicon Macs, Intel Macs and Windows will appear on [GitHub Releases](https://github.com/nicremo/yap/releases) once Apple's checks and the update assets are verified. You can already run Yap from source using the instructions below.
 
-| Platform | Download | Install |
-| --- | --- | --- |
-| macOS, Apple Silicon | [Download the Apple Silicon installer](https://github.com/nicremo/yap/releases/download/v1.1.1/Yap-1.1.1-arm64.dmg) | Open the DMG and drag Yap into Applications. |
-| macOS, Intel | [Download the Intel installer](https://github.com/nicremo/yap/releases/download/v1.1.1/Yap-1.1.1-x64.dmg) | Open the DMG and drag Yap into Applications. |
-| Windows, x64 | [Download the Windows installer](https://github.com/nicremo/yap/releases/download/v1.1.1/Yap-1.1.1-setup.exe) | Run the setup installer. |
-
-macOS builds are signed but not notarized by Apple. Windows builds are not Authenticode signed. Your operating system may show a warning for a downloaded app. See the release notes for platform-specific installation guidance.
-
-The setup wizard walks you through the engine, permissions and shortcut. Groq mode uses your own API key. Local transcription needs an initial model download. The app itself is free.
+Groq mode uses your own API key. Local transcription needs an initial model download. The app itself is free.
 
 ### Run from source
 
