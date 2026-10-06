@@ -45,7 +45,7 @@ describe('WindowsHelperBridge.paste', () => {
 
   it('puts the previous clipboard back after a successful paste', async () => {
     helperReplies.push('{"ok":true}');
-    const result = await bridge.paste({ text: 'dictated', restoreClipboard: true });
+    const result = await bridge.paste({ text: 'dictated', restoreClipboard: true, selfEditable: false });
     expect(result).toEqual({ ok: true });
     expect(clipboard.readText()).toBe('dictated');
 
@@ -55,7 +55,7 @@ describe('WindowsHelperBridge.paste', () => {
 
   it('leaves the text on the clipboard when pasting failed', async () => {
     helperReplies.push('{"ok":false}');
-    const result = await bridge.paste({ text: 'dictated', restoreClipboard: true });
+    const result = await bridge.paste({ text: 'dictated', restoreClipboard: true, selfEditable: false });
     expect(result).toEqual({ ok: false, reason: 'failed' });
 
     // The engine's fallback: the text must survive on the clipboard.
@@ -64,25 +64,32 @@ describe('WindowsHelperBridge.paste', () => {
     expect(clipboard.readText()).toBe('dictated');
   });
 
+  it('never names a window to bring forward', async () => {
+    const { spawn } = await import('node:child_process');
+    helperReplies.push('{"ok":true}');
+    await bridge.paste({ text: 'dictated', restoreClipboard: true, selfEditable: false });
+    expect(vi.mocked(spawn).mock.lastCall?.[1]).toEqual(['paste']);
+  });
+
   it('keeps the text when asked to leave it on the clipboard', async () => {
     helperReplies.push('{"ok":true}');
-    await bridge.paste({ text: 'dictated', restoreClipboard: false });
+    await bridge.paste({ text: 'dictated', restoreClipboard: false, selfEditable: false });
     vi.advanceTimersByTime(1_000);
     expect(clipboard.readText()).toBe('dictated');
   });
 
   it('restores the original once after two quick dictations', async () => {
     helperReplies.push('{"ok":true}', '{"ok":true}');
-    await bridge.paste({ text: 'first', restoreClipboard: true });
+    await bridge.paste({ text: 'first', restoreClipboard: true, selfEditable: false });
     vi.advanceTimersByTime(300);
-    await bridge.paste({ text: 'second', restoreClipboard: true });
+    await bridge.paste({ text: 'second', restoreClipboard: true, selfEditable: false });
     vi.advanceTimersByTime(1_000);
     expect(clipboard.readText()).toBe('what the user copied');
   });
 
   it('does not overwrite something the user copied in the meantime', async () => {
     helperReplies.push('{"ok":true}');
-    await bridge.paste({ text: 'dictated', restoreClipboard: true });
+    await bridge.paste({ text: 'dictated', restoreClipboard: true, selfEditable: false });
     clipboard.writeText('copied right after');
     vi.advanceTimersByTime(1_000);
     expect(clipboard.readText()).toBe('copied right after');

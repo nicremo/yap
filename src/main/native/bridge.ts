@@ -17,20 +17,21 @@ export interface ListenerStatus {
 export interface HotkeySignal {
   /** 'chord': another key was pressed while the hotkey was held, so it was used as a modifier. */
   type: 'down' | 'up' | 'chord';
-  /** The app that had focus when the key went down. */
-  focus?: FocusInfo;
 }
 
+/** Pastes into whatever has keyboard focus. No app or window is ever brought forward. */
 export interface PasteRequest {
   text: string;
   /** Put the previous clipboard content back afterwards and keep the text out of clipboard history. */
   restoreClipboard: boolean;
-  target?: FocusInfo;
+  /** Whether a text field has focus in a Yap window, in case Yap itself is in front. */
+  selfEditable: boolean;
 }
 
 export interface PasteResult {
   ok: boolean;
-  reason?: 'accessibility' | 'unavailable' | 'failed';
+  /** 'no-target': Yap itself was in front without a text field to paste into. */
+  reason?: 'accessibility' | 'unavailable' | 'failed' | 'no-target';
 }
 
 export interface NativeBridgeEvents {

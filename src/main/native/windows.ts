@@ -232,11 +232,9 @@ export class WindowsHelperBridge extends NativeBridge {
 
     let ok = false;
     try {
-      const args = ['paste'];
-      if (request.target?.processIdentifier) {
-        args.push(request.target.bundleIdentifier ?? '', String(request.target.processIdentifier));
-      }
-      ok = (await this.runOnce<{ ok: boolean }>(args)).ok;
+      // No target arguments: the helper would bring that window forward, and
+      // the text belongs wherever the user is now.
+      ok = (await this.runOnce<{ ok: boolean }>(['paste'])).ok;
     } catch {
       ok = false;
     }

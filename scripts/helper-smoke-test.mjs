@@ -65,7 +65,7 @@ try {
   check(await waitForEvent('ready'), 'announces readiness');
 
   const hello = await call('hello');
-  check(hello.ok && hello.result.version >= 2, `hello answers (version ${hello.result?.version})`);
+  check(hello.ok && hello.result.version >= 3, `hello answers (version ${hello.result?.version})`);
 
   const permissions = await call('permissions');
   check(
@@ -81,6 +81,7 @@ try {
 
   const focus = await call('focus');
   check(focus.ok && typeof focus.result === 'object', `focus answers ${JSON.stringify(focus.result)}`);
+  check(typeof focus.result.editable === 'boolean' && 'role' in focus.result, 'focus says whether a text field has it');
 
   const fn = await call('fnUsage');
   check(fn.ok && 'value' in fn.result, `fn usage answers ${JSON.stringify(fn.result)}`);
@@ -88,8 +89,13 @@ try {
   const prepare = await call('prepareClipboard');
   check(prepare.ok, 'prepares the clipboard');
 
-  const paste = await call('paste', { text: 'smoke test', restore: true });
+  // Empty text: with permissions granted this really pastes, into the terminal running the test.
+  const pasteStartedAt = Date.now();
+  const paste = await call('paste', { text: '', restore: true, selfEditable: false, processIdentifier: 1 });
+  const pasteMs = Date.now() - pasteStartedAt;
   check(paste.ok && typeof paste.result.ok === 'boolean', `paste answers ${JSON.stringify(paste.result)}`);
+  // It used to bring the dictation's start app forward and wait up to 400 ms for it.
+  check(pasteMs < 300, `paste goes to the current focus without activating anything (${pasteMs} ms)`);
   if (!permissions.result.accessibility && !permissions.result.postEvents) {
     check(paste.result.ok === false && paste.result.reason === 'accessibility', 'paste without Accessibility is refused cleanly');
   }

@@ -44,6 +44,8 @@ function toFocus(value: unknown): FocusInfo | undefined {
     appName: typeof raw.appName === 'string' ? raw.appName : undefined,
     bundleIdentifier: typeof raw.bundleIdentifier === 'string' ? raw.bundleIdentifier : undefined,
     processIdentifier: typeof raw.processIdentifier === 'number' ? raw.processIdentifier : undefined,
+    role: typeof raw.role === 'string' ? raw.role : undefined,
+    editable: typeof raw.editable === 'boolean' ? raw.editable : undefined,
   };
   return focus.appName || focus.bundleIdentifier || focus.processIdentifier ? focus : undefined;
 }
@@ -140,7 +142,6 @@ export class MacHelperBridge extends NativeBridge {
       case 'hotkey':
         this.emit('hotkey', {
           type: message.state === 'down' ? 'down' : message.state === 'chord' ? 'chord' : 'up',
-          focus: toFocus(message.focus),
         });
         break;
       case 'permissions':
@@ -289,12 +290,13 @@ export class MacHelperBridge extends NativeBridge {
         {
           text: request.text,
           restore: request.restoreClipboard,
-          processIdentifier: request.target?.processIdentifier,
+          selfEditable: request.selfEditable,
         },
         PASTE_TIMEOUT_MS,
       );
       if (result.ok === true) return { ok: true };
-      return { ok: false, reason: result.reason === 'accessibility' ? 'accessibility' : 'failed' };
+      const reason = result.reason === 'accessibility' || result.reason === 'no-target' ? result.reason : 'failed';
+      return { ok: false, reason };
     } catch (error) {
       console.warn('[yap] paste failed:', error instanceof Error ? error.message : error);
       return { ok: false, reason: 'failed' };

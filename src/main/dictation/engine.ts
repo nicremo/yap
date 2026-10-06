@@ -28,6 +28,8 @@ const MAX_RECORDING_MS = 10 * 60 * 1000;
 /** The recorder answers a stop within a few milliseconds. Anything past this is a dead window. */
 const AUDIO_TIMEOUT_MS = 5_000;
 const MIN_RECORDING_MS = 200;
+/** Asking the helper where the focus is takes a few milliseconds; a hung target app gets this long. */
+const FOCUS_TIMEOUT_MS = 400;
 
 export interface EngineHost {
   getSettings(): AppSettings;
@@ -38,13 +40,18 @@ export interface EngineHost {
   getRecorder(): Promise<WebContents | null>;
   setStatus(status: AppStatus): void;
   broadcastHistory(entries: HistoryEntry[]): void;
-  showMainWindow(): void;
+  /** A system notification. Clicking it opens Yap; the window itself never opens on its own. */
+  notify(title: string, body: string): void;
   notifyHotkey(down: boolean): void;
+  /**
+   * Whether a text field has focus in a Yap window. Null when no Yap window
+   * has focus, so the text goes to another app.
+   */
+  ownTextFieldFocused(): Promise<boolean | null>;
 }
 
 interface Session {
   id: number;
-  focus?: FocusInfo;
   startedAt: number;
   handsfree: boolean;
   maxTimer: ReturnType<typeof setTimeout>;
@@ -67,7 +74,7 @@ interface DeliverySlot {
   release: () => void;
 }
 
-type Delivery = 'pasted' | 'copied' | 'saved' | 'paste-failed' | 'needs-accessibility';
+type Delivery = 'pasted' | 'copied' | 'saved' | 'paste-failed' | 'needs-accessibility' | 'no-target';
 
 function formatSeconds(ms: number): string {
   return `${(ms / 1000).toFixed(ms < 10_000 ? 2 : 1)} s`;
@@ -95,7 +102,6 @@ export class DictationEngine {
   private deliveryTail: Promise<void> = Promise.resolve();
   private lastResult: AppStatus | null = null;
   private resultTimer: ReturnType<typeof setTimeout> | null = null;
-  private lastFocus: FocusInfo | undefined;
 
   constructor(
     private readonly host: EngineHost,
@@ -111,7 +117,6 @@ export class DictationEngine {
     }
     this.host.notifyHotkey(signal.type === 'down');
     if (signal.type === 'down') {
-      this.lastFocus = signal.focus;
       this.gesture.keyDown();
     } else {
       this.gesture.keyUp();
@@ -197,7 +202,8 @@ export class DictationEngine {
     if (blocker) {
       this.gesture.reset();
       this.showResult({ phase: 'error', title: blocker.title, detail: blocker.detail });
-      if (blocker.openApp) this.host.showMainWindow();
+      // The user is in another app: tell them, but leave the window closed.
+      if (blocker.openApp) this.host.notify(blocker.title, blocker.detail);
       return;
     }
 
@@ -205,7 +211,6 @@ export class DictationEngine {
     const id = this.nextSessionId++;
     const session: Session = {
       id,
-      focus: this.lastFocus,
       startedAt: Date.now(),
       handsfree: false,
       maxTimer: setTimeout(() => this.onMaxDuration(id), MAX_RECORDING_MS),
@@ -217,11 +222,6 @@ export class DictationEngine {
     // Everything that can happen while the user speaks happens now.
     if (settings.transcriptionMode === 'cloud') prewarmGroq();
     if (settings.autoPaste && !settings.copyToClipboard) this.bridge.prepareClipboard();
-    if (!session.focus) {
-      void this.bridge.getFocus().then((focus) => {
-        if (focus && !session.focus) session.focus = focus;
-      }).catch(() => undefined);
-    }
 
     const recorder = await this.host.getRecorder();
     if (this.session !== session) return;
@@ -259,6 +259,22 @@ export class DictationEngine {
     });
   }
 
+  /**
+   * Where the user is when the dictation ends. That app gets the text and
+   * decides the style, no matter where the dictation started.
+   */
+  private focusAtRelease(): Promise<FocusInfo | undefined> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<undefined>((resolve) => {
+      timer = setTimeout(() => resolve(undefined), FOCUS_TIMEOUT_MS);
+    });
+    const focus = this.bridge
+      .getFocus()
+      .then((value) => value ?? undefined)
+      .catch(() => undefined);
+    return Promise.race([focus, timeout]).finally(() => clearTimeout(timer));
+  }
+
   /** Reserves this dictation's place in the paste order at the moment it ends. */
   private reserveDeliverySlot(): DeliverySlot {
     const previous = this.deliveryTail;
@@ -277,6 +293,7 @@ export class DictationEngine {
     clearTimeout(session.maxTimer);
 
     const releasedAt = Date.now();
+    const focus = this.focusAtRelease();
     const audioPromise = this.awaitAudio(session.id);
     // Awaited below; this only keeps an early failure path from leaving it unhandled.
     audioPromise.catch(() => undefined);
@@ -290,7 +307,7 @@ export class DictationEngine {
       if (!recorder) throw new Error('The recorder window is not available. Restart Yap.');
       recorder.send('recorder:command', { type: 'stop', sessionId: session.id });
       const audio = await audioPromise;
-      await this.process(job, session, audio, releasedAt, slot);
+      await this.process(job, audio, releasedAt, slot, focus);
     } catch (error) {
       if (error instanceof NothingHeardError) {
         this.showResult({ phase: 'error', title: 'Nothing heard', detail: error.message });
@@ -307,7 +324,13 @@ export class DictationEngine {
 
   /* ── Processing ────────────────────────────────────────────────────── */
 
-  private async process(job: Job, session: Session, audio: RecordedAudio, releasedAt: number, slot: DeliverySlot): Promise<void> {
+  private async process(
+    job: Job,
+    audio: RecordedAudio,
+    releasedAt: number,
+    slot: DeliverySlot,
+    focusPromise: Promise<FocusInfo | undefined>,
+  ): Promise<void> {
     const settings = this.host.getSettings();
 
     if (audio.durationMs < MIN_RECORDING_MS || audio.peakRms < SILENCE_PEAK_RMS) {
@@ -319,7 +342,7 @@ export class DictationEngine {
     const historyId = randomUUID();
     // Saved in the background while the request runs, so a failed dictation
     // can still be retranscribed from History.
-    const persisted = this.persistRecording(historyId, settings, wav, session.focus);
+    const persisted = this.persistRecording(historyId, settings, wav, focusPromise);
 
     const [dictionary, corrections, rules] = await Promise.all([loadDictionary(), loadCorrections(), loadAppRules()]);
 
@@ -344,7 +367,9 @@ export class DictationEngine {
     }
 
     const corrected = applyCorrections(rawText, corrections);
-    const style = resolveStyleForApp(session.focus, rules, settings.styleMode, settings.enhancementLevel);
+    // Resolved long ago in practice: the helper answers while Groq is still busy.
+    const focus = await focusPromise;
+    const style = resolveStyleForApp(focus, rules, settings.styleMode, settings.enhancementLevel);
 
     if (settings.enhancementEnabled && isGroqKeySet(settings)) {
       job.phase = 'rewriting';
@@ -365,7 +390,7 @@ export class DictationEngine {
     this.publishStatus();
 
     await slot.previous;
-    const delivery = await this.deliver(polished.text, session.focus, settings);
+    const delivery = await this.deliver(polished.text, settings);
     slot.release();
 
     const metrics: DictationMetrics = {
@@ -395,7 +420,7 @@ export class DictationEngine {
       transcriptionSource: outcome.source,
       styleMode: style.styleMode,
       enhancementLevel: style.enhancementLevel,
-      appName: session.focus?.appName,
+      appName: focus?.appName,
       status: 'success',
       errorMessage: polished.notice,
       latencyMs: metrics.totalMs,
@@ -422,23 +447,34 @@ export class DictationEngine {
         };
       case 'paste-failed':
         return { ...base, title: 'Copied instead', detail: 'Pasting failed, the text is on your clipboard.' };
+      case 'no-target':
+        return { ...base, title: 'Copied', detail: 'No text field was focused, so the text is on your clipboard.' };
     }
   }
 
-  private async deliver(text: string, focus: FocusInfo | undefined, settings: AppSettings): Promise<Delivery> {
+  private async deliver(text: string, settings: AppSettings): Promise<Delivery> {
     if (settings.autoPaste) {
+      // Cmd+V goes to whatever has focus right now. A Yap window in front
+      // only takes the text into a focused text field.
+      const ownTextField = await this.host.ownTextFieldFocused().catch(() => null);
+      if (ownTextField === false) {
+        clipboard.writeText(text);
+        return 'no-target';
+      }
+
       const result = await this.bridge.paste({
         text,
         // Only when the user did not ask for the text on the clipboard: then
         // the old clipboard comes back and history managers skip the text.
         restoreClipboard: !settings.copyToClipboard,
-        target: focus,
+        selfEditable: ownTextField === true,
       });
       if (result.ok) return 'pasted';
 
       // The text must not get lost, so it lands on the clipboard after all.
       clipboard.writeText(text);
-      return result.reason === 'accessibility' ? 'needs-accessibility' : 'paste-failed';
+      if (result.reason === 'accessibility') return 'needs-accessibility';
+      return result.reason === 'no-target' ? 'no-target' : 'paste-failed';
     }
 
     if (settings.copyToClipboard) {
@@ -450,7 +486,12 @@ export class DictationEngine {
 
   /* ── History ───────────────────────────────────────────────────────── */
 
-  private async persistRecording(id: string, settings: AppSettings, wav: Uint8Array, focus?: FocusInfo): Promise<void> {
+  private async persistRecording(
+    id: string,
+    settings: AppSettings,
+    wav: Uint8Array,
+    focusPromise: Promise<FocusInfo | undefined>,
+  ): Promise<void> {
     let audioFilename: string | null = null;
     try {
       audioFilename = (await writeAudioRecording(settings, id, Buffer.from(wav.buffer, wav.byteOffset, wav.byteLength))).filename;
@@ -458,6 +499,7 @@ export class DictationEngine {
       console.warn('[yap] audio could not be saved:', errorMessage(error));
     }
 
+    const focus = await focusPromise;
     try {
       const { entries } = await addHistoryEntry({
         id,

@@ -178,7 +178,7 @@ async function run(context) {
   const validation = mock.requests.find((request) => request.path === '/openai/v1/models');
   expect(validation?.authorization === `Bearer ${API_KEY}`, 'the key is verified against /models', validation);
 
-  console.log('\nHold to dictate (paste unavailable, so the text lands on the clipboard)');
+  console.log('\nHold to dictate with Yap in front and no text field focused');
   await window.click('.nav-item:has-text("Home")');
   let since = await statusCount();
   await hotkey('down');
@@ -206,7 +206,11 @@ async function run(context) {
   expect(chat.model === 'openai/gpt-oss-20b' && chat.reasoning_effort === 'low' && chat.include_reasoning === false, 'the rewrite uses gpt-oss with low reasoning', { model: chat.model, reasoning_effort: chat.reasoning_effort, include_reasoning: chat.include_reasoning });
   expect(chat.messages.some((message) => message.role === 'user' && message.content.includes(TRANSCRIPT)), 'the transcript is what gets polished');
 
-  expect(result.phase === 'done' && result.title === 'Copied instead', 'the result says it was copied instead of pasted', result);
+  expect(
+    result.phase === 'done' && result.title === 'Copied' && /No text field was focused/.test(result.detail),
+    'nothing is pasted into Yap itself: the text is copied instead',
+    result,
+  );
   expect(result.preview === POLISHED, 'the polished text is shown', result.preview);
   expect((await readClipboard()) === POLISHED, 'the polished text is on the clipboard');
 
@@ -214,6 +218,22 @@ async function run(context) {
   expect(first.status === 'success' && first.rawText === TRANSCRIPT && typeof first.latencyMs === 'number', 'history records the dictation', first);
   const audioFiles = await readdir(path.join(storage, 'audio')).catch(() => []);
   expect(audioFiles.includes(first.audioFilename), 'the recording is kept for retranscription', audioFiles);
+
+  console.log('\nA focused text field in Yap itself is a valid target');
+  const ownTextField = () => app.evaluate(() => globalThis.__yapE2E.ownTextFieldFocused());
+  await window.click('.nav-item:has-text("Dictionary")');
+  await window.focus('input[placeholder^="Kubernetes"]');
+  expect((await ownTextField()) === true, 'the probe sees the focused input under the real CSP');
+  since = await statusCount();
+  await hotkey('down');
+  await sleep(1_200);
+  await hotkey('up');
+  result = await waitForResult(since);
+  // No native helper on Linux, so the paste itself is unavailable: what
+  // matters is that Yap tried to paste instead of refusing the target.
+  expect(result.title === 'Copied instead', 'Yap pastes into its own text field', result);
+  await window.click('.nav-item:has-text("Dictionary")');
+  expect((await ownTextField()) === false, 'a focused button is not a target');
 
   console.log('\nA quick tap is dropped without touching the network');
   const requestsBeforeTap = mock.requests.length;
@@ -241,11 +261,11 @@ async function run(context) {
   result = await waitForResult(since);
   expect(result.phase === 'done' && result.title === 'Saved', 'the dictation is saved to history only', result);
   expect((await readClipboard()) === 'something the user copied', 'the clipboard still holds what the user copied');
-  const history = await waitFor('the second history entry', async () => {
+  const history = await waitFor('every history entry', async () => {
     const entries = await readHistory();
-    return entries.length >= 2 && entries;
+    return entries.length >= 3 && entries;
   }, 3_000);
-  expect(history.every((entry) => entry.status === 'success'), 'both dictations are in the history', history.map((entry) => entry.status));
+  expect(history.every((entry) => entry.status === 'success'), 'every dictation is in the history', history.map((entry) => entry.status));
 }
 
 async function main() {

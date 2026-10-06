@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, Tray, nativeImage, shell } from 'electron';
+import { app, BrowserWindow, Menu, Notification, Tray, nativeImage, shell } from 'electron';
 import log from 'electron-log/main.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -184,6 +184,44 @@ function showMainWindow(): void {
   window.focus();
 }
 
+/* Runs in the main window when a dictation ends while Yap itself is in front.
+   Only a real text field takes the text; anything else would swallow Cmd+V. */
+const EDITABLE_PROBE = `(() => {
+  const element = document.activeElement;
+  if (!element) return false;
+  if (element.isContentEditable) return true;
+  if (element instanceof HTMLTextAreaElement) return !element.readOnly && !element.disabled;
+  if (element instanceof HTMLInputElement) {
+    const textual = ['text', 'search', 'email', 'url', 'tel', 'password', 'number'];
+    return textual.includes(element.type) && !element.readOnly && !element.disabled;
+  }
+  return false;
+})()`;
+
+async function ownTextFieldFocused(): Promise<boolean | null> {
+  const window = liveWindow(mainWindow);
+  // The overlay never takes focus, so a focused Yap window is the main window.
+  if (!window || BrowserWindow.getFocusedWindow() !== window) return null;
+  try {
+    return (await window.webContents.executeJavaScript(EDITABLE_PROBE)) === true;
+  } catch {
+    return false;
+  }
+}
+
+let lastNotification: { notification: Notification; title: string; at: number } | null = null;
+
+function notify(title: string, body: string): void {
+  if (!Notification.isSupported()) return;
+  // Pressing the hotkey again for the same problem should not stack banners.
+  if (lastNotification && lastNotification.title === title && Date.now() - lastNotification.at < 10_000) return;
+  const notification = new Notification({ title, body, silent: true });
+  notification.on('click', () => showMainWindow());
+  notification.show();
+  // Held so the click handler survives garbage collection.
+  lastNotification = { notification, title, at: Date.now() };
+}
+
 function updateMicPolling(): void {
   const visible = liveWindow(mainWindow)?.isVisible() ?? false;
   if (visible && !micPollTimer) {
@@ -274,8 +312,9 @@ const engine = new DictationEngine(
     getRecorder: async () => (await ensureOverlayWindow())?.webContents ?? null,
     setStatus,
     broadcastHistory: (history) => patch({ history }),
-    showMainWindow,
+    notify,
     notifyHotkey: (down) => sendToMain('hotkey:activity', down),
+    ownTextFieldFocused,
   },
   bridge,
 );
@@ -287,6 +326,7 @@ permissions.onChange((state) => patch({ permissions: state }));
 if (!app.isPackaged && process.env.YAP_E2E === '1') {
   (globalThis as { __yapE2E?: unknown }).__yapE2E = {
     hotkey: (type: 'down' | 'up') => engine.handleHotkey({ type }),
+    ownTextFieldFocused,
   };
 }
 

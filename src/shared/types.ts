@@ -85,6 +85,10 @@ export interface FocusInfo {
   appName?: string;
   bundleIdentifier?: string;
   processIdentifier?: number;
+  /** Accessibility role of the focused element, e.g. AXTextArea. */
+  role?: string;
+  /** A text field or similar has focus. */
+  editable?: boolean;
 }
 
 export interface DictationMetrics {

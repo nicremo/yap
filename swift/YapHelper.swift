@@ -16,7 +16,7 @@ import AppKit
 import ApplicationServices
 import Foundation
 
-let helperVersion = 2
+let helperVersion = 3
 
 // MARK: - Output
 
@@ -99,6 +99,54 @@ func frontmostPid() -> pid_t? {
     return NSWorkspace.shared.frontmostApplication?.processIdentifier
 }
 
+private let yapBundleIdentifier = "ai.yap.desktop"
+
+/// Yap itself: the Electron process that launched this helper, or the
+/// installed app when the helper was started some other way.
+func isOwnApp(_ pid: pid_t) -> Bool {
+    if pid == getppid() {
+        return true
+    }
+    return NSRunningApplication(processIdentifier: pid)?.bundleIdentifier == yapBundleIdentifier
+}
+
+private let editableRoles: Set<String> = [
+    kAXTextFieldRole as String,
+    kAXTextAreaRole as String,
+    kAXComboBoxRole as String,
+    "AXSearchField",
+]
+
+/// The element that has keyboard focus, and whether text can be typed into it.
+func focusedElementState() -> (role: String?, editable: Bool) {
+    guard AXIsProcessTrusted() else {
+        return (nil, false)
+    }
+    var focusedRef: CFTypeRef?
+    guard AXUIElementCopyAttributeValue(systemWideElement, kAXFocusedUIElementAttribute as CFString, &focusedRef) == .success,
+          let focusedRef
+    else {
+        return (nil, false)
+    }
+    let element = unsafeBitCast(focusedRef, to: AXUIElement.self)
+
+    var roleRef: CFTypeRef?
+    let role = AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &roleRef) == .success
+        ? roleRef as? String
+        : nil
+    if let role, editableRoles.contains(role) {
+        return (role, true)
+    }
+
+    var settable = DarwinBoolean(false)
+    if AXUIElementIsAttributeSettable(element, kAXValueAttribute as CFString, &settable) == .success, settable.boolValue {
+        return (role, true)
+    }
+    var rangeRef: CFTypeRef?
+    let hasSelection = AXUIElementCopyAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, &rangeRef) == .success
+    return (role, hasSelection)
+}
+
 func focusInfo(for application: NSRunningApplication?) -> [String: Any] {
     guard let application else {
         return [:]
@@ -110,11 +158,19 @@ func focusInfo(for application: NSRunningApplication?) -> [String: Any] {
     ]
 }
 
+/// Where keyboard input goes right now. Asked when a dictation ends, because
+/// that is where the text belongs.
 func currentFocus() -> [String: Any] {
+    var info: [String: Any]
     if let pid = frontmostPid(), let application = NSRunningApplication(processIdentifier: pid) {
-        return focusInfo(for: application)
+        info = focusInfo(for: application)
+    } else {
+        info = focusInfo(for: NSWorkspace.shared.frontmostApplication)
     }
-    return focusInfo(for: NSWorkspace.shared.frontmostApplication)
+    let element = focusedElementState()
+    info["role"] = orNull(element.role)
+    info["editable"] = element.editable
+    return info
 }
 
 // MARK: - Hotkey
@@ -180,13 +236,10 @@ private var tapMode: String?
 private var listenerWanted = false
 private var listenerError: String?
 
+/// Sent straight from the tap thread. The focus is asked separately when the
+/// dictation ends, so nothing here can slow down keyboard input.
 private func emitHotkey(down: Bool) {
-    var message: [String: Any] = ["event": "hotkey", "state": down ? "down" : "up"]
-    if down {
-        // NSRunningApplication properties are safe to read from this thread.
-        message["focus"] = focusInfo(for: NSWorkspace.shared.frontmostApplication)
-    }
-    send(message)
+    send(["event": "hotkey", "state": down ? "down" : "up"])
 }
 
 /// Computes the new pressed state for an event, or nil when the event is not about the hotkey.
@@ -423,24 +476,6 @@ func prepareClipboard() {
     preparedSnapshot = snapshotPasteboard()
 }
 
-private func activateIfNeeded(pid: pid_t?) {
-    guard let pid, pid > 0, pid != getpid() else { return }
-    if frontmostPid() == pid { return }
-    guard let application = NSRunningApplication(processIdentifier: pid), !application.isTerminated else { return }
-
-    application.unhide()
-    application.activate(options: [.activateIgnoringOtherApps])
-
-    // Wait until it really has focus rather than sleeping a fixed time.
-    for _ in 0..<40 {
-        usleep(10_000)
-        if frontmostPid() == pid {
-            usleep(30_000)
-            return
-        }
-    }
-}
-
 private func postCommandV() -> Bool {
     guard let source = CGEventSource(stateID: .combinedSessionState),
           let commandDown = CGEvent(keyboardEventSource: source, virtualKey: 55, keyDown: true),
@@ -467,9 +502,21 @@ private func postCommandV() -> Bool {
     return true
 }
 
-func paste(text: String, restore: Bool, pid: pid_t?) -> [String: Any] {
+/// Pastes into whatever has keyboard focus at this moment. Yap never brings
+/// another app or window forward: the text goes where the user is.
+///
+/// `selfEditable` is the app's own answer to "is a text field focused in a
+/// Yap window", which is more reliable than asking Chromium through AX.
+func paste(text: String, restore: Bool, selfEditable: Bool?) -> [String: Any] {
     guard AXIsProcessTrusted() || postEventsGranted() else {
         return ["ok": false, "reason": "accessibility"]
+    }
+
+    // Yap's own window in front without a text field: there is nowhere to
+    // paste, and Cmd+V would land in a button or the window itself.
+    let target = frontmostPid()
+    if let target, isOwnApp(target), !(selfEditable ?? focusedElementState().editable) {
+        return ["ok": false, "reason": "no-target"]
     }
 
     let pasteboard = NSPasteboard.general
@@ -506,7 +553,6 @@ func paste(text: String, restore: Bool, pid: pid_t?) -> [String: Any] {
     }
     let ownChangeCount = pasteboard.changeCount
 
-    activateIfNeeded(pid: pid)
     let posted = postCommandV()
 
     if restore, let original {
@@ -524,7 +570,7 @@ func paste(text: String, restore: Bool, pid: pid_t?) -> [String: Any] {
         DispatchQueue.main.asyncAfter(deadline: due, execute: work)
     }
 
-    return ["ok": posted]
+    return ["ok": posted, "processIdentifier": orNull(target.map { Int($0) })]
 }
 
 // MARK: - Shutdown
@@ -642,8 +688,8 @@ private func handle(_ line: String) {
     case "paste":
         let text = command["text"] as? String ?? ""
         let restore = command["restore"] as? Bool ?? false
-        let pid = (command["processIdentifier"] as? NSNumber).map { pid_t($0.int32Value) }
-        reply(paste(text: text, restore: restore, pid: pid))
+        let selfEditable = command["selfEditable"] as? Bool
+        reply(paste(text: text, restore: restore, selfEditable: selfEditable))
     case "fnUsage":
         reply(["value": orNull(fnUsageType())])
     default:
