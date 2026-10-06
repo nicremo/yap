@@ -95,6 +95,13 @@ switches the input source. Yap detects this and tells you.
 If pasting is impossible (Accessibility off), the text lands on the clipboard
 so it is never lost.
 
+**Copy last dictation** (*Settings, Shortcuts*) is a shortcut of your own, up
+to four modifiers plus a key, for example ⌃⌥⇧⌘6. Pressed in any app, it puts
+your most recent dictation on the clipboard, also while a new one is still
+being transcribed. It goes through the system's hotkey API, so it needs no
+extra permission. Yap asks for at least two modifiers, one of them ⌃ or ⌘ (or
+a function key), so the shortcut cannot swallow characters you type.
+
 ## Build from source
 
 ```bash
