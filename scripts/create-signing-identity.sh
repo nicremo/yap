@@ -47,15 +47,13 @@ openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
   -config "${WORK}/openssl.cnf" \
   -keyout "${WORK}/key.pem" -out "${WORK}/cert.pem" >/dev/null 2>&1
 
-# macOS' security tool only reads PKCS#12 files with the legacy algorithms.
-# LibreSSL (the system openssl) writes those by default, OpenSSL 3 needs a flag.
-PKCS12_FLAGS=()
-if openssl version | grep -q "^OpenSSL 3"; then
-  PKCS12_FLAGS+=(-legacy)
-fi
+# macOS' security tool only reads PKCS#12 files with the old algorithms
+# (3DES and a SHA-1 MAC). LibreSSL, the system openssl, writes those by
+# default. OpenSSL 3 and 4 (Homebrew is often first in PATH) default to AES
+# and SHA-256, which security rejects with "MAC verification failed". Naming
+# the algorithms works with all of them, no version check needed.
 PASSWORD="yap-$(date +%s)"
-# The odd expansion keeps bash 3.2 (macOS default) happy with an empty array under set -u.
-openssl pkcs12 -export ${PKCS12_FLAGS[@]+"${PKCS12_FLAGS[@]}"} \
+openssl pkcs12 -export -keypbe PBE-SHA1-3DES -certpbe PBE-SHA1-3DES -macalg sha1 \
   -inkey "${WORK}/key.pem" -in "${WORK}/cert.pem" \
   -name "${NAME}" -out "${WORK}/identity.p12" -passout "pass:${PASSWORD}"
 
