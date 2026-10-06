@@ -1,3 +1,5 @@
+import type { SetupStep } from './setup';
+
 export type EnhancementLevel = 'none' | 'soft' | 'medium' | 'high';
 export type StyleMode = 'conversation' | 'vibe-coding' | 'custom-plus';
 export type CustomPlusVoice = 'conversation' | 'developer';
@@ -58,6 +60,8 @@ export interface AppSettings {
   showOverlay: boolean;
   launchAtLogin: boolean;
   setupComplete: boolean;
+  /** Where the setup wizard resumes, e.g. after macOS restarted Yap for a permission. */
+  setupStep: SetupStep;
 }
 
 /** Settings as the renderer sees them: the encrypted key never leaves main. */

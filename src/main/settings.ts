@@ -13,6 +13,7 @@ import type {
   UpdateSettingsInput,
 } from '../shared/types';
 import { CLOUD_MODELS, LANGUAGES, LOCAL_MODELS, REWRITE_MODELS } from '../shared/models';
+import { SETUP_STEPS } from '../shared/setup';
 import { createDefaultSettings, SETTINGS_VERSION } from './defaults';
 import { encryptSecret } from './secrets';
 import { readJsonFile, writeJsonFile } from './json-file';
@@ -133,6 +134,7 @@ export function migrateSettings(raw: unknown, defaults: AppSettings): AppSetting
     showOverlay: bool(source.showOverlay, defaults.showOverlay),
     launchAtLogin: bool(source.launchAtLogin, defaults.launchAtLogin),
     setupComplete: bool(source.setupComplete, defaults.setupComplete),
+    setupStep: pick(source.setupStep, SETUP_STEPS, defaults.setupStep),
   };
 }
 

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 
+import { SETUP_STEPS, type SetupStep } from '../../shared/setup';
 import type { AppState, TranscriptionMode } from '../../shared/types';
 import { GroqKeyField } from '../components/GroqKeyField';
 import { HotkeySettings } from '../components/HotkeyRecorder';
@@ -10,8 +11,8 @@ import { PermissionList } from '../components/PermissionList';
 import { Button, Chip, KeyCap, Notice } from '../components/ui';
 import { formatSeconds, useAction } from '../lib/store';
 
-const STEPS = ['welcome', 'engine', 'connect', 'permissions', 'shortcut', 'try'] as const;
-type Step = (typeof STEPS)[number];
+const STEPS = SETUP_STEPS;
+type Step = SetupStep;
 
 const STEP_LABELS: Record<Step, string> = {
   welcome: 'Welcome',
@@ -34,13 +35,20 @@ function engineReady(state: AppState): boolean {
 }
 
 export function SetupWizard({ state, onState }: { state: AppState; onState: (next: AppState) => void }) {
-  const [step, setStep] = useState<Step>('welcome');
+  // Resumes where the user was: granting Input Monitoring can make macOS
+  // offer to quit and reopen Yap in the middle of the permissions step.
+  const [step, setStep] = useState<Step>(state.settings.setupStep);
   const index = STEPS.indexOf(step);
-  const next = () => setStep(STEPS[Math.min(STEPS.length - 1, index + 1)]);
-  const back = () => setStep(STEPS[Math.max(0, index - 1)]);
+  const goTo = (target: Step) => {
+    setStep(target);
+    void window.yap.updateSettings({ setupStep: target }).catch(() => undefined);
+  };
+  const next = () => goTo(STEPS[Math.min(STEPS.length - 1, index + 1)]);
+  const back = () => goTo(STEPS[Math.max(0, index - 1)]);
   const { busy, error, run } = useAction();
 
-  const finish = () => run('finish', async () => onState(await window.yap.updateSettings({ setupComplete: true })));
+  const finish = () =>
+    run('finish', async () => onState(await window.yap.updateSettings({ setupComplete: true, setupStep: 'welcome' })));
 
   return (
     <main className="setup">
@@ -105,6 +113,12 @@ export function SetupWizard({ state, onState }: { state: AppState; onState: (nex
             <h1>Allow access</h1>
             <p className="setup-lead">Yap needs to hear you and to paste into other apps. Each switch updates here live.</p>
             <PermissionList state={state} onState={onState} />
+            {state.permissions.nativePermissionsRequired && (
+              <p className="setup-hint">
+                After you allow Input Monitoring, macOS may offer to quit and reopen Yap. Later is enough: Yap picks up the
+                permission without a restart.
+              </p>
+            )}
             <SetupNav onBack={back}>
               {!permissionsReady(state) && (
                 <Button variant="ghost" onClick={next}>

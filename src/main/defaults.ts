@@ -32,5 +32,6 @@ export function createDefaultSettings(): AppSettings {
     showOverlay: true,
     launchAtLogin: false,
     setupComplete: false,
+    setupStep: 'welcome',
   };
 }

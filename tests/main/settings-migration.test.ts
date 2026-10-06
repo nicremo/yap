@@ -102,6 +102,12 @@ describe('migrateSettings', () => {
     expect(migrated.cloudModel).toBe(defaults.cloudModel);
   });
 
+  it('keeps a known setup step and resets anything else', () => {
+    expect(migrateSettings({ setupStep: 'permissions' }, defaults).setupStep).toBe('permissions');
+    expect(migrateSettings({ setupStep: 'nonsense' }, defaults).setupStep).toBe('welcome');
+    expect(migrateSettings({}, defaults).setupStep).toBe('welcome');
+  });
+
   it('falls back to the defaults for garbage', () => {
     expect(migrateSettings(undefined, defaults)).toEqual(defaults);
     expect(migrateSettings('nope', defaults)).toEqual(defaults);
