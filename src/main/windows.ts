@@ -58,9 +58,15 @@ export function positionOverlayWindow(window: BrowserWindow): void {
  * The overlay doubles as the recorder: it owns the microphone, so it exists
  * for the whole session even while hidden, and it never takes focus away
  * from the app the user is dictating into.
+ *
+ * On macOS it is a non-activating panel. That floats over full-screen apps
+ * and shows on every Space by itself, so the window never needs
+ * setVisibleOnAllWorkspaces, whose process type switch hides the windows and
+ * the Dock icon for a moment and can activate Yap.
  */
 export async function createOverlayWindow(): Promise<BrowserWindow> {
   const window = new BrowserWindow({
+    ...(isMac ? { type: 'panel' } : {}),
     width: OVERLAY_WIDTH,
     height: OVERLAY_HEIGHT,
     show: false,
@@ -82,9 +88,6 @@ export async function createOverlayWindow(): Promise<BrowserWindow> {
     },
   });
 
-  if (isMac) {
-    window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-  }
   window.setAlwaysOnTop(true, 'floating');
   window.setIgnoreMouseEvents(true);
   positionOverlayWindow(window);
