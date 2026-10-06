@@ -421,9 +421,12 @@ export class DictationEngine {
       styleMode: style.styleMode,
       enhancementLevel: style.enhancementLevel,
       appName: focus?.appName,
+      appBundleId: focus?.bundleIdentifier,
       status: 'success',
       errorMessage: polished.notice,
       latencyMs: metrics.totalMs,
+      rewriteModel: polished.model,
+      appRule: style.matchedApp,
     });
 
     this.showResult(this.describeDelivery(delivery, polished.text, metrics, polished.notice));
@@ -484,6 +487,29 @@ export class DictationEngine {
     return 'saved';
   }
 
+  /**
+   * Pastes an earlier dictation into whatever has focus now. Main moves the
+   * Yap window out of the way first, so the app behind it is the target.
+   */
+  async pasteAgain(text: string): Promise<void> {
+    const settings = this.host.getSettings();
+    const delivery = await this.deliver(text, { ...settings, autoPaste: true });
+    const titles: Record<Delivery, string> = {
+      pasted: 'Pasted',
+      copied: 'Copied',
+      saved: 'Saved',
+      'needs-accessibility': 'Copied instead',
+      'paste-failed': 'Copied instead',
+      'no-target': 'Copied',
+    };
+    this.showResult({
+      phase: 'done',
+      title: titles[delivery],
+      detail: delivery === 'pasted' ? 'Pasted again.' : 'The text is on your clipboard.',
+      preview: text,
+    });
+  }
+
   /* ── History ───────────────────────────────────────────────────────── */
 
   private async persistRecording(
@@ -509,6 +535,7 @@ export class DictationEngine {
         styleMode: settings.styleMode,
         enhancementLevel: settings.enhancementLevel,
         appName: focus?.appName,
+        appBundleId: focus?.bundleIdentifier,
         audioFilename,
         status: 'audio-only',
       });

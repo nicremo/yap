@@ -141,6 +141,10 @@ export interface HistoryEntry {
   styleMode: StyleMode;
   enhancementLevel: EnhancementLevel;
   appName?: string;
+  /** Lets History offer the app for an app rule. */
+  appBundleId?: string;
+  /** The app rule that chose style and polish, by app name. */
+  appRule?: string;
   createdAt: string;
   audioFilename: string | null;
   audioExpiresAt: string | null;
@@ -148,6 +152,8 @@ export interface HistoryEntry {
   errorMessage?: string;
   /** Key release to delivered text, in milliseconds. */
   latencyMs?: number;
+  /** The model that polished the text; absent when it went out as transcribed. */
+  rewriteModel?: string;
 }
 
 export interface AppState {

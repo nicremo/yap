@@ -35,6 +35,7 @@ export interface IpcController {
   chooseStorage(): Promise<AppState>;
   revealStorage(): Promise<void>;
   showMainWindow(): void;
+  pasteHistoryEntry(id: string, version: 'final' | 'raw'): Promise<void>;
   isRecorder(sender: Electron.WebContents): boolean;
   patch(state: Partial<AppState>): void;
 }
@@ -161,6 +162,10 @@ export function registerIpcHandlers(controller: IpcController): void {
     const target = (await loadHistory()).find((entry) => entry.id === entryId);
     if (!target?.audioFilename) throw new Error('This dictation has no audio file anymore.');
     shell.showItemInFolder(resolveAudioPath(controller.getSettings(), target.audioFilename));
+  });
+  handle('history:paste', async (_event, id: unknown, version: unknown) => {
+    if (version !== 'final' && version !== 'raw') throw new Error('Invalid text version.');
+    await controller.pasteHistoryEntry(requireString(id, 'the entry'), version);
   });
   handle('history:retranscribe', async (_event, id: unknown, mode: unknown) => {
     if (mode !== 'transcribe-only' && mode !== 'transcribe-and-stylize') {

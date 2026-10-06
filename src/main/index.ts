@@ -243,6 +243,16 @@ async function ownTextFieldFocused(): Promise<boolean | null> {
   }
 }
 
+/** Waits until another app has focus after the window hid, at most 800 ms. */
+async function waitUntilYapIsBehind(): Promise<void> {
+  const deadline = Date.now() + 800;
+  while (Date.now() < deadline) {
+    const focus = await bridge.getFocus().catch(() => null);
+    if (!focus || focus.processIdentifier !== process.pid) return;
+    await new Promise((resolve) => setTimeout(resolve, 40));
+  }
+}
+
 let lastNotification: { notification: Notification; title: string; at: number } | null = null;
 
 function notify(title: string, body: string): void {
@@ -562,6 +572,17 @@ async function bootstrap(): Promise<void> {
       await shell.openPath(settings.storageDirectory);
     },
     showMainWindow,
+    pasteHistoryEntry: async (id, version) => {
+      const entry = (await loadHistory()).find((candidate) => candidate.id === id);
+      const text = version === 'raw' ? entry?.rawText : entry?.finalText;
+      if (!text) throw new Error('This dictation has no text to paste.');
+      // The user asked for it: Yap steps aside, and macOS gives the focus back
+      // to the app behind it. Yap itself activates nothing.
+      const window = liveWindow(mainWindow);
+      if (window?.isVisible()) hideMainWindow(window);
+      await waitUntilYapIsBehind();
+      await engine.pasteAgain(text);
+    },
     isRecorder: (sender) => liveWindow(overlayWindow)?.webContents === sender,
     patch,
   });

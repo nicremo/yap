@@ -83,6 +83,7 @@ export interface CreateHistoryInput {
   styleMode: StyleMode;
   enhancementLevel: EnhancementLevel;
   appName?: string;
+  appBundleId?: string;
   audioFilename: string | null;
   status: DictationStatus;
   errorMessage?: string;
@@ -101,6 +102,7 @@ export async function addHistoryEntry(input: CreateHistoryInput): Promise<{ entr
     styleMode: input.styleMode,
     enhancementLevel: input.enhancementLevel,
     appName: input.appName,
+    appBundleId: input.appBundleId,
     createdAt,
     audioFilename: input.audioFilename,
     audioExpiresAt: input.audioFilename ? computeAudioExpiresAt(createdAt) : null,

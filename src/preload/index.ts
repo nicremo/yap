@@ -56,6 +56,9 @@ const api = {
   removeHistoryEntry: (id: string) => ipcRenderer.invoke('history:remove', id) as Promise<HistoryEntry[]>,
   clearHistory: () => ipcRenderer.invoke('history:clear') as Promise<HistoryEntry[]>,
   revealAudio: (id: string) => ipcRenderer.invoke('history:revealAudio', id) as Promise<void>,
+  /** Hides Yap and pastes the dictation into the app behind it. */
+  pasteHistoryEntry: (id: string, version: 'final' | 'raw') =>
+    ipcRenderer.invoke('history:paste', id, version) as Promise<void>,
   retranscribe: (id: string, mode: RetranscribeMode) =>
     ipcRenderer.invoke('history:retranscribe', id, mode) as Promise<HistoryEntry[]>,
 
