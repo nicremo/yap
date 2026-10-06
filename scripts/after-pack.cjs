@@ -106,6 +106,11 @@ exports.default = async function afterPack(context) {
     await notarizeApp(appPath, process.env.YAP_NOTARY_PROFILE, path.resolve(__dirname, '..', 'work', 'notarization'));
   }
 
+  // The archive cache compares the output directory timestamp, not nested app files.
+  // Refresh it after signing and stapling so update ZIPs contain the current app.
+  const packedAt = new Date();
+  fs.utimesSync(context.appOutDir, packedAt, packedAt);
+
   if (identity.name === '-') {
     console.log('[afterPack] Ad-hoc signed. Run scripts/create-signing-identity.sh once so permissions survive updates.');
   }
