@@ -2,242 +2,193 @@
 
 ![yap](assets/cover.png)
 
-**Open source dictation for macOS.** Hold a key, speak, release. Your words are
-transcribed, polished, and pasted right where your cursor is. No subscription,
-no account, no telemetry.
-
-Works in any app.
-
-## Why this fork exists
-
-The original [OpenWhisp](https://github.com/giusmarci/openwhisp) was built
-local-first: Whisper and a 9.6 GB language model both running on your machine.
-That is a fine principle and it still works here, but in practice it meant
-about 12 GB of RAM, a warm laptop, and a wait between releasing the key and
-seeing your text.
-
-yap moves the transcription to [Groq](https://console.groq.com) instead. Groq
-runs Whisper Large v3 on their own inference hardware and their free tier is
-generous enough for everyday dictation, so:
-
-- **Nothing heavy runs on your machine.** No 12 GB model resident in RAM, no
-  fans spinning up, no battery drain while you dictate.
-- **It is fast.** Groq returns a transcript of a normal sentence in well under
-  a second, which is the difference between dictation feeling instant and
-  feeling like a round trip.
-- **It is more accurate.** Whisper Large v3 instead of the small local Base
-  model, which matters a lot for names, jargon and any language that is not
-  English.
-- **It costs nothing.** The free tier covers roughly two hours of audio a day.
-  There is no paid plan you get nudged towards, and no account beyond a free
-  API key.
-
-The local path is still there and still complete. Turn off your internet and
-yap falls back to local Whisper automatically, so you are never stuck. You can
-also run entirely local by choice, exactly like the original.
-
-The rewrite step that cleans up your text can run either way too: locally
-through Ollama with a small 2.7 GB model, or in the cloud through Groq,
-OpenRouter or Fireworks.
+**Fast, free dictation for macOS.** Hold a key, speak, release. Your words are
+transcribed, cleaned up and pasted where your cursor is, usually in well under
+a second. No subscription, no account, no telemetry.
 
 ## How it works
 
-1. **Hold your key** to start recording
-2. **Speak** naturally
-3. **Release** and the pipeline kicks in:
+1. **Hold your key** (fn by default). The microphone opens on the very first
+   press, and Yap opens its connection to Groq while you are still speaking.
+2. **Speak.** Double tap instead of holding to dictate hands-free, tap once more
+   to finish.
+3. **Release.** The recording goes to Groq as compact Opus audio, Whisper Large
+   v3 transcribes it, a fast language model polishes it in your style, and the
+   text is pasted into the app you were typing in.
 
 ```
-Audio -> Groq Whisper Large v3 (cloud, free)
-           |
-           v
-      Raw text (in your language)
-           |
-           v
-      Ollama qwen3.5:2b (local, 2.7 GB)
-           |
-           v
-      Polished text -> Clipboard -> Auto-paste
+fn down ──► mic open, TLS warm-up, clipboard snapshot   (while you speak)
+fn up   ──► Opus upload ──► Whisper Large v3 (Groq) ──► polish (Groq) ──► paste
 ```
 
-No internet? No problem. yap falls back to local Whisper automatically.
+Every dictation shows its timing on the Home page, for example
+`Total 0.64 s · Transcribe 0.31 s · Polish 0.24 s`.
 
-## Features
+### Two engines, pick one
 
-- **Cloud + Local Hybrid**: Groq for speed and accuracy, local Whisper as offline fallback
-- **Free**: Groq's free tier covers about two hours of audio per day
-- **Tiny local LLM**: qwen3.5:2b (2.7 GB) instead of 9.6 GB, runs on any Mac
-- **3 Transcription Modes**: Auto (cloud + fallback), Cloud-only, Local-only
-- **Styles**: Conversation, Vibe Coding and Custom + modes
-- **4 Enhancement Levels**: No Filter, Soft, Medium, High
-- **Intent Resolution**: "Make it white... actually, black" resolves to final intent only
-- **Auto-Paste**: Text is pasted directly into the active app
-- **Encrypted API Key**: Stored via macOS Keychain, never in plaintext
-- **Configurable Provider**: Groq, OpenAI, Lemonfox.ai, or any OpenAI-compatible provider
-- **Language Selector**: German, English, French, Spanish, and 90+ more
+| | Cloud (Groq) | Local |
+|---|---|---|
+| Speed | A fraction of a second | Seconds, depends on the Mac |
+| Accuracy | Whisper Large v3 | Whisper Base or Small |
+| Privacy | Audio goes to Groq | Nothing leaves the device |
+| Cost | Free tier, about two hours of audio a day | Free |
 
-## Why Groq?
+Polishing (removing fillers, fixing grammar, applying your style) runs on Groq
+and can be switched off. In local mode it starts switched off, so nothing
+leaves the device unless you turn it on.
 
-| Provider | Price/min | Model | Free Tier |
-|---|---|---|---|
-| **Groq** | $0.0002 | Whisper Large v3 | 7,200 sec/hr (~2 hrs of audio per day, free) |
-| OpenAI | $0.006 | Whisper v2 | None |
-| Lemonfox | $0.003 | Whisper Large v3 | 1 month free |
+## Install
 
-Groq is **30x cheaper than OpenAI** and offers a generous free tier. For normal usage (a few minutes of dictation per day), it is **completely free**.
+1. Download the latest `.dmg` from [Releases](https://github.com/nicremo/yap/releases)
+   and drag Yap to Applications.
+2. The build is not notarised by Apple, so clear the quarantine flag once:
 
-## Quick Start
+   ```bash
+   xattr -cr /Applications/Yap.app
+   ```
 
-### 1. Install Ollama and pull the text model
+3. Open Yap. The setup walks you through:
+   - **Engine**: Groq cloud (recommended) or local.
+   - **Connect**: paste a free key from [console.groq.com/keys](https://console.groq.com/keys),
+     or download the local model. Everything happens inside the app.
+   - **Access**: microphone and Accessibility. The list updates live while you
+     flip the switches in System Settings.
+   - **Shortcut**: fn or any key combination, with a live test.
+   - **Try it**: dictate into a test box to see the whole pipeline work.
 
-```bash
-# Install Ollama: https://ollama.com/download/mac
-ollama serve
+## Language
 
-# Pull the text enhancement model (only 2.7 GB!)
-ollama pull qwen3.5:2b
-```
+Yap speaks English and German. *Settings, Appearance, Language* offers
+**System**, which follows the language order of macOS (the first language Yap
+knows wins, otherwise English), or a fixed choice. It changes Yap itself: the
+app, the dictation pill, menus and notifications. The language you dictate in
+is a separate setting under *Engine*.
 
-### 2. Get a Groq API key (free)
+## Permissions
 
-1. Go to [console.groq.com](https://console.groq.com)
-2. Create an account (free)
-3. Generate an API key
+| Permission | Why | Required |
+|---|---|---|
+| Microphone | Recording while the key is held | Yes |
+| Accessibility | Pasting into other apps and watching the shortcut | Yes |
+| Input Monitoring | Watching the shortcut passively | No, only if the shortcut does not react |
 
-### 3. Download the app
+Yap checks them continuously and shows the live state in Settings. If System
+Settings shows Yap as allowed but Yap still reports a permission as missing,
+macOS is holding on to an entry from an older build: press **Repair
+permissions** in Settings (it clears Yap's entries with `tccutil`) and allow
+access once more.
 
-Grab the latest `.dmg` from [Releases](https://github.com/nicremo/yap/releases), open it and drag yap to your Applications folder.
+If you use **fn** as the shortcut, set *System Settings → Keyboard → Press 🌐
+key to* → **Do Nothing**, otherwise macOS also opens the emoji picker or
+switches the input source. Yap detects this and tells you.
 
-Since the app is not signed with an Apple Developer certificate, macOS will block it on first launch. Run this once in Terminal to allow it:
+## Clipboard
 
-```bash
-xattr -cr /Applications/Yap.app
-```
+- **Paste automatically** on, **Keep on clipboard** off (default): Yap pastes,
+  then puts back exactly what you had copied before. The dictation is marked
+  as transient, so clipboard managers such as Raycast, Maccy or Paste do not
+  record it.
+- **Keep on clipboard** on: every dictation stays on the clipboard.
+- **Paste automatically** off: the text is copied (if *Keep on clipboard* is
+  on) or only saved to History.
 
-Then open yap normally. You only need to do this once.
+If pasting is impossible (Accessibility off), the text lands on the clipboard
+so it is never lost.
 
-### 3b. Or build from source
+**Copy last dictation** (*Settings, Shortcuts*) is a shortcut of your own, up
+to four modifiers plus a key, for example ⌃⌥⇧⌘6. Pressed in any app, it puts
+your most recent dictation on the clipboard, also while a new one is still
+being transcribed. It goes through the system's hotkey API, so it needs no
+extra permission. Yap asks for at least two modifiers, one of them ⌃ or ⌘ (or
+a function key), so the shortcut cannot swallow characters you type.
+
+## Build from source
 
 ```bash
 git clone https://github.com/nicremo/yap.git
 cd yap
 npm install
-npm run build:native
 npm run dev
 ```
 
-### 4. Setup Wizard
+The native helper compiles itself on the first `npm run dev`. During
+development macOS attributes permissions to the terminal that started Yap, so
+grant them to your terminal app.
 
-The setup wizard walks you through:
+### Distributable build
 
-1. **Transcription Engine**: Enter your Groq API key (or download local Whisper as fallback)
-2. **Ollama**: Verify the connection
-3. **Permissions**: Microphone, Accessibility, Input Monitoring
+```bash
+scripts/create-signing-identity.sh   # once per build machine
+npm run package:mac
+```
 
-After setup: hold your key, speak, release. Done.
+`create-signing-identity.sh` creates a self-signed code signing certificate.
+macOS ties privacy permissions to the code signature: with an ad-hoc signature
+every new build counts as a different app, and users have to grant
+Accessibility again after each update. Builds signed with the same certificate
+keep their permissions. A `Developer ID Application` certificate in the
+keychain is picked up automatically instead; `YAP_SIGN_IDENTITY` overrides both.
 
-## Changing the language
+The native helper is built as a universal binary, the app for the architecture
+of the build machine (`npx electron-builder --mac --x64` or `--universal` for
+others).
 
-The app defaults to German. To switch to English (or any other language):
-
-1. Open the **Models** page
-2. Change the **Language** dropdown to your language
-3. Done. Both transcription and LLM rewrite will use your selected language.
-
-Supported: German, English, French, Spanish, Italian, Portuguese, Dutch, Polish, Japanese, Chinese, Korean, and 90+ more via Whisper.
-
-## Models
-
-| Purpose | Model | Size | Provider |
-|---|---|---|---|
-| Transcription (cloud) | Whisper Large v3 | Cloud | Groq (free) |
-| Transcription (local) | whisper-base | ~150 MB | Local via HuggingFace |
-| Text enhancement | qwen3.5:2b | ~2.7 GB | Local via Ollama |
-
-### Alternative Cloud Providers
-
-The app works with any OpenAI-compatible provider. Just change the Base URL and API key on the Models page:
-
-| Provider | Base URL | Model |
-|---|---|---|
-| Groq (default) | `https://api.groq.com/openai` | `whisper-large-v3` |
-| OpenAI | `https://api.openai.com` | `gpt-4o-mini-transcribe` |
-| Lemonfox | `https://api.lemonfox.ai` | `whisper-1` |
-
-### Alternative Text Models
-
-Any Ollama model works. Recommendations by size:
-
-| Model | Size | Quality | Speed |
-|---|---|---|---|
-| qwen3.5:2b (default) | 2.7 GB | Very good | Fast |
-| qwen3:4b | 2.5 GB | Excellent | Fast |
-| gemma3:4b | 3.3 GB | Excellent | Medium |
-| qwen3.5:4b | 3.4 GB | Top tier | Medium |
-
-## Tech Stack
-
-- **Electron** + **React** + **TypeScript** for the desktop shell and UI
-- **Groq API** (or any OpenAI-compatible provider) for cloud transcription
-- **@huggingface/transformers** for local Whisper inference (offline fallback)
-- **Ollama** for local LLM text enhancement
-- **Swift** native macOS helper for hotkey listening, focus detection, and paste simulation
-- **electron-vite** for build tooling
-- **Electron safeStorage** for encrypted API key storage via macOS Keychain
-
-## Project Structure
+## Architecture
 
 ```
 src/
   main/
-    api-key.ts              # API key encryption (macOS Keychain)
-    cloud-transcription.ts  # Cloud STT (Groq/OpenAI-compatible)
-    dictation.ts            # Pipeline: transcribe -> rewrite -> paste
-    transcription.ts        # Local Whisper inference (fallback)
-    ollama.ts               # Ollama API client + auto-launch
-    prompts/
-      legacy.ts             # Frozen prompts for Conversation and Vibe Coding
-      plus.ts               # Tuned prompts for Custom +
-      index.ts              # Family dispatch and rewrite user messages
-    rewrite-provider.ts     # Groq, OpenRouter, Fireworks target resolution
-    settings.ts             # Settings persistence
-    windows.ts              # Window management
+    index.ts            App lifecycle, windows, tray, state broadcasting
+    dictation/
+      engine.ts         Key press to pasted text, pipelined and ordered
+      gesture.ts        Hold, tap and double-tap handling
+      pipeline.ts       Transcription and polishing, silence and hallucination filters
+    groq.ts             Groq client on Chromium's network stack, connection pre-warming
+    rewrite.ts          Polishing prompts and output cleanup
+    local-whisper.ts    On-device Whisper via transformers.js
+    native/             Bridge to the native helper (persistent on macOS)
+    permissions.ts      Live permission state, requests and repair
+    settings.ts         Settings with migration from older versions
+    prompts/            Prompt families for Conversation, Vibe Coding and Custom +
   renderer/
-    App.tsx                 # UI: sidebar, pages, setup wizard, overlay
-    styles.css              # Styling
-    audio-recorder.ts       # Web Audio recorder with level metering
-  preload/                  # Electron preload bridge
-  shared/                   # Shared types and constants
-swift/
-  YapHelper.swift           # Native macOS helper
+    App.tsx, pages/     Settings app
+    setup/              First-run setup
+    overlay/            Dictation pill and the recorder host
+    recorder/           AudioWorklet capture at 16 kHz, Opus via MediaRecorder
+swift/YapHelper.swift   Hotkey tap, focus, clipboard and paste (one long-lived process)
+windows/YapHelper.cpp   Windows helper
 ```
 
-## Building for distribution
+What makes it fast:
+
+- Recording starts on the first key press, no waiting to tell a tap from a hold.
+- The connection to Groq is opened while you speak (`session.preconnect`), and
+  requests use Chromium's HTTP/2 connection pool.
+- Audio is uploaded as Opus, about a tenth of the WAV size; WAV is the fallback.
+- No disk access between key release and paste; history and audio are saved
+  in the background.
+- One persistent native helper instead of a process launch per paste, and no
+  fixed delays before pasting.
+- Reasoning models run with minimal reasoning effort.
+
+## Tests
 
 ```bash
-npm run package
+npm test             # unit tests
+npm run typecheck
+npm run test:helper  # macOS: protocol test of the compiled native helper
+npm run build && xvfb-run -a npm run test:e2e
+                     # Linux: the built app against a mock Groq server
 ```
 
-Builds the Electron app, compiles the Swift helper, and packages everything into a `.dmg` and `.zip` in the `release/` directory.
-
-The build is unsigned by default, so it works without an Apple Developer
-account. macOS will refuse to open an unsigned build until you clear the
-quarantine flag, see the Install section above.
-
-To produce a signed build, point electron-builder at your own certificate:
-
-```bash
-CSC_NAME="Your Name (TEAMID)" npm run package:mac
-```
+The end-to-end test launches the real app with Chromium's fake microphone,
+drives the hotkey and checks the whole path: key setup, Opus upload, rewrite,
+delivery, clipboard behaviour and history.
 
 ## Credits
 
-yap is a rebranded fork of [OpenWhisp](https://github.com/giusmarci/openwhisp)
-by [Gius.Marci](https://x.com/GiusMarci) of [Raelume](https://raelume.ai). The
-interaction model and the visual design are theirs, and the credit for both
-belongs to them. The original has not been updated since April 2026, so this
-fork carries it forward with cloud transcription, additional rewrite providers
-and a different backend.
+Based on [OpenWhisp](https://github.com/giusmarci/openwhisp), MIT licensed.
 
 ## License
 
-MIT, same as the original. See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).

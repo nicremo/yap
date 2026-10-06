@@ -1,62 +1,10 @@
 /// <reference types="vite/client" />
 
-import type {
-  AppRule,
-  AppStatus,
-  BootstrapState,
-  CloudRewriteProvider,
-  CorrectionEntry,
-  DictionaryEntry,
-  DictationRequest,
-  FocusInfo,
-  HistoryEntry,
-  HotkeyEvent,
-  RetranscribeMode,
-  UpdateSettingsInput,
-} from '../shared/types';
+import type { YapApi } from '../preload';
 
 declare global {
   interface Window {
-    yap: {
-      bootstrap: () => Promise<BootstrapState>;
-      updateSettings: (updates: UpdateSettingsInput) => Promise<BootstrapState>;
-      chooseStorage: () => Promise<BootstrapState>;
-      requestMicrophoneAccess: () => Promise<BootstrapState>;
-      requestSystemAccess: () => Promise<BootstrapState>;
-      prepareSpeechModel: () => Promise<BootstrapState>;
-      refreshOllama: () => Promise<BootstrapState>;
-      pullRecommendedModel: () => Promise<BootstrapState>;
-      testApiKey: (apiKey: string, baseUrl?: string) => Promise<{ valid: boolean; error?: string }>;
-      testOpenrouterKey: (apiKey: string) => Promise<{ valid: boolean; error?: string }>;
-      testFireworksKey: (apiKey: string) => Promise<{ valid: boolean; error?: string }>;
-      clearApiKey: (provider?: CloudRewriteProvider) => Promise<BootstrapState>;
-      addDictionaryWord: (word: string) => Promise<DictionaryEntry[]>;
-      removeDictionaryWord: (word: string) => Promise<DictionaryEntry[]>;
-      addCorrection: (from: string, to: string) => Promise<CorrectionEntry[]>;
-      removeCorrection: (from: string) => Promise<CorrectionEntry[]>;
-      addAppRule: (rule: AppRule) => Promise<AppRule[]>;
-      removeAppRule: (appIdentifier: string) => Promise<AppRule[]>;
-      updateAppRule: (appIdentifier: string, styleMode: string, enhancementLevel: string) => Promise<AppRule[]>;
-      removeHistoryEntry: (id: string) => Promise<HistoryEntry[]>;
-      clearHistory: () => Promise<HistoryEntry[]>;
-      retranscribe: (id: string, mode: RetranscribeMode) => Promise<HistoryEntry[]>;
-      revealAudio: (id: string) => Promise<void>;
-      cleanupAudio: () => Promise<HistoryEntry[]>;
-      captureFocusTarget: () => Promise<FocusInfo>;
-      processAudio: (request: DictationRequest) => Promise<{
-        rawText: string;
-        finalText: string;
-        pasted: boolean;
-      }>;
-      pushStatus: (status: AppStatus) => void;
-      showMainWindow: () => Promise<void>;
-      hideMainWindow: () => Promise<void>;
-      openExternal: (targetUrl: string) => Promise<void>;
-      revealStorage: () => Promise<void>;
-      onStatus: (listener: (status: AppStatus) => void) => () => void;
-      onHotkey: (listener: (event: HotkeyEvent) => void) => () => void;
-      onHistoryUpdated: (listener: (history: HistoryEntry[]) => void) => () => void;
-    };
+    yap: YapApi;
   }
 }
 

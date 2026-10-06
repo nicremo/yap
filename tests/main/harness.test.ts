@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { encryptApiKey, decryptApiKey } from '../../src/main/api-key';
+import { decryptSecret, encryptSecret } from '../../src/main/secrets';
 
 describe('test harness', () => {
   it('imports a main-process module that depends on electron', () => {
-    expect(decryptApiKey(encryptApiKey('hello'))).toBe('hello');
+    expect(decryptSecret(encryptSecret('hello'))).toBe('hello');
   });
 });

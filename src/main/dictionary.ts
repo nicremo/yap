@@ -1,147 +1,109 @@
 import { app } from 'electron';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import type { CorrectionEntry, DictionaryEntry } from '../shared/types';
+import { readJsonFile, writeJsonFile } from './json-file';
 
 const DICTIONARY_FILE = 'dictionary.json';
 const CORRECTIONS_FILE = 'corrections.json';
 
-const locks = new Map<string, Promise<void>>();
+/* Both lists are read once and then served from memory. Only this module
+   writes the files, so the cache cannot go stale, and a dictation no longer
+   pays for two file reads before it can start transcribing. */
+let dictionaryCache: DictionaryEntry[] | null = null;
+let correctionsCache: CorrectionEntry[] | null = null;
 
-async function withLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
-  const previous = locks.get(key) ?? Promise.resolve();
-  let resolve: () => void;
-  const current = new Promise<void>((r) => { resolve = r; });
-  locks.set(key, current);
-  await previous;
-  try {
-    return await fn();
-  } finally {
-    resolve!();
-  }
+function filePath(name: string): string {
+  return path.join(app.getPath('userData'), name);
 }
 
-function getDictionaryPath(): string {
-  return path.join(app.getPath('userData'), DICTIONARY_FILE);
+function isDictionaryEntry(value: unknown): value is DictionaryEntry {
+  return !!value && typeof (value as DictionaryEntry).word === 'string';
 }
 
-function getCorrectionsPath(): string {
-  return path.join(app.getPath('userData'), CORRECTIONS_FILE);
+function isCorrectionEntry(value: unknown): value is CorrectionEntry {
+  return (
+    !!value &&
+    typeof (value as CorrectionEntry).from === 'string' &&
+    typeof (value as CorrectionEntry).to === 'string'
+  );
 }
 
 export async function loadDictionary(): Promise<DictionaryEntry[]> {
-  try {
-    const raw = await readFile(getDictionaryPath(), 'utf8');
-    return JSON.parse(raw) as DictionaryEntry[];
-  } catch {
-    return [];
+  if (!dictionaryCache) {
+    const raw = await readJsonFile<unknown[]>(filePath(DICTIONARY_FILE));
+    dictionaryCache = Array.isArray(raw) ? raw.filter(isDictionaryEntry) : [];
   }
-}
-
-async function saveDictionary(entries: DictionaryEntry[]): Promise<void> {
-  const filePath = getDictionaryPath();
-  await mkdir(path.dirname(filePath), { recursive: true });
-  await writeFile(filePath, `${JSON.stringify(entries, null, 2)}\n`, 'utf8');
-}
-
-export async function addDictionaryEntry(word: string): Promise<DictionaryEntry[]> {
-  return withLock('dictionary', async () => {
-    const entries = await loadDictionary();
-    const trimmed = word.trim();
-
-    if (!trimmed) {
-      return entries;
-    }
-
-    const exists = entries.some((e) => e.word.toLowerCase() === trimmed.toLowerCase());
-    if (exists) {
-      return entries;
-    }
-
-    entries.push({ word: trimmed, addedAt: new Date().toISOString() });
-    entries.sort((a, b) => a.word.localeCompare(b.word));
-    await saveDictionary(entries);
-    return entries;
-  });
-}
-
-export async function removeDictionaryEntry(word: string): Promise<DictionaryEntry[]> {
-  return withLock('dictionary', async () => {
-    const entries = await loadDictionary();
-    const filtered = entries.filter((e) => e.word !== word);
-    await saveDictionary(filtered);
-    return filtered;
-  });
+  return dictionaryCache;
 }
 
 export async function loadCorrections(): Promise<CorrectionEntry[]> {
-  try {
-    const raw = await readFile(getCorrectionsPath(), 'utf8');
-    return JSON.parse(raw) as CorrectionEntry[];
-  } catch {
-    return [];
+  if (!correctionsCache) {
+    const raw = await readJsonFile<unknown[]>(filePath(CORRECTIONS_FILE));
+    correctionsCache = Array.isArray(raw) ? raw.filter(isCorrectionEntry) : [];
   }
+  return correctionsCache;
 }
 
-async function saveCorrections(entries: CorrectionEntry[]): Promise<void> {
-  const filePath = getCorrectionsPath();
-  await mkdir(path.dirname(filePath), { recursive: true });
-  await writeFile(filePath, `${JSON.stringify(entries, null, 2)}\n`, 'utf8');
+export async function addDictionaryEntry(word: string): Promise<DictionaryEntry[]> {
+  const entries = await loadDictionary();
+  const trimmed = word.trim();
+  if (!trimmed || entries.some((entry) => entry.word.toLowerCase() === trimmed.toLowerCase())) {
+    return entries;
+  }
+
+  dictionaryCache = [...entries, { word: trimmed, addedAt: new Date().toISOString() }].sort((a, b) =>
+    a.word.localeCompare(b.word),
+  );
+  await writeJsonFile(filePath(DICTIONARY_FILE), dictionaryCache);
+  return dictionaryCache;
+}
+
+export async function removeDictionaryEntry(word: string): Promise<DictionaryEntry[]> {
+  const entries = await loadDictionary();
+  dictionaryCache = entries.filter((entry) => entry.word !== word);
+  await writeJsonFile(filePath(DICTIONARY_FILE), dictionaryCache);
+  return dictionaryCache;
 }
 
 export async function addCorrection(from: string, to: string): Promise<CorrectionEntry[]> {
-  return withLock('corrections', async () => {
-    const entries = await loadCorrections();
-    const trimmedFrom = from.trim();
-    const trimmedTo = to.trim();
-
-    if (!trimmedFrom || !trimmedTo) {
-      return entries;
-    }
-
-    const exists = entries.some((e) => e.from.toLowerCase() === trimmedFrom.toLowerCase());
-    if (exists) {
-      return entries;
-    }
-
-    entries.push({ from: trimmedFrom, to: trimmedTo, addedAt: new Date().toISOString() });
-    entries.sort((a, b) => a.from.localeCompare(b.from));
-    await saveCorrections(entries);
+  const entries = await loadCorrections();
+  const trimmedFrom = from.trim();
+  const trimmedTo = to.trim();
+  if (
+    !trimmedFrom ||
+    !trimmedTo ||
+    entries.some((entry) => entry.from.toLowerCase() === trimmedFrom.toLowerCase())
+  ) {
     return entries;
-  });
+  }
+
+  correctionsCache = [...entries, { from: trimmedFrom, to: trimmedTo, addedAt: new Date().toISOString() }].sort(
+    (a, b) => a.from.localeCompare(b.from),
+  );
+  await writeJsonFile(filePath(CORRECTIONS_FILE), correctionsCache);
+  return correctionsCache;
 }
 
 export async function removeCorrection(from: string): Promise<CorrectionEntry[]> {
-  return withLock('corrections', async () => {
-    const entries = await loadCorrections();
-    const filtered = entries.filter((e) => e.from !== from);
-    await saveCorrections(filtered);
-    return filtered;
-  });
+  const entries = await loadCorrections();
+  correctionsCache = entries.filter((entry) => entry.from !== from);
+  await writeJsonFile(filePath(CORRECTIONS_FILE), correctionsCache);
+  return correctionsCache;
 }
 
+/* Whisper only reads the last 224 tokens of the prompt. 800 characters stays
+   under that for typical vocabulary. */
 const WHISPER_PROMPT_MAX_CHARS = 800;
 
-export function buildWhisperPrompt(
-  dictionary: DictionaryEntry[],
-  corrections: CorrectionEntry[],
-): string {
-  const dictWords = dictionary.map((e) => e.word);
-  const correctionTargets = corrections.map((e) => e.to);
-  const unique = [...new Set([...dictWords, ...correctionTargets])];
-
-  if (unique.length === 0) {
-    return '';
-  }
-
+export function buildWhisperPrompt(dictionary: DictionaryEntry[], corrections: CorrectionEntry[]): string {
+  const unique = [...new Set([...dictionary.map((e) => e.word), ...corrections.map((e) => e.to)])];
   const parts: string[] = [];
   let length = 0;
 
   for (const word of unique) {
     const addition = parts.length > 0 ? word.length + 2 : word.length;
     if (length + addition > WHISPER_PROMPT_MAX_CHARS) {
-      console.warn(`[yap] Whisper prompt truncated at ${parts.length}/${unique.length} words (224 token limit)`);
       break;
     }
     parts.push(word);
@@ -151,10 +113,7 @@ export function buildWhisperPrompt(
   return parts.join(', ');
 }
 
-export function buildDictionaryContext(
-  dictionary: DictionaryEntry[],
-  corrections: CorrectionEntry[],
-): string {
+export function buildDictionaryContext(dictionary: DictionaryEntry[], corrections: CorrectionEntry[]): string {
   const parts: string[] = [];
 
   if (dictionary.length > 0) {
@@ -166,9 +125,21 @@ export function buildDictionaryContext(
     parts.push(`CORRECTIONS: Apply these replacements in the output: ${rules}.`);
   }
 
-  if (parts.length === 0) {
-    return '';
-  }
+  return parts.length === 0 ? '' : '\n' + parts.join('\n');
+}
 
-  return '\n' + parts.join('\n');
+/**
+ * Applies the user's misspelling corrections to text directly. The rewrite
+ * model is told about them as well, but with enhancement off (or when the
+ * model ignores the instruction) this is what actually fixes the words.
+ */
+export function applyCorrections(text: string, corrections: CorrectionEntry[]): string {
+  let result = text;
+  for (const { from, to } of corrections) {
+    if (!from) continue;
+    const escaped = from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // Unicode-aware word boundaries so "Ä" and "ß" count as letters.
+    result = result.replace(new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'giu'), to);
+  }
+  return result;
 }

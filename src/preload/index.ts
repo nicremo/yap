@@ -1,94 +1,93 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 
+import { isLocale, type Locale } from '../shared/i18n';
 import type {
   AppRule,
+  AppState,
   AppStatus,
-  BootstrapState,
-  CloudRewriteProvider,
   CorrectionEntry,
   DictionaryEntry,
-  DictationRequest,
-  FocusInfo,
   HistoryEntry,
-  HotkeyEvent,
+  KeyValidationResult,
+  PermissionKind,
+  RecordedAudio,
+  RecorderCommand,
+  RecorderEvent,
   RetranscribeMode,
+  RuleLevel,
+  StyleMode,
   UpdateSettingsInput,
 } from '../shared/types';
 
+function subscribe<T>(channel: string, listener: (payload: T) => void): () => void {
+  const wrapped = (_event: IpcRendererEvent, payload: T) => listener(payload);
+  ipcRenderer.on(channel, wrapped);
+  return () => {
+    ipcRenderer.removeListener(channel, wrapped);
+  };
+}
+
+function argument(name: string): string | undefined {
+  const prefix = `--${name}=`;
+  return process.argv.find((value) => value.startsWith(prefix))?.slice(prefix.length);
+}
+
+const themeArgument = argument('yap-theme');
+const localeArgument = argument('yap-locale');
+
 const api = {
-  bootstrap: () => ipcRenderer.invoke('app:bootstrap') as Promise<BootstrapState>,
-  updateSettings: (updates: UpdateSettingsInput) =>
-    ipcRenderer.invoke('settings:update', updates) as Promise<BootstrapState>,
-  chooseStorage: () => ipcRenderer.invoke('settings:chooseStorage') as Promise<BootstrapState>,
-  requestMicrophoneAccess: () =>
-    ipcRenderer.invoke('permissions:requestMicrophone') as Promise<BootstrapState>,
-  requestSystemAccess: () =>
-    ipcRenderer.invoke('permissions:requestSystem') as Promise<BootstrapState>,
-  prepareSpeechModel: () =>
-    ipcRenderer.invoke('models:prepareSpeech') as Promise<BootstrapState>,
-  refreshOllama: () => ipcRenderer.invoke('models:refreshOllama') as Promise<BootstrapState>,
-  pullRecommendedModel: () =>
-    ipcRenderer.invoke('models:pullRecommended') as Promise<BootstrapState>,
-  testApiKey: (apiKey: string, baseUrl?: string) =>
-    ipcRenderer.invoke('openai:testKey', apiKey, baseUrl) as Promise<{ valid: boolean; error?: string }>,
-  testOpenrouterKey: (apiKey: string) =>
-    ipcRenderer.invoke('openrouter:testKey', apiKey) as Promise<{ valid: boolean; error?: string }>,
-  testFireworksKey: (apiKey: string) =>
-    ipcRenderer.invoke('fireworks:testKey', apiKey) as Promise<{ valid: boolean; error?: string }>,
-  clearApiKey: (provider?: CloudRewriteProvider) =>
-    ipcRenderer.invoke('openai:clearKey', provider) as Promise<BootstrapState>,
-  addDictionaryWord: (word: string) =>
-    ipcRenderer.invoke('dictionary:add', word) as Promise<DictionaryEntry[]>,
-  removeDictionaryWord: (word: string) =>
-    ipcRenderer.invoke('dictionary:remove', word) as Promise<DictionaryEntry[]>,
-  addCorrection: (from: string, to: string) =>
-    ipcRenderer.invoke('corrections:add', from, to) as Promise<CorrectionEntry[]>,
-  removeCorrection: (from: string) =>
-    ipcRenderer.invoke('corrections:remove', from) as Promise<CorrectionEntry[]>,
-  addAppRule: (rule: AppRule) =>
-    ipcRenderer.invoke('appRules:add', rule) as Promise<AppRule[]>,
-  removeAppRule: (appIdentifier: string) =>
-    ipcRenderer.invoke('appRules:remove', appIdentifier) as Promise<AppRule[]>,
-  updateAppRule: (appIdentifier: string, styleMode: string, enhancementLevel: string) =>
+  /** The theme the window was opened with, before the state arrives. */
+  initialTheme: themeArgument === 'light' || themeArgument === 'dark' ? themeArgument : 'system',
+  /** The language the window was opened with; later switches arrive through onLocale. */
+  initialLocale: (isLocale(localeArgument) ? localeArgument : 'en') as Locale,
+  getState: () => ipcRenderer.invoke('app:getState') as Promise<AppState>,
+  updateSettings: (updates: UpdateSettingsInput) => ipcRenderer.invoke('settings:update', updates) as Promise<AppState>,
+  chooseStorage: () => ipcRenderer.invoke('settings:chooseStorage') as Promise<AppState>,
+
+  saveGroqKey: (key: string) =>
+    ipcRenderer.invoke('groq:saveKey', key) as Promise<{ result: KeyValidationResult; state: AppState }>,
+  clearGroqKey: () => ipcRenderer.invoke('groq:clearKey') as Promise<AppState>,
+  downloadLocalModel: () => ipcRenderer.invoke('local:download') as Promise<AppState>,
+
+  requestPermission: (kind: PermissionKind) => ipcRenderer.invoke('permissions:request', kind) as Promise<AppState>,
+  openPermissionSettings: (kind: PermissionKind) => ipcRenderer.invoke('permissions:openSettings', kind) as Promise<void>,
+  repairPermissions: () => ipcRenderer.invoke('permissions:repair') as Promise<AppState>,
+  refreshPermissions: () => ipcRenderer.invoke('permissions:refresh') as Promise<AppState>,
+  openKeyboardSettings: () => ipcRenderer.invoke('system:openKeyboardSettings') as Promise<void>,
+
+  addDictionaryWord: (word: string) => ipcRenderer.invoke('dictionary:add', word) as Promise<DictionaryEntry[]>,
+  removeDictionaryWord: (word: string) => ipcRenderer.invoke('dictionary:remove', word) as Promise<DictionaryEntry[]>,
+  addCorrection: (from: string, to: string) => ipcRenderer.invoke('corrections:add', from, to) as Promise<CorrectionEntry[]>,
+  removeCorrection: (from: string) => ipcRenderer.invoke('corrections:remove', from) as Promise<CorrectionEntry[]>,
+  addAppRule: (rule: AppRule) => ipcRenderer.invoke('appRules:add', rule) as Promise<AppRule[]>,
+  removeAppRule: (appIdentifier: string) => ipcRenderer.invoke('appRules:remove', appIdentifier) as Promise<AppRule[]>,
+  updateAppRule: (appIdentifier: string, styleMode: StyleMode, enhancementLevel: RuleLevel) =>
     ipcRenderer.invoke('appRules:update', appIdentifier, styleMode, enhancementLevel) as Promise<AppRule[]>,
-  removeHistoryEntry: (id: string) =>
-    ipcRenderer.invoke('history:remove', id) as Promise<HistoryEntry[]>,
-  clearHistory: () =>
-    ipcRenderer.invoke('history:clear') as Promise<HistoryEntry[]>,
+
+  removeHistoryEntry: (id: string) => ipcRenderer.invoke('history:remove', id) as Promise<HistoryEntry[]>,
+  clearHistory: () => ipcRenderer.invoke('history:clear') as Promise<HistoryEntry[]>,
+  revealAudio: (id: string) => ipcRenderer.invoke('history:revealAudio', id) as Promise<void>,
+  /** Hides Yap and pastes the dictation into the app behind it. */
+  pasteHistoryEntry: (id: string, version: 'final' | 'raw') =>
+    ipcRenderer.invoke('history:paste', id, version) as Promise<void>,
   retranscribe: (id: string, mode: RetranscribeMode) =>
-    ipcRenderer.invoke('dictation:retranscribe', id, mode) as Promise<HistoryEntry[]>,
-  revealAudio: (id: string) =>
-    ipcRenderer.invoke('history:revealAudio', id) as Promise<void>,
-  cleanupAudio: () =>
-    ipcRenderer.invoke('history:cleanup') as Promise<HistoryEntry[]>,
-  captureFocusTarget: () =>
-    ipcRenderer.invoke('dictation:captureTarget') as Promise<FocusInfo>,
-  processAudio: (request: DictationRequest) =>
-    ipcRenderer.invoke('dictation:processAudio', request) as Promise<{
-      rawText: string;
-      finalText: string;
-      pasted: boolean;
-    }>,
-  pushStatus: (status: AppStatus) => ipcRenderer.send('dictation:status', status),
-  showMainWindow: () => ipcRenderer.invoke('system:showMainWindow'),
-  hideMainWindow: () => ipcRenderer.invoke('system:hideMainWindow'),
-  openExternal: (targetUrl: string) => ipcRenderer.invoke('system:openExternal', targetUrl),
-  revealStorage: () => ipcRenderer.invoke('system:revealStorage'),
-  onStatus: (listener: (status: AppStatus) => void) => {
-    const wrapped = (_event: Electron.IpcRendererEvent, status: AppStatus) => listener(status);
-    ipcRenderer.on('app:status', wrapped);
-    return () => ipcRenderer.removeListener('app:status', wrapped);
-  },
-  onHotkey: (listener: (event: HotkeyEvent) => void) => {
-    const wrapped = (_event: Electron.IpcRendererEvent, event: HotkeyEvent) => listener(event);
-    ipcRenderer.on('hotkey:event', wrapped);
-    return () => ipcRenderer.removeListener('hotkey:event', wrapped);
-  },
-  onHistoryUpdated: (listener: (history: HistoryEntry[]) => void) => {
-    const wrapped = (_event: Electron.IpcRendererEvent, history: HistoryEntry[]) => listener(history);
-    ipcRenderer.on('history:updated', wrapped);
-    return () => ipcRenderer.removeListener('history:updated', wrapped);
-  },
+    ipcRenderer.invoke('history:retranscribe', id, mode) as Promise<HistoryEntry[]>,
+
+  showMainWindow: () => ipcRenderer.invoke('system:showMainWindow') as Promise<void>,
+  openExternal: (url: string) => ipcRenderer.invoke('system:openExternal', url) as Promise<void>,
+  revealStorage: () => ipcRenderer.invoke('system:revealStorage') as Promise<void>,
+
+  onStatus: (listener: (status: AppStatus) => void) => subscribe('app:status', listener),
+  onStatePatch: (listener: (patch: Partial<AppState>) => void) => subscribe('state:patch', listener),
+  onHotkeyActivity: (listener: (down: boolean) => void) => subscribe('hotkey:activity', listener),
+  onLocale: (listener: (locale: Locale) => void) => subscribe('app:locale', listener),
+
+  /* Recorder protocol, used by the overlay window only. */
+  onRecorderCommand: (listener: (command: RecorderCommand) => void) => subscribe('recorder:command', listener),
+  sendRecorderEvent: (event: RecorderEvent) => ipcRenderer.send('recorder:event', event),
+  sendRecordedAudio: (audio: RecordedAudio) => ipcRenderer.send('recorder:audio', audio),
 };
+
+export type YapApi = typeof api;
 
 contextBridge.exposeInMainWorld('yap', api);

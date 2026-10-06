@@ -1,8 +1,8 @@
 import { app } from 'electron';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-import type { AppRule, EnhancementLevel, FocusInfo, StyleMode } from '../shared/types';
+import type { AppRule, EnhancementLevel, FocusInfo, RuleLevel, StyleMode } from '../shared/types';
+import { readJsonFile, writeJsonFile } from './json-file';
 
 const APP_RULES_FILE = 'app-rules.json';
 
@@ -44,66 +44,94 @@ const DEFAULT_APP_RULES: AppRule[] = [
   { appIdentifier: 'com.docker.docker', label: 'Docker Desktop', styleMode: 'vibe-coding', enhancementLevel: 'high' },
 ];
 
-export async function loadAppRules(): Promise<AppRule[]> {
-  try {
-    const raw = await readFile(getAppRulesPath(), 'utf8');
-    return JSON.parse(raw) as AppRule[];
-  } catch {
-    await saveAppRules(DEFAULT_APP_RULES);
-    return DEFAULT_APP_RULES;
-  }
+let cache: AppRule[] | null = null;
+
+function isAppRule(value: unknown): value is AppRule {
+  const rule = value as AppRule;
+  return (
+    !!rule &&
+    typeof rule.appIdentifier === 'string' &&
+    typeof rule.label === 'string' &&
+    typeof rule.styleMode === 'string' &&
+    typeof rule.enhancementLevel === 'string'
+  );
 }
 
-async function saveAppRules(rules: AppRule[]): Promise<void> {
-  const filePath = getAppRulesPath();
-  await mkdir(path.dirname(filePath), { recursive: true });
-  await writeFile(filePath, `${JSON.stringify(rules, null, 2)}\n`, 'utf8');
+export async function loadAppRules(): Promise<AppRule[]> {
+  if (cache) {
+    return cache;
+  }
+
+  const raw = await readJsonFile<unknown[]>(getAppRulesPath());
+  if (Array.isArray(raw)) {
+    cache = raw.filter(isAppRule);
+  } else {
+    cache = DEFAULT_APP_RULES;
+    await writeJsonFile(getAppRulesPath(), cache);
+  }
+  return cache;
+}
+
+async function saveAppRules(rules: AppRule[]): Promise<AppRule[]> {
+  cache = rules;
+  await writeJsonFile(getAppRulesPath(), rules);
+  return rules;
 }
 
 export async function addAppRule(rule: AppRule): Promise<AppRule[]> {
   const rules = await loadAppRules();
-  const exists = rules.some((r) => r.appIdentifier === rule.appIdentifier);
-  if (exists) {
+  if (rules.some((r) => r.appIdentifier === rule.appIdentifier)) {
     return rules;
   }
-  rules.push(rule);
-  rules.sort((a, b) => a.label.localeCompare(b.label));
-  await saveAppRules(rules);
-  return rules;
+  return saveAppRules([...rules, rule].sort((a, b) => a.label.localeCompare(b.label)));
 }
 
 export async function removeAppRule(appIdentifier: string): Promise<AppRule[]> {
   const rules = await loadAppRules();
-  const filtered = rules.filter((r) => r.appIdentifier !== appIdentifier);
-  await saveAppRules(filtered);
-  return filtered;
+  return saveAppRules(rules.filter((r) => r.appIdentifier !== appIdentifier));
 }
 
-export async function updateAppRule(appIdentifier: string, styleMode: StyleMode, enhancementLevel: EnhancementLevel): Promise<AppRule[]> {
+export async function updateAppRule(
+  appIdentifier: string,
+  styleMode: StyleMode,
+  enhancementLevel: RuleLevel,
+): Promise<AppRule[]> {
   const rules = await loadAppRules();
-  const rule = rules.find((r) => r.appIdentifier === appIdentifier);
-  if (rule) {
-    rule.styleMode = styleMode;
-    rule.enhancementLevel = enhancementLevel;
-    await saveAppRules(rules);
+  if (!rules.some((r) => r.appIdentifier === appIdentifier)) {
+    return rules;
   }
-  return rules;
+  return saveAppRules(
+    rules.map((r) => (r.appIdentifier === appIdentifier ? { ...r, styleMode, enhancementLevel } : r)),
+  );
 }
 
+export interface ResolvedStyle {
+  styleMode: StyleMode;
+  enhancementLevel: EnhancementLevel;
+  /** False when the app's rule switches polishing off. Off in Style switches it off everywhere. */
+  polish: boolean;
+  /** The app rule that applied, by app name. */
+  matchedApp?: string;
+}
+
+/**
+ * The style for a dictation, decided by the app that has focus when it ends.
+ * A rule for that app (matched by bundle identifier) replaces the defaults.
+ */
 export function resolveStyleForApp(
   focusInfo: FocusInfo | undefined,
   rules: AppRule[],
   defaultStyle: StyleMode,
   defaultLevel: EnhancementLevel,
-): { styleMode: StyleMode; enhancementLevel: EnhancementLevel; matchedApp?: string } {
-  if (!focusInfo?.bundleIdentifier) {
-    return { styleMode: defaultStyle, enhancementLevel: defaultLevel };
+): ResolvedStyle {
+  const match = focusInfo?.bundleIdentifier
+    ? rules.find((rule) => rule.appIdentifier === focusInfo.bundleIdentifier)
+    : undefined;
+  if (!match) {
+    return { styleMode: defaultStyle, enhancementLevel: defaultLevel, polish: true };
   }
-
-  const match = rules.find((r) => r.appIdentifier === focusInfo.bundleIdentifier);
-  if (match) {
-    return { styleMode: match.styleMode, enhancementLevel: match.enhancementLevel, matchedApp: match.label };
+  if (match.enhancementLevel === 'off') {
+    return { styleMode: match.styleMode, enhancementLevel: defaultLevel, polish: false, matchedApp: match.label };
   }
-
-  return { styleMode: defaultStyle, enhancementLevel: defaultLevel };
+  return { styleMode: match.styleMode, enhancementLevel: match.enhancementLevel, polish: true, matchedApp: match.label };
 }

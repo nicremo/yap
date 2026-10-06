@@ -1,6 +1,6 @@
 {
   "name": "yap",
-  "version": "0.9.0",
+  "version": "1.0.0",
   "license": "MIT",
   "author": "Fabian Bitzer (https://github.com/nicremo)",
   "repository": {
@@ -10,16 +10,16 @@
   "homepage": "https://github.com/nicremo/yap",
   "private": true,
   "type": "module",
-  "description": "Free, open source dictation for macOS. Hold a key, speak, release. Transcription runs on Groq's free tier so nothing heavy runs on your Mac, with a local Whisper fallback when offline.",
+  "description": "Fast, free dictation for macOS. Hold a key, speak, release. Groq transcribes in well under a second, with an optional fully local mode.",
   "main": "dist/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:e2e": "node tests/e2e/dictation.e2e.mjs",
     "build:native": "node scripts/build-helper-platform.js",
-    "build:native:mac": "swiftc swift/YapHelper.swift -o build/native/yap-helper",
-    "build:native:win": "cd windows && cl.exe /O2 /W3 YapHelper.cpp /link user32.lib kernel32.lib /out:..\\build\\native\\yap-helper.exe",
+    "test:helper": "node scripts/helper-smoke-test.mjs",
     "package": "npm run build && npm run build:native && electron-builder",
     "package:mac": "npm run build && npm run build:native && electron-builder --mac",
     "package:win": "npm run build && npm run build:native && electron-builder --win"
@@ -29,7 +29,18 @@
     "productName": "Yap",
     "files": [
       "dist/**/*",
-      "package.json"
+      "!dist/**/*.map",
+      "package.json",
+      "!**/node_modules/onnxruntime-web/**",
+      "!**/node_modules/onnxruntime-node/bin/napi-v*/linux/**",
+      "!**/node_modules/@huggingface/transformers/dist/*.web*.js",
+      "!**/node_modules/@huggingface/transformers/dist/transformers.js",
+      "!**/node_modules/@huggingface/transformers/dist/transformers.min.js",
+      "!**/node_modules/@huggingface/transformers/dist/*.cjs",
+      "!**/node_modules/@huggingface/transformers/dist/*.min.mjs",
+      "!**/node_modules/@huggingface/transformers/dist/ort-*.mjs",
+      "!**/node_modules/@huggingface/transformers/src/**",
+      "!**/node_modules/@huggingface/transformers/types/**"
     ],
     "extraResources": [
       {
@@ -55,14 +66,32 @@
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
       "extendInfo": {
-        "NSMicrophoneUsageDescription": "Yap needs microphone access to transcribe your speech locally."
+        "NSMicrophoneUsageDescription": "Yap records your voice while you hold the dictation key and turns it into text.",
+        "LSApplicationCategoryType": "public.app-category.productivity",
+        "LSUIElement": true
       },
-      "icon": "build/icons/icon.icns"
+      "icon": "build/icons/icon.icns",
+      "minimumSystemVersion": "12.0",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "files": [
+        "!**/node_modules/onnxruntime-node/bin/napi-v*/win32/**"
+      ],
+      "identity": null,
+      "extraResources": [
+        {
+          "from": "build/mac-locales",
+          "to": "."
+        }
+      ]
     },
     "win": {
       "target": [
         "nsis",
         "zip"
+      ],
+      "files": [
+        "!**/node_modules/onnxruntime-node/bin/napi-v*/darwin/**"
       ]
     },
     "nsis": {
@@ -75,18 +104,18 @@
       "provider": "github",
       "owner": "nicremo",
       "repo": "yap"
-    }
+    },
+    "afterPack": "scripts/after-pack.cjs"
   },
   "dependencies": {
-    "@hugeicons/core-free-icons": "^4.1.1",
-    "@hugeicons/react": "^1.1.6",
     "@huggingface/transformers": "^4.0.1",
     "electron-log": "^5.4.3",
-    "electron-updater": "^6.8.3",
-    "react": "^19.2.5",
-    "react-dom": "^19.2.5"
+    "electron-updater": "^6.8.3"
   },
   "devDependencies": {
+    "@fontsource-variable/geist": "^5.3.0",
+    "@fontsource-variable/geist-mono": "^5.3.0",
+    "@fontsource/instrument-serif": "^5.3.0",
     "@types/node": "^25.6.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
@@ -94,6 +123,9 @@
     "electron": "^41.2.0",
     "electron-builder": "^26.8.1",
     "electron-vite": "^5.0.0",
+    "playwright-core": "^1.56.1",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
     "typescript": "^6.0.2",
     "vite": "^7.3.2",
     "vitest": "^4.1.10"

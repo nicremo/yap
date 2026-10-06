@@ -1,224 +1,289 @@
+// Native macOS helper for Yap.
+//
+// Runs as one long-lived process (`yap-helper serve`) for the lifetime of the
+// app. Commands arrive as JSON lines on stdin, replies and events leave as
+// JSON lines on stdout. Keeping it alive removes a process launch from every
+// focus query and every paste, and lets it watch the hotkey, the permissions
+// and the clipboard continuously.
+//
+// Threads:
+//   main      command handling, clipboard, paste, permission polling
+//   hotkey    the event tap and its run loop, so nothing the main thread does
+//             can ever delay keyboard input
+//   stdin     blocking line reader that hands commands to the main queue
+
 import AppKit
 import ApplicationServices
 import Foundation
 
-struct PermissionState: Codable {
-    let microphone: String
-    let accessibility: Bool
-    let inputMonitoring: Bool
-    let postEvents: Bool
+let helperVersion = 3
+
+// MARK: - Output
+
+private let outputQueue = DispatchQueue(label: "yap.helper.output")
+
+func send(_ message: [String: Any]) {
+    guard JSONSerialization.isValidJSONObject(message),
+          var data = try? JSONSerialization.data(withJSONObject: message, options: [])
+    else {
+        return
+    }
+    data.append(0x0A)
+    outputQueue.sync {
+        FileHandle.standardOutput.write(data)
+    }
 }
 
-struct FocusState: Codable {
-    let canPaste: Bool
-    let role: String?
-    let appName: String?
-    let bundleIdentifier: String?
-    let processIdentifier: Int32?
+func orNull(_ value: Any?) -> Any {
+    return value ?? NSNull()
 }
 
-struct OkState: Codable {
-    let ok: Bool
+// MARK: - Permissions
+
+func inputMonitoringGranted() -> Bool {
+    return CGPreflightListenEventAccess()
 }
 
-struct EventMessage: Codable {
-    let type: String
-    let message: String?
+func postEventsGranted() -> Bool {
+    return CGPreflightPostEventAccess()
 }
 
-private var hotkeyIsDown = false
-private var targetKeyCode: Int64 = 61
-private var targetModifiers: UInt64 = 0
+func permissionState() -> [String: Any] {
+    return [
+        "accessibility": AXIsProcessTrusted(),
+        "inputMonitoring": inputMonitoringGranted(),
+        "postEvents": postEventsGranted(),
+    ]
+}
 
-// Modifier flag constants matching CGEventFlags raw values
-private let kModifierCommand: UInt64  = 0x100000
-private let kModifierOption: UInt64   = 0x80000
-private let kModifierShift: UInt64    = 0x20000
-private let kModifierControl: UInt64  = 0x40000
-private let kModifierFn: UInt64       = 0x800000
+func requestAccessibility() {
+    let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+    _ = AXIsProcessTrustedWithOptions(options)
+}
 
-// Key codes that are themselves modifier keys
+func requestInputMonitoring() {
+    _ = CGRequestListenEventAccess()
+}
+
+/// What the Globe/Fn key does: 0 nothing, 1 input source, 2 emoji, 3 dictation.
+func fnUsageType() -> Int? {
+    guard let value = CFPreferencesCopyAppValue("AppleFnUsageType" as CFString, "com.apple.HIToolbox" as CFString) else {
+        return nil
+    }
+    return (value as? NSNumber)?.intValue
+}
+
+// MARK: - Focus
+
+private let systemWideElement: AXUIElement = {
+    let element = AXUIElementCreateSystemWide()
+    // A hung target app must not be able to stall the helper.
+    _ = AXUIElementSetMessagingTimeout(element, 0.25)
+    return element
+}()
+
+/// The pid of the app that has keyboard focus, asked fresh from the
+/// accessibility server. Falls back to NSWorkspace, which can lag a run loop turn.
+func frontmostPid() -> pid_t? {
+    if AXIsProcessTrusted() {
+        var value: CFTypeRef?
+        if AXUIElementCopyAttributeValue(systemWideElement, kAXFocusedApplicationAttribute as CFString, &value) == .success,
+           let value {
+            let element = unsafeBitCast(value, to: AXUIElement.self)
+            var pid: pid_t = 0
+            if AXUIElementGetPid(element, &pid) == .success, pid > 0 {
+                return pid
+            }
+        }
+    }
+    return NSWorkspace.shared.frontmostApplication?.processIdentifier
+}
+
+private let yapBundleIdentifier = "ai.yap.desktop"
+
+/// Yap itself: the Electron process that launched this helper, or the
+/// installed app when the helper was started some other way.
+func isOwnApp(_ pid: pid_t) -> Bool {
+    if pid == getppid() {
+        return true
+    }
+    return NSRunningApplication(processIdentifier: pid)?.bundleIdentifier == yapBundleIdentifier
+}
+
+private let editableRoles: Set<String> = [
+    kAXTextFieldRole as String,
+    kAXTextAreaRole as String,
+    kAXComboBoxRole as String,
+    "AXSearchField",
+]
+
+/// The element that has keyboard focus, and whether text can be typed into it.
+func focusedElementState() -> (role: String?, editable: Bool) {
+    guard AXIsProcessTrusted() else {
+        return (nil, false)
+    }
+    var focusedRef: CFTypeRef?
+    guard AXUIElementCopyAttributeValue(systemWideElement, kAXFocusedUIElementAttribute as CFString, &focusedRef) == .success,
+          let focusedRef
+    else {
+        return (nil, false)
+    }
+    let element = unsafeBitCast(focusedRef, to: AXUIElement.self)
+
+    var roleRef: CFTypeRef?
+    let role = AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &roleRef) == .success
+        ? roleRef as? String
+        : nil
+    if let role, editableRoles.contains(role) {
+        return (role, true)
+    }
+
+    var settable = DarwinBoolean(false)
+    if AXUIElementIsAttributeSettable(element, kAXValueAttribute as CFString, &settable) == .success, settable.boolValue {
+        return (role, true)
+    }
+    var rangeRef: CFTypeRef?
+    let hasSelection = AXUIElementCopyAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, &rangeRef) == .success
+    return (role, hasSelection)
+}
+
+func focusInfo(for application: NSRunningApplication?) -> [String: Any] {
+    guard let application else {
+        return [:]
+    }
+    return [
+        "appName": orNull(application.localizedName),
+        "bundleIdentifier": orNull(application.bundleIdentifier),
+        "processIdentifier": Int(application.processIdentifier),
+    ]
+}
+
+/// Where keyboard input goes right now. Asked when a dictation ends, because
+/// that is where the text belongs.
+func currentFocus() -> [String: Any] {
+    var info: [String: Any]
+    if let pid = frontmostPid(), let application = NSRunningApplication(processIdentifier: pid) {
+        info = focusInfo(for: application)
+    } else {
+        info = focusInfo(for: NSWorkspace.shared.frontmostApplication)
+    }
+    let element = focusedElementState()
+    info["role"] = orNull(element.role)
+    info["editable"] = element.editable
+    return info
+}
+
+// MARK: - Hotkey
+
 private let modifierKeyCodes: Set<Int64> = [54, 55, 56, 58, 59, 60, 61, 62, 63]
 
-private func flagForKeyCode(_ code: Int64) -> UInt64 {
-    switch code {
-    case 54, 55: return kModifierCommand
-    case 58, 61: return kModifierOption
-    case 56, 60: return kModifierShift
-    case 59, 62: return kModifierControl
-    case 63: return kModifierFn
+private let flagCommand: UInt64 = 0x100000
+private let flagOption: UInt64 = 0x80000
+private let flagShift: UInt64 = 0x20000
+private let flagControl: UInt64 = 0x40000
+private let flagFn: UInt64 = 0x800000
+
+// Device-dependent bits tell the left and right variant of a modifier apart.
+private let deviceFlagsMask: UInt64 = 0x207F
+
+private func genericFlag(for keyCode: Int64) -> UInt64 {
+    switch keyCode {
+    case 54, 55: return flagCommand
+    case 58, 61: return flagOption
+    case 56, 60: return flagShift
+    case 59, 62: return flagControl
+    case 63: return flagFn
     default: return 0
     }
 }
 
-func emitJSON<T: Encodable>(_ value: T) {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = []
-
-    guard let data = try? encoder.encode(value) else {
-        return
+private func deviceFlag(for keyCode: Int64) -> UInt64 {
+    switch keyCode {
+    case 59: return 0x01   // left control
+    case 56: return 0x02   // left shift
+    case 60: return 0x04   // right shift
+    case 55: return 0x08   // left command
+    case 54: return 0x10   // right command
+    case 58: return 0x20   // left option
+    case 61: return 0x40   // right option
+    case 62: return 0x2000 // right control
+    default: return 0
     }
-
-    FileHandle.standardOutput.write(data)
-    FileHandle.standardOutput.write("\n".data(using: .utf8)!)
 }
 
-func inputMonitoringGranted() -> Bool {
-    if #available(macOS 10.15, *) {
-        return CGPreflightListenEventAccess()
+/// Whether the given modifier key is held according to a flags value.
+private func modifierKeyIsDown(_ keyCode: Int64, flags: UInt64) -> Bool {
+    let device = deviceFlag(for: keyCode)
+    if device != 0 && (flags & deviceFlagsMask) != 0 {
+        return (flags & device) != 0
     }
-
-    return true
+    return (flags & genericFlag(for: keyCode)) != 0
 }
 
-func postEventsGranted() -> Bool {
-    if #available(macOS 10.15, *) {
-        return CGPreflightPostEventAccess()
-    }
-
-    return true
+private final class HotkeyState {
+    let lock = NSLock()
+    var keyCode: Int64 = 63
+    var modifiers: UInt64 = 0
+    var isDown = false
+    /// Another key was pressed while a modifier hotkey was held (fn + arrow, ...).
+    var chorded = false
 }
 
-func buildPermissionState() -> PermissionState {
-    PermissionState(
-        microphone: "unknown",
-        accessibility: AXIsProcessTrusted(),
-        inputMonitoring: inputMonitoringGranted(),
-        postEvents: postEventsGranted()
-    )
+private let hotkey = HotkeyState()
+private var tapPort: CFMachPort?
+private var tapRunLoop: CFRunLoop?
+private var tapMode: String?
+private var listenerWanted = false
+private var listenerError: String?
+/// The same failure as a stable code, which Yap words in the user's language.
+private var listenerErrorCode: String?
+
+/// Sent straight from the tap thread. The focus is asked separately when the
+/// dictation ends, so nothing here can slow down keyboard input.
+private func emitHotkey(down: Bool) {
+    send(["event": "hotkey", "state": down ? "down" : "up"])
 }
 
-func requestPermissions() -> PermissionState {
-    let options = [
-        kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true
-    ] as CFDictionary
-
-    _ = AXIsProcessTrustedWithOptions(options)
-
-    if #available(macOS 10.15, *) {
-        _ = CGRequestListenEventAccess()
-        _ = CGRequestPostEventAccess()
+/// Computes the new pressed state for an event, or nil when the event is not about the hotkey.
+private func evaluate(type: CGEventType, keyCode: Int64, flags: UInt64, target: Int64, modifiers: UInt64) -> Bool? {
+    if modifierKeyCodes.contains(target) {
+        guard type == .flagsChanged, keyCode == target else { return nil }
+        let keyDown = modifierKeyIsDown(target, flags: flags)
+        if modifiers == 0 {
+            return keyDown
+        }
+        return keyDown && (flags & modifiers) == modifiers
     }
 
-    return buildPermissionState()
+    guard type == .keyDown || type == .keyUp, keyCode == target else { return nil }
+    if type == .keyDown && modifiers != 0 && (flags & modifiers) != modifiers {
+        return nil
+    }
+    return type == .keyDown
 }
 
-func currentFocus() -> FocusState {
-    let frontmostApplication = NSWorkspace.shared.frontmostApplication
-    let appName = frontmostApplication?.localizedName
-    let bundleIdentifier = frontmostApplication?.bundleIdentifier
-    let processIdentifier = frontmostApplication.map { Int32($0.processIdentifier) }
-    let systemWide = AXUIElementCreateSystemWide()
-    var focusedRef: CFTypeRef?
-
-    let focusedStatus = AXUIElementCopyAttributeValue(
-        systemWide,
-        kAXFocusedUIElementAttribute as CFString,
-        &focusedRef
-    )
-
-    guard focusedStatus == .success, let focusedRef else {
-        return FocusState(
-            canPaste: false,
-            role: nil,
-            appName: appName,
-            bundleIdentifier: bundleIdentifier,
-            processIdentifier: processIdentifier
-        )
+/// After the tap was disabled events may have been missed. Read the real key state.
+private func resyncHotkey() {
+    hotkey.lock.lock()
+    let target = hotkey.keyCode
+    let modifiers = hotkey.modifiers
+    let wasDown = hotkey.isDown
+    let flags = CGEventSource.flagsState(.combinedSessionState).rawValue
+    var nowDown: Bool
+    if modifierKeyCodes.contains(target) {
+        nowDown = modifierKeyIsDown(target, flags: flags)
+    } else {
+        nowDown = CGEventSource.keyState(.combinedSessionState, key: CGKeyCode(truncatingIfNeeded: target))
     }
-
-    let focused = unsafeBitCast(focusedRef, to: AXUIElement.self)
-
-    var roleRef: CFTypeRef?
-    let roleStatus = AXUIElementCopyAttributeValue(
-        focused,
-        kAXRoleAttribute as CFString,
-        &roleRef
-    )
-
-    let role = roleStatus == .success ? (roleRef as? String) : nil
-    let knownTextRoles: Set<String> = [
-        kAXTextFieldRole as String,
-        kAXTextAreaRole as String,
-        "AXSearchField",
-        kAXComboBoxRole as String,
-        "AXWebArea"
-    ]
-
-    var valueSettable = DarwinBoolean(false)
-    let valueStatus = AXUIElementIsAttributeSettable(
-        focused,
-        kAXValueAttribute as CFString,
-        &valueSettable
-    )
-
-    var selectedTextRangeRef: CFTypeRef?
-    let selectedTextRangeStatus = AXUIElementCopyAttributeValue(
-        focused,
-        kAXSelectedTextRangeAttribute as CFString,
-        &selectedTextRangeRef
-    )
-
-    let canPaste =
-        knownTextRoles.contains(role ?? "") ||
-        (valueStatus == .success && valueSettable.boolValue) ||
-        selectedTextRangeStatus == .success
-
-    return FocusState(
-        canPaste: canPaste,
-        role: role,
-        appName: appName,
-        bundleIdentifier: bundleIdentifier,
-        processIdentifier: processIdentifier
-    )
-}
-
-func activateTargetApplication(bundleIdentifier: String?, processIdentifier: pid_t?) {
-    var application: NSRunningApplication?
-
-    if let processIdentifier, processIdentifier > 0 {
-        application = NSRunningApplication(processIdentifier: processIdentifier)
+    if modifiers != 0 {
+        nowDown = nowDown && (flags & modifiers) == modifiers
     }
+    hotkey.isDown = nowDown
+    hotkey.lock.unlock()
 
-    if application == nil, let bundleIdentifier, !bundleIdentifier.isEmpty {
-        application = NSRunningApplication.runningApplications(withBundleIdentifier: bundleIdentifier).first
+    if nowDown != wasDown {
+        emitHotkey(down: nowDown)
     }
-
-    application?.unhide()
-    _ = application?.activate(options: [.activateIgnoringOtherApps])
-    usleep(260_000)
-}
-
-func pasteClipboardContents(bundleIdentifier: String?, processIdentifier: pid_t?) -> Bool {
-    guard postEventsGranted() else {
-        return false
-    }
-
-    activateTargetApplication(bundleIdentifier: bundleIdentifier, processIdentifier: processIdentifier)
-
-    let commandKeyCode: CGKeyCode = 55
-    let keyCodeV: CGKeyCode = 9
-    guard let source = CGEventSource(stateID: .combinedSessionState),
-          let commandDown = CGEvent(keyboardEventSource: source, virtualKey: commandKeyCode, keyDown: true),
-          let keyDown = CGEvent(keyboardEventSource: source, virtualKey: keyCodeV, keyDown: true),
-          let keyUp = CGEvent(keyboardEventSource: source, virtualKey: keyCodeV, keyDown: false),
-          let commandUp = CGEvent(keyboardEventSource: source, virtualKey: commandKeyCode, keyDown: false)
-    else {
-        return false
-    }
-
-    commandDown.flags = .maskCommand
-    keyDown.flags = .maskCommand
-    keyUp.flags = .maskCommand
-    commandUp.flags = []
-    commandDown.post(tap: .cghidEventTap)
-    usleep(12_000)
-    keyDown.post(tap: .cghidEventTap)
-    keyUp.post(tap: .cghidEventTap)
-    usleep(12_000)
-    commandUp.post(tap: .cghidEventTap)
-
-    return true
 }
 
 private func hotkeyCallback(
@@ -227,125 +292,483 @@ private func hotkeyCallback(
     event: CGEvent,
     userInfo: UnsafeMutableRawPointer?
 ) -> Unmanaged<CGEvent>? {
-    let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
-    let rawFlags = event.flags.rawValue
-
-    if type == .flagsChanged {
-        if modifierKeyCodes.contains(targetKeyCode) && targetModifiers == 0 {
-            // Single modifier key mode, e.g. right Option on its own.
-            guard keyCode == targetKeyCode else {
-                return Unmanaged.passUnretained(event)
-            }
-            let keyFlag = flagForKeyCode(targetKeyCode)
-            let keyIsDown = (rawFlags & keyFlag) != 0
-            if keyIsDown != hotkeyIsDown {
-                hotkeyIsDown = keyIsDown
-                emitJSON(EventMessage(type: keyIsDown ? "fnDown" : "fnUp", message: nil))
-            }
-        } else if modifierKeyCodes.contains(targetKeyCode) && targetModifiers != 0 {
-            // Modifier combo mode (e.g. Cmd+Option = press Option while Cmd is held)
-            guard keyCode == targetKeyCode else {
-                return Unmanaged.passUnretained(event)
-            }
-            let keyFlag = flagForKeyCode(targetKeyCode)
-            let keyIsDown = (rawFlags & keyFlag) != 0
-            let modifiersHeld = (rawFlags & targetModifiers) == targetModifiers
-            let isDown = keyIsDown && modifiersHeld
-            if isDown != hotkeyIsDown {
-                hotkeyIsDown = isDown
-                emitJSON(EventMessage(type: isDown ? "fnDown" : "fnUp", message: nil))
-            }
+    if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+        // macOS switches a tap off when it was slow once. Without turning it
+        // back on the hotkey silently stops working until the app restarts.
+        if let tapPort {
+            CGEvent.tapEnable(tap: tapPort, enable: true)
         }
-    } else if type == .keyDown || type == .keyUp {
-        // Regular key with modifier combo (e.g. Cmd+Opt+Space)
-        guard !modifierKeyCodes.contains(targetKeyCode) else {
-            return Unmanaged.passUnretained(event)
-        }
-        guard keyCode == targetKeyCode else {
-            return Unmanaged.passUnretained(event)
-        }
-        if targetModifiers != 0 {
-            let modifiersHeld = (rawFlags & targetModifiers) == targetModifiers
-            guard modifiersHeld else {
-                return Unmanaged.passUnretained(event)
-            }
-        }
-        let isDown = (type == .keyDown)
-        if isDown != hotkeyIsDown {
-            hotkeyIsDown = isDown
-            emitJSON(EventMessage(type: isDown ? "fnDown" : "fnUp", message: nil))
-        }
+        resyncHotkey()
+        return Unmanaged.passUnretained(event)
     }
 
+    if type == .keyDown && event.getIntegerValueField(.keyboardEventAutorepeat) != 0 {
+        return Unmanaged.passUnretained(event)
+    }
+
+    let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
+    let flags = event.flags.rawValue
+
+    hotkey.lock.lock()
+    let next = evaluate(type: type, keyCode: keyCode, flags: flags, target: hotkey.keyCode, modifiers: hotkey.modifiers)
+    var changed = false
+    if let next, next != hotkey.isDown {
+        hotkey.isDown = next
+        hotkey.chorded = false
+        changed = true
+    }
+    // A modifier hotkey used as a modifier (fn + delete, right option + a
+    // letter) is not a dictation. Tell the app once per press so it can drop
+    // the recording that already started.
+    var chord = false
+    if type == .keyDown && hotkey.isDown && !hotkey.chorded
+        && keyCode != hotkey.keyCode && modifierKeyCodes.contains(hotkey.keyCode) {
+        hotkey.chorded = true
+        chord = true
+    }
+    hotkey.lock.unlock()
+
+    if changed, let next {
+        emitHotkey(down: next)
+    }
+    if chord {
+        send(["event": "hotkey", "state": "chord"])
+    }
+
+    // Never swallow or alter the event: other apps see the key exactly as typed.
     return Unmanaged.passUnretained(event)
 }
 
-func listenForHotkey() -> Int32 {
-    guard inputMonitoringGranted() else {
-        emitJSON(EventMessage(type: "error", message: "Input Monitoring is not enabled for Yap."))
-        return 1
+/// Creates the tap on its own thread and waits for the outcome. The result is
+/// communicated through `tapPort`, so the thread closure captures nothing mutable.
+private func createTap(listenOnly: Bool) -> Bool {
+    let ready = DispatchSemaphore(value: 0)
+
+    let thread = Thread {
+        let mask = CGEventMask(1 << CGEventType.flagsChanged.rawValue)
+            | CGEventMask(1 << CGEventType.keyDown.rawValue)
+            | CGEventMask(1 << CGEventType.keyUp.rawValue)
+
+        guard let port = CGEvent.tapCreate(
+            tap: .cgSessionEventTap,
+            place: .headInsertEventTap,
+            options: listenOnly ? .listenOnly : .defaultTap,
+            eventsOfInterest: mask,
+            callback: hotkeyCallback,
+            userInfo: nil
+        ) else {
+            ready.signal()
+            return
+        }
+
+        let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, port, 0)
+        let runLoop = CFRunLoopGetCurrent()
+        CFRunLoopAddSource(runLoop, source, .commonModes)
+        CGEvent.tapEnable(tap: port, enable: true)
+        tapPort = port
+        tapRunLoop = runLoop
+        ready.signal()
+        CFRunLoopRun()
     }
+    thread.name = "yap.hotkey"
+    thread.qualityOfService = .userInteractive
+    thread.start()
 
-    var eventMask: CGEventMask
-    if modifierKeyCodes.contains(targetKeyCode) {
-        eventMask = CGEventMask(1 << CGEventType.flagsChanged.rawValue)
-    } else {
-        eventMask = CGEventMask(
-            (1 << CGEventType.flagsChanged.rawValue) |
-            (1 << CGEventType.keyDown.rawValue) |
-            (1 << CGEventType.keyUp.rawValue)
-        )
-    }
-
-    guard let tap = CGEvent.tapCreate(
-        tap: .cgSessionEventTap,
-        place: .headInsertEventTap,
-        options: .listenOnly,
-        eventsOfInterest: eventMask,
-        callback: hotkeyCallback,
-        userInfo: nil
-    ) else {
-        emitJSON(EventMessage(type: "error", message: "Yap could not create the global hotkey listener."))
-        return 1
-    }
-
-    let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
-    CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .commonModes)
-    CGEvent.tapEnable(tap: tap, enable: true)
-    CFRunLoopRun()
-
-    return 0
+    ready.wait()
+    return tapPort != nil
 }
+
+private func stopTap() {
+    if let port = tapPort {
+        CGEvent.tapEnable(tap: port, enable: false)
+        CFMachPortInvalidate(port)
+    }
+    if let runLoop = tapRunLoop {
+        CFRunLoopStop(runLoop)
+    }
+    tapPort = nil
+    tapRunLoop = nil
+    tapMode = nil
+    hotkey.lock.lock()
+    hotkey.isDown = false
+    hotkey.lock.unlock()
+}
+
+func listenerStatus() -> [String: Any] {
+    return [
+        "active": tapPort != nil,
+        "mode": orNull(tapMode),
+        "error": orNull(tapPort == nil ? listenerError : nil),
+        "errorCode": orNull(tapPort == nil ? listenerErrorCode : nil),
+    ]
+}
+
+/// Starts the tap with the least intrusive mode the permissions allow:
+/// a passive listener with Input Monitoring, otherwise an active pass-through
+/// tap, which only needs Accessibility.
+func startListening() {
+    guard listenerWanted, tapPort == nil else { return }
+
+    if inputMonitoringGranted() && createTap(listenOnly: true) {
+        tapMode = "listen-only"
+    } else if AXIsProcessTrusted() && createTap(listenOnly: false) {
+        tapMode = "active"
+    } else if !AXIsProcessTrusted() && !inputMonitoringGranted() {
+        listenerError = "Yap needs Accessibility access to see the dictation key."
+        listenerErrorCode = "needs-access"
+    } else {
+        listenerError = "macOS refused the keyboard listener. Remove Yap from Accessibility and Input Monitoring in System Settings, then grant access again."
+        listenerErrorCode = "refused"
+    }
+
+    if tapPort != nil {
+        listenerError = nil
+        listenerErrorCode = nil
+        resyncHotkey()
+    }
+    var message: [String: Any] = ["event": "listener"]
+    message.merge(listenerStatus()) { current, _ in current }
+    send(message)
+}
+
+// MARK: - Clipboard and paste
+
+private let transientTypes = [
+    NSPasteboard.PasteboardType("org.nspasteboard.TransientType"),
+    NSPasteboard.PasteboardType("org.nspasteboard.ConcealedType"),
+    NSPasteboard.PasteboardType("org.nspasteboard.AutoGeneratedType"),
+]
+
+/// How long the dictated text stays on the clipboard before the previous
+/// content comes back. The target app reads it while handling Cmd+V, slow
+/// apps can take a few hundred milliseconds for that.
+private let restoreDelay: TimeInterval = 0.8
+
+private struct Snapshot {
+    let items: [NSPasteboardItem]
+    let changeCount: Int
+}
+
+private var preparedSnapshot: Snapshot?
+private var pendingRestore: (items: [NSPasteboardItem], work: DispatchWorkItem, due: DispatchTime)?
+
+private func snapshotPasteboard() -> Snapshot {
+    let pasteboard = NSPasteboard.general
+    var items: [NSPasteboardItem] = []
+    for item in pasteboard.pasteboardItems ?? [] {
+        let copy = NSPasteboardItem()
+        var hasData = false
+        for type in item.types {
+            if let data = item.data(forType: type) {
+                copy.setData(data, forType: type)
+                hasData = true
+            }
+        }
+        if hasData {
+            items.append(copy)
+        }
+    }
+    return Snapshot(items: items, changeCount: pasteboard.changeCount)
+}
+
+/// Called when the hotkey goes down, so reading a large clipboard happens
+/// while the user speaks instead of delaying the paste.
+func prepareClipboard() {
+    if pendingRestore != nil {
+        // The clipboard currently holds our previous text. The snapshot of
+        // the real content travels with that pending restore.
+        return
+    }
+    preparedSnapshot = snapshotPasteboard()
+}
+
+private func postCommandV() -> Bool {
+    guard let source = CGEventSource(stateID: .combinedSessionState),
+          let commandDown = CGEvent(keyboardEventSource: source, virtualKey: 55, keyDown: true),
+          let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 9, keyDown: true),
+          let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 9, keyDown: false),
+          let commandUp = CGEvent(keyboardEventSource: source, virtualKey: 55, keyDown: false)
+    else {
+        return false
+    }
+
+    // Explicit flags, so a modifier still physically held cannot turn this
+    // into Cmd+Shift+V or similar.
+    commandDown.flags = .maskCommand
+    keyDown.flags = .maskCommand
+    keyUp.flags = .maskCommand
+    commandUp.flags = []
+
+    commandDown.post(tap: .cghidEventTap)
+    usleep(8_000)
+    keyDown.post(tap: .cghidEventTap)
+    keyUp.post(tap: .cghidEventTap)
+    usleep(8_000)
+    commandUp.post(tap: .cghidEventTap)
+    return true
+}
+
+/// Pastes into whatever has keyboard focus at this moment. Yap never brings
+/// another app or window forward: the text goes where the user is.
+///
+/// `selfEditable` is the app's own answer to "is a text field focused in a
+/// Yap window", which is more reliable than asking Chromium through AX.
+func paste(text: String, restore: Bool, selfEditable: Bool?) -> [String: Any] {
+    guard AXIsProcessTrusted() || postEventsGranted() else {
+        return ["ok": false, "reason": "accessibility"]
+    }
+
+    // Yap's own window in front without a text field: there is nowhere to
+    // paste, and Cmd+V would land in a button or the window itself.
+    let target = frontmostPid()
+    if let target, isOwnApp(target), !(selfEditable ?? focusedElementState().editable) {
+        return ["ok": false, "reason": "no-target"]
+    }
+
+    let pasteboard = NSPasteboard.general
+    var original: [NSPasteboardItem]?
+
+    if let pending = pendingRestore {
+        pending.work.cancel()
+        pendingRestore = nil
+        if restore {
+            original = pending.items
+        }
+    } else if restore {
+        if let prepared = preparedSnapshot, prepared.changeCount == pasteboard.changeCount {
+            original = prepared.items
+        } else {
+            original = snapshotPasteboard().items
+        }
+    }
+    preparedSnapshot = nil
+
+    if restore {
+        // Marked transient and kept off Universal Clipboard, so clipboard
+        // managers and other devices never record the temporary text.
+        pasteboard.prepareForNewContents(with: .currentHostOnly)
+        let item = NSPasteboardItem()
+        item.setString(text, forType: .string)
+        for type in transientTypes {
+            item.setData(Data(), forType: type)
+        }
+        pasteboard.writeObjects([item])
+    } else {
+        pasteboard.clearContents()
+        pasteboard.setString(text, forType: .string)
+    }
+    let ownChangeCount = pasteboard.changeCount
+
+    let posted = postCommandV()
+
+    if restore, let original {
+        let work = DispatchWorkItem {
+            pendingRestore = nil
+            // Somebody copied something in the meantime: theirs wins.
+            guard pasteboard.changeCount == ownChangeCount else { return }
+            pasteboard.clearContents()
+            if !original.isEmpty {
+                pasteboard.writeObjects(original)
+            }
+        }
+        let due = DispatchTime.now() + restoreDelay
+        pendingRestore = (original, work, due)
+        DispatchQueue.main.asyncAfter(deadline: due, execute: work)
+    }
+
+    return ["ok": posted, "processIdentifier": orNull(target.map { Int($0) })]
+}
+
+// MARK: - Shutdown
+
+private var terminationSource: DispatchSourceSignal?
+
+/// Leaves once a pending clipboard restore has run, so quitting or restarting
+/// right after a dictation does not cost the user what they had copied.
+private func finishAndExit() {
+    stopTap()
+    guard let pending = pendingRestore else { exit(0) }
+    DispatchQueue.main.asyncAfter(deadline: pending.due) {
+        pendingRestore?.work.perform()
+        exit(0)
+    }
+}
+
+// MARK: - Permission watching
+
+private var lastPermissions: [String: Bool] = [:]
+private var permissionTimer: DispatchSourceTimer?
+
+private func pollPermissions() {
+    let current = [
+        "accessibility": AXIsProcessTrusted(),
+        "inputMonitoring": inputMonitoringGranted(),
+        "postEvents": postEventsGranted(),
+    ]
+    guard current != lastPermissions else { return }
+    lastPermissions = current
+
+    var message: [String: Any] = ["event": "permissions"]
+    for (key, value) in current {
+        message[key] = value
+    }
+    send(message)
+
+    guard listenerWanted else { return }
+    let accessibility = current["accessibility"] == true
+    let inputMonitoring = current["inputMonitoring"] == true
+
+    if tapPort == nil {
+        if accessibility || inputMonitoring {
+            startListening()
+        }
+    } else if tapMode == "active" && (inputMonitoring || !accessibility) {
+        // Prefer the passive listener as soon as Input Monitoring allows it,
+        // and drop an active tap whose permission was taken away.
+        stopTap()
+        startListening()
+    } else if tapMode == "listen-only" && !inputMonitoring {
+        stopTap()
+        startListening()
+    }
+}
+
+// MARK: - Commands
+
+private func handle(_ line: String) {
+    guard let data = line.data(using: .utf8),
+          let command = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+          let name = command["cmd"] as? String
+    else {
+        send(["event": "error", "message": "Malformed command."])
+        return
+    }
+
+    let id = command["id"] as? Int ?? 0
+    func reply(_ result: [String: Any]) {
+        send(["id": id, "ok": true, "result": result])
+    }
+
+    switch name {
+    case "hello":
+        reply(["version": helperVersion, "pid": Int(getpid())])
+    case "permissions":
+        reply(permissionState())
+    case "requestAccessibility":
+        requestAccessibility()
+        reply(permissionState())
+    case "requestInputMonitoring":
+        requestInputMonitoring()
+        reply(permissionState())
+    case "listen":
+        let keyCode = (command["keyCode"] as? NSNumber)?.int64Value ?? 63
+        let modifiers = (command["modifiers"] as? NSNumber)?.uint64Value ?? 0
+        hotkey.lock.lock()
+        let changed = hotkey.keyCode != keyCode || hotkey.modifiers != modifiers
+        // Switching keys mid-press: end that press, or the app keeps recording.
+        let releaseOld = changed && hotkey.isDown
+        hotkey.keyCode = keyCode
+        hotkey.modifiers = modifiers
+        if changed {
+            hotkey.isDown = false
+            hotkey.chorded = false
+        }
+        hotkey.lock.unlock()
+        if releaseOld {
+            emitHotkey(down: false)
+        }
+        listenerWanted = true
+        startListening()
+        reply(listenerStatus())
+    case "stopListening":
+        listenerWanted = false
+        stopTap()
+        reply(listenerStatus())
+    case "listenerStatus":
+        reply(listenerStatus())
+    case "focus":
+        reply(currentFocus())
+    case "prepareClipboard":
+        prepareClipboard()
+        reply([:])
+    case "paste":
+        let text = command["text"] as? String ?? ""
+        let restore = command["restore"] as? Bool ?? false
+        let selfEditable = command["selfEditable"] as? Bool
+        reply(paste(text: text, restore: restore, selfEditable: selfEditable))
+    case "fnUsage":
+        reply(["value": orNull(fnUsageType())])
+    default:
+        send(["id": id, "ok": false, "error": "Unknown command \(name)."])
+    }
+}
+
+func serve() -> Never {
+    signal(SIGPIPE, SIG_DFL)
+
+    // The app stops the helper with SIGTERM; finish a pending restore first.
+    signal(SIGTERM, SIG_IGN)
+    let termination = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
+    termination.setEventHandler { finishAndExit() }
+    termination.resume()
+    terminationSource = termination
+
+    lastPermissions = [
+        "accessibility": AXIsProcessTrusted(),
+        "inputMonitoring": inputMonitoringGranted(),
+        "postEvents": postEventsGranted(),
+    ]
+
+    let timer = DispatchSource.makeTimerSource(queue: .main)
+    timer.schedule(deadline: .now() + 1, repeating: 1)
+    timer.setEventHandler { pollPermissions() }
+    timer.resume()
+    permissionTimer = timer
+
+    // Plain read(2) instead of readLine(): stdio would hold the stdin lock
+    // while blocked, and exit() from another thread can wait on that lock.
+    let reader = Thread {
+        var pending = Data()
+        var chunk = [UInt8](repeating: 0, count: 65_536)
+        func dispatch(_ bytes: Data) {
+            let line = String(decoding: bytes, as: UTF8.self)
+            if line.isEmpty { return }
+            DispatchQueue.main.async { handle(line) }
+        }
+        while true {
+            let count = read(STDIN_FILENO, &chunk, chunk.count)
+            if count < 0 && errno == EINTR { continue }
+            if count <= 0 { break }
+            pending.append(contentsOf: chunk[0..<count])
+            while let newline = pending.firstIndex(of: 0x0A) {
+                dispatch(pending[pending.startIndex..<newline])
+                pending.removeSubrange(pending.startIndex...newline)
+            }
+        }
+        dispatch(pending)
+        // The app closed our stdin: it quit or crashed. Leave with it.
+        DispatchQueue.main.async { finishAndExit() }
+    }
+    reader.name = "yap.stdin"
+    reader.start()
+
+    send(["event": "ready", "version": helperVersion])
+    CFRunLoopRun()
+    exit(0)
+}
+
+// MARK: - Entry
 
 let arguments = CommandLine.arguments
 
-guard arguments.count >= 2 else {
-    emitJSON(EventMessage(type: "error", message: "No helper command was provided."))
-    exit(1)
+if arguments.count >= 2 && arguments[1] == "--version" {
+    print(helperVersion)
+    exit(0)
 }
 
-switch arguments[1] {
-case "permissions":
-    if arguments.count >= 3 && arguments[2] == "request" {
-        emitJSON(requestPermissions())
-    } else {
-        emitJSON(buildPermissionState())
-    }
-case "focus":
-    emitJSON(currentFocus())
-case "paste":
-    let bundleIdentifier = arguments.count >= 3 ? arguments[2] : nil
-    let processIdentifier = arguments.count >= 4 ? Int32(arguments[3]) : nil
-    emitJSON(OkState(ok: pasteClipboardContents(bundleIdentifier: bundleIdentifier, processIdentifier: processIdentifier)))
-case "listen":
-    if arguments.count >= 3, let code = Int64(arguments[2]) {
-        targetKeyCode = code
-    }
-    if arguments.count >= 4, let mods = UInt64(arguments[3]) {
-        targetModifiers = mods
-    }
-    exit(listenForHotkey())
-default:
-    emitJSON(EventMessage(type: "error", message: "Unknown helper command."))
-    exit(1)
+if arguments.count >= 2 && arguments[1] == "serve" {
+    serve()
 }
+
+FileHandle.standardError.write("Usage: yap-helper serve\n".data(using: .utf8)!)
+exit(1)

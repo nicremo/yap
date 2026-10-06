@@ -1,12 +1,16 @@
+import type { UiLanguage } from './i18n';
+import type { SetupStep } from './setup';
+
 export type EnhancementLevel = 'none' | 'soft' | 'medium' | 'high';
 export type StyleMode = 'conversation' | 'vibe-coding' | 'custom-plus';
 export type CustomPlusVoice = 'conversation' | 'developer';
-export type TranscriptionMode = 'auto' | 'cloud' | 'local';
-export type RewriteMode = 'cloud' | 'local';
-export type CloudRewriteProvider = 'groq' | 'openrouter' | 'fireworks';
-export type CloudTranscriptionModel = 'gpt-4o-mini-transcribe' | 'gpt-4o-transcribe' | 'whisper-1' | 'whisper-large-v3' | 'whisper-large-v3-turbo' | 'distil-whisper-large-v3-en';
+export type TranscriptionMode = 'cloud' | 'local';
+/** System follows the macOS appearance. */
+export type ThemePreference = 'system' | 'light' | 'dark';
+export type CloudTranscriptionModel = 'whisper-large-v3' | 'whisper-large-v3-turbo';
+export type LocalWhisperModel = 'onnx-community/whisper-base' | 'onnx-community/whisper-small';
 
-export type OverlayPhase =
+export type DictationPhase =
   | 'idle'
   | 'listening'
   | 'transcribing'
@@ -26,11 +30,14 @@ export interface CorrectionEntry {
   addedAt: string;
 }
 
+/** A rule can also switch polishing off for its app. */
+export type RuleLevel = EnhancementLevel | 'off';
+
 export interface AppRule {
   appIdentifier: string;
   label: string;
   styleMode: StyleMode;
-  enhancementLevel: EnhancementLevel;
+  enhancementLevel: RuleLevel;
 }
 
 export interface HotkeyConfig {
@@ -40,80 +47,113 @@ export interface HotkeyConfig {
 }
 
 export interface AppSettings {
+  settingsVersion: number;
   storageDirectory: string;
-  whisperModel: string;
-  whisperLabel: string;
-  ollamaBaseUrl: string;
-  textModel: string;
-  rewriteMode: RewriteMode;
-  cloudRewriteModel: string;
-  cloudRewriteProvider: CloudRewriteProvider;
-  openrouterApiKeyEncrypted: string;
-  openrouterModel: string;
-  openrouterSpeedRouting: boolean;
-  fireworksApiKeyEncrypted: string;
-  fireworksModel: string;
+  transcriptionMode: TranscriptionMode;
+  cloudModel: CloudTranscriptionModel;
+  localModel: LocalWhisperModel;
+  /** ISO-639-1 code, empty string means auto-detect. */
+  language: string;
+  groqApiKeyEncrypted: string;
+  enhancementEnabled: boolean;
+  rewriteModel: string;
   styleMode: StyleMode;
   customPlusVoice: CustomPlusVoice;
   enhancementLevel: EnhancementLevel;
-  transcriptionMode: TranscriptionMode;
-  cloudModel: CloudTranscriptionModel;
-  cloudApiBaseUrl: string;
-  cloudLanguage: string;
-  openaiApiKeyEncrypted: string;
   hotkey: HotkeyConfig;
   autoPaste: boolean;
   copyToClipboard: boolean;
   showOverlay: boolean;
   launchAtLogin: boolean;
+  theme: ThemePreference;
+  /** The language of Yap itself, not the one dictated in. */
+  uiLanguage: UiLanguage;
+  /** Electron accelerator that copies the last dictation from anywhere; empty when off. */
+  copyLastShortcut: string;
   setupComplete: boolean;
+  /** Where the setup wizard resumes, e.g. after macOS restarted Yap for a permission. */
+  setupStep: SetupStep;
 }
+
+/** Settings as the renderer sees them: the encrypted key never leaves main. */
+export type PublicSettings = Omit<AppSettings, 'groqApiKeyEncrypted'>;
+
+/** Why the shortcut listener is not running. The UI words it in the current language. */
+export type HotkeyErrorCode =
+  | 'needs-access'
+  | 'refused'
+  | 'helper-missing'
+  | 'helper-crashing'
+  | 'reconnecting'
+  | 'fn-unsupported'
+  | 'key-unsupported'
+  | 'listener-failed'
+  | 'stopped'
+  | 'unsupported';
+
+export type MicrophoneStatus = 'granted' | 'denied' | 'restricted' | 'not-determined' | 'unknown';
 
 export interface PermissionsState {
-  microphone: 'granted' | 'denied' | 'restricted' | 'not-determined' | 'unknown';
+  microphone: MicrophoneStatus;
   accessibility: boolean;
   inputMonitoring: boolean;
-  postEvents: boolean;
+  /** The global hotkey listener is running. This is the ground truth for hotkey capability. */
+  hotkeyActive: boolean;
+  hotkeyError: HotkeyErrorCode | null;
+  /** macOS needs Accessibility and Input Monitoring, Windows does not. */
+  nativePermissionsRequired: boolean;
 }
 
-export interface OllamaModelInfo {
-  name: string;
-  size: number;
-  modifiedAt?: string;
-}
+export type PermissionKind = 'microphone' | 'accessibility' | 'inputMonitoring';
+
+/** What the Globe/Fn key does in macOS keyboard settings. */
+export type FnKeyAction = 'nothing' | 'input-source' | 'emoji' | 'dictation' | 'unknown';
 
 export interface FocusInfo {
-  canPaste: boolean;
-  role?: string;
   appName?: string;
   bundleIdentifier?: string;
   processIdentifier?: number;
+  /** Accessibility role of the focused element, e.g. AXTextArea. */
+  role?: string;
+  /** A text field or similar has focus. */
+  editable?: boolean;
 }
 
+export interface DictationMetrics {
+  recordingMs: number;
+  transcribeMs: number;
+  rewriteMs: number | null;
+  /** From key release to the text arriving in the target app. */
+  totalMs: number;
+  uploadBytes: number | null;
+}
+
+/** Where a finished dictation went. */
+export type DeliveryOutcome = 'pasted' | 'copied' | 'saved' | 'paste-failed' | 'needs-accessibility' | 'no-target';
+
 export interface AppStatus {
-  phase: OverlayPhase;
+  phase: DictationPhase;
   title: string;
   detail: string;
   preview?: string;
-  rawText?: string;
+  handsfree?: boolean;
+  metrics?: DictationMetrics;
+  /** Set on a finished dictation, so the pill can word it without parsing the title. */
+  delivery?: DeliveryOutcome;
 }
 
-export interface BootstrapState {
-  settings: AppSettings;
-  permissions: PermissionsState;
-  ollamaReachable: boolean;
-  ollamaModels: OllamaModelInfo[];
-  recommendedModelInstalled: boolean;
-  speechModelReady: boolean;
-  helperReady: boolean;
-  openaiApiKeySet: boolean;
-  openrouterApiKeySet: boolean;
-  fireworksApiKeySet: boolean;
-  dictionary: DictionaryEntry[];
-  corrections: CorrectionEntry[];
-  appRules: AppRule[];
-  history: HistoryEntry[];
-  status: AppStatus;
+export interface LocalModelDownload {
+  model: LocalWhisperModel;
+  progress: number;
+  detail: string;
+}
+
+export interface EngineState {
+  groqKeySet: boolean;
+  localModelReady: boolean;
+  localModelDownload: LocalModelDownload | null;
+  /** Rewrite models this key can use, in catalogue order. */
+  rewriteModelIds: string[];
 }
 
 export type DictationStatus = 'success' | 'transcription-failed' | 'audio-only';
@@ -127,56 +167,65 @@ export interface HistoryEntry {
   styleMode: StyleMode;
   enhancementLevel: EnhancementLevel;
   appName?: string;
+  /** Lets History offer the app for an app rule. */
+  appBundleId?: string;
+  /** The app rule that chose style and polish, by app name. */
+  appRule?: string;
   createdAt: string;
   audioFilename: string | null;
   audioExpiresAt: string | null;
   status: DictationStatus;
   errorMessage?: string;
+  /** Key release to delivered text, in milliseconds. */
+  latencyMs?: number;
+  /** The model that polished the text; absent when it went out as transcribed. */
+  rewriteModel?: string;
 }
 
-export interface ProcessAudioResult {
-  rawText: string;
-  finalText: string;
-  pasted: boolean;
-  focusInfo?: FocusInfo;
-  transcriptionSource: 'cloud' | 'local';
-  styleMode: StyleMode;
-  enhancementLevel: EnhancementLevel;
+/** Whether the copy-last shortcut is registered with the system. */
+export type ShortcutState = 'off' | 'active' | 'taken';
+
+export interface AppState {
+  platform: string;
+  version: string;
+  isPackaged: boolean;
+  settings: PublicSettings;
+  permissions: PermissionsState;
+  engine: EngineState;
+  dictionary: DictionaryEntry[];
+  corrections: CorrectionEntry[];
+  appRules: AppRule[];
+  history: HistoryEntry[];
+  status: AppStatus;
+  fnKeyAction: FnKeyAction | null;
+  copyLastShortcut: ShortcutState;
 }
 
-export interface DictationRequest {
-  wavBase64: string;
-  targetFocus?: FocusInfo;
+export type UpdateSettingsInput = Partial<Omit<PublicSettings, 'settingsVersion'>>;
+
+export interface KeyValidationResult {
+  valid: boolean;
+  error?: string;
 }
 
-export interface HotkeyEvent {
-  type: 'down' | 'up';
+/* ── Recorder protocol between main and the overlay window ──────────────── */
+
+export type RecorderCommand =
+  | { type: 'start'; sessionId: number; encodeOpus: boolean }
+  | { type: 'stop'; sessionId: number }
+  | { type: 'cancel'; sessionId: number };
+
+export interface RecordedAudio {
+  sessionId: number;
+  /** 16 kHz mono PCM16 WAV. Always present. */
+  wav: ArrayBuffer;
+  /** WebM/Opus, much smaller upload. Present when requested and the encoder produced data. */
+  opus: ArrayBuffer | null;
+  durationMs: number;
+  /** Loudest 50 ms window, RMS in 0..1. Used to skip silent recordings. */
+  peakRms: number;
 }
 
-export interface UpdateSettingsInput {
-  styleMode?: StyleMode;
-  customPlusVoice?: CustomPlusVoice;
-  enhancementLevel?: EnhancementLevel;
-  transcriptionMode?: TranscriptionMode;
-  cloudModel?: CloudTranscriptionModel;
-  cloudApiBaseUrl?: string;
-  cloudLanguage?: string;
-  openaiApiKey?: string;
-  textModel?: string;
-  rewriteMode?: RewriteMode;
-  cloudRewriteModel?: string;
-  cloudRewriteProvider?: CloudRewriteProvider;
-  openrouterApiKey?: string;
-  openrouterModel?: string;
-  openrouterSpeedRouting?: boolean;
-  fireworksApiKey?: string;
-  fireworksModel?: string;
-  ollamaBaseUrl?: string;
-  storageDirectory?: string;
-  hotkey?: HotkeyConfig;
-  autoPaste?: boolean;
-  copyToClipboard?: boolean;
-  showOverlay?: boolean;
-  launchAtLogin?: boolean;
-  setupComplete?: boolean;
-}
+export type RecorderEvent =
+  | { type: 'started'; sessionId: number }
+  | { type: 'failed'; sessionId: number; message: string };

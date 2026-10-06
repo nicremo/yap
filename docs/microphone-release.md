@@ -78,7 +78,7 @@ released when it ends.
 - A log warning fires if opening the microphone takes longer than 500 ms, which
   is the point where the first spoken word starts getting clipped.
 
-Covered by `tests/renderer/audio-recorder.test.ts`.
+Covered by `tests/renderer/recorder.test.ts`.
 
 ## Verifying it
 
@@ -90,12 +90,16 @@ After a dictation and two minutes of waiting this must print `PASS`. The script
 matches the assertion name rather than the `Resources:` line, so unrelated
 holders such as an iOS Simulator audio device do not raise a false alarm.
 
-## Known remaining gaps
+## Since then
 
-- Handsfree mode has no time limit. Start it by double tapping and forget about
-  it, and the microphone stays open for as long as you leave it.
-- Both windows run with `backgroundThrottling: false`. The overlay needs it, the
-  main window probably does not.
-- `ScriptProcessorNode` is deprecated. An `AudioWorkletNode` would move audio
-  processing off the main thread and remove the need to connect to
-  `destination` at all, so no output device would be opened during a recording.
+- Recording moved from `ScriptProcessorNode` to an `AudioWorkletNode` with no
+  outputs, running in a 16 kHz `AudioContext`. Capture happens on the audio
+  thread and nothing needs resampling in JavaScript.
+- Every dictation gets its own `AudioRecorder` instance, so a new recording can
+  start while the previous one is still being handed over. An instance records
+  once and refuses a second `start()`.
+- Hands-free recordings stop after ten minutes.
+- Only the overlay window, which hosts the recorder, runs with
+  `backgroundThrottling: false`.
+
+Covered by `tests/renderer/recorder.test.ts`.

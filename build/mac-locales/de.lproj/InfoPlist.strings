@@ -1,0 +1,2 @@
+/* German texts macOS shows for Yap, e.g. when it asks for the microphone. */
+"NSMicrophoneUsageDescription" = "Yap nimmt deine Stimme auf, solange du die Diktiertaste hältst, und macht daraus Text.";
