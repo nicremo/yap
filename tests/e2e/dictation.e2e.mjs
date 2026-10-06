@@ -266,6 +266,30 @@ async function run(context) {
     return entries.length >= 3 && entries;
   }, 3_000);
   expect(history.every((entry) => entry.status === 'success'), 'every dictation is in the history', history.map((entry) => entry.status));
+
+  console.log('\nClosing the window keeps Yap running in the menu bar');
+  const mainWindowVisible = () =>
+    app.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows()
+        .filter((candidate) => !candidate.webContents.getURL().includes('#overlay'))
+        .map((candidate) => candidate.isVisible()),
+    );
+  await app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()
+      .find((candidate) => !candidate.webContents.getURL().includes('#overlay'))
+      ?.close(),
+  );
+  await sleep(200);
+  const visibility = await mainWindowVisible();
+  expect(visibility.length === 1 && visibility[0] === false, 'the window hides instead of closing', visibility);
+  const uploadsBefore = mock.requests.filter((request) => request.path === '/openai/v1/audio/transcriptions').length;
+  since = await statusCount();
+  await hotkey('down');
+  await sleep(1_200);
+  await hotkey('up');
+  result = await waitForResult(since);
+  const uploadsAfter = mock.requests.filter((request) => request.path === '/openai/v1/audio/transcriptions').length;
+  expect(result.phase === 'done' && uploadsAfter === uploadsBefore + 1, 'dictation keeps working with the window closed', result);
 }
 
 async function main() {

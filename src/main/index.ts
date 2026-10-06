@@ -180,12 +180,31 @@ function setStatus(next: AppStatus): void {
   syncOverlay(wasIdle && next.phase === 'listening');
 }
 
+/*
+ * Yap lives in the menu bar. The Dock icon, Cmd+Tab and the app menu exist
+ * only while the window is open. setActivationPolicy sets NSApp's policy
+ * directly; app.dock.hide()/show() would go through the asynchronous
+ * TransformProcessType, which briefly hides windows and can leave a
+ * duplicate Dock icon when switched quickly.
+ */
+function setDockVisible(visible: boolean): void {
+  if (process.platform !== 'darwin') return;
+  app.setActivationPolicy(visible ? 'regular' : 'accessory');
+}
+
 function showMainWindow(): void {
   const window = liveWindow(mainWindow);
   if (!window) return;
+  setDockVisible(true);
   if (window.isMinimized()) window.restore();
   window.show();
   window.focus();
+  if (process.platform === 'darwin') app.focus({ steal: true });
+}
+
+function hideMainWindow(window: BrowserWindow): void {
+  window.hide();
+  setDockVisible(false);
 }
 
 /* Runs in the main window when a dictation ends while Yap itself is in front.
@@ -252,14 +271,10 @@ async function createMain(showOnReady: boolean): Promise<void> {
   });
   window.on('close', (event) => {
     if (isQuitting) return;
-    if (!app.isPackaged) {
-      // Closing the window ends a development session.
-      app.quit();
-      return;
-    }
-    // The app keeps running in the menu bar; the window only hides.
+    // The red button and Cmd+W only hide the window: Yap keeps running in
+    // the menu bar, and dictation keeps working.
     event.preventDefault();
-    window.hide();
+    hideMainWindow(window);
   });
   window.on('closed', () => {
     if (mainWindow === window) mainWindow = null;
@@ -274,6 +289,21 @@ async function createMain(showOnReady: boolean): Promise<void> {
   });
 
   if (showOnReady) showMainWindow();
+}
+
+function createAppMenu(): void {
+  if (process.platform !== 'darwin') return;
+  Menu.setApplicationMenu(
+    Menu.buildFromTemplate([
+      { role: 'appMenu' },
+      // Close Window (Cmd+W) hides to the menu bar through the close handler.
+      { role: 'fileMenu' },
+      // Copy and paste in the API key field.
+      { role: 'editMenu' },
+      ...(app.isPackaged ? [] : [{ role: 'viewMenu' } as const]),
+      { role: 'windowMenu' },
+    ]),
+  );
 }
 
 function getTrayIconPath(): string {
@@ -519,7 +549,11 @@ async function bootstrap(): Promise<void> {
     })
     .catch((error) => console.error('[yap] native helper failed to start:', error));
 
+  // A login start stays in the menu bar: no window and no Dock icon until the
+  // user opens Yap. The packaged app starts as LSUIElement for the same reason.
   const startHidden = settings.setupComplete && wasOpenedAtLogin();
+  if (startHidden) setDockVisible(false);
+  createAppMenu();
   await Promise.all([createMain(!startHidden), ensureOverlayWindow()]);
   createTray();
 
@@ -581,11 +615,9 @@ if (!app.requestSingleInstanceLock()) {
     });
   });
 
-  app.on('window-all-closed', () => {
-    // Development: closing the window ends the session. Packaged builds keep
-    // running in the menu bar because their window only hides.
-    if (!app.isPackaged) app.quit();
-  });
+  // The window only hides, so this fires on quit at most. Without a listener
+  // Electron would quit as soon as the last window is gone.
+  app.on('window-all-closed', () => undefined);
 
   for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     process.on(signal, () => app.quit());

@@ -67,7 +67,8 @@
       "entitlementsInherit": "build/entitlements.mac.plist",
       "extendInfo": {
         "NSMicrophoneUsageDescription": "Yap records your voice while you hold the dictation key and turns it into text.",
-        "LSApplicationCategoryType": "public.app-category.productivity"
+        "LSApplicationCategoryType": "public.app-category.productivity",
+        "LSUIElement": true
       },
       "icon": "build/icons/icon.icns",
       "minimumSystemVersion": "12.0",
