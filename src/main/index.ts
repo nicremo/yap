@@ -10,7 +10,7 @@ log.transports.file.maxSize = 5 * 1024 * 1024;
 log.transports.console.level = 'info';
 Object.assign(console, log.functions);
 
-import type { AppSettings, AppState, AppStatus, PublicSettings, UpdateSettingsInput } from '../shared/types';
+import type { AppSettings, AppState, AppStatus, PermissionsState, PublicSettings, UpdateSettingsInput } from '../shared/types';
 import { loadAppRules } from './app-rules';
 import { sweepAudioStore } from './audio-store';
 import { DictationEngine } from './dictation/engine';
@@ -32,6 +32,8 @@ import { createMainWindow, createOverlayWindow, positionOverlayWindow } from './
 
 const projectRoot = path.resolve(fileURLToPath(new URL('../../', import.meta.url)));
 const AUDIO_CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1000;
+/** How long after a permission click in Yap a grant brings the window back. */
+const GRANT_WATCH_MS = 10 * 60 * 1000;
 
 let settings: AppSettings;
 let mainWindow: BrowserWindow | null = null;
@@ -45,7 +47,9 @@ let micPollTimer: ReturnType<typeof setInterval> | null = null;
 let audioCleanupTimer: ReturnType<typeof setInterval> | null = null;
 
 const bridge = createNativeBridge();
-const permissions = new PermissionsService(bridge);
+const permissions = new PermissionsService(bridge, {
+  appHasFocus: () => BrowserWindow.getFocusedWindow() !== null,
+});
 const localModel = new LocalModelManager(
   () => settings,
   () => patch({ engine: engineState() }),
@@ -320,7 +324,33 @@ const engine = new DictationEngine(
 );
 
 bridge.on('hotkey', (signal) => engine.handleHotkey(signal));
-permissions.onChange((state) => patch({ permissions: state }));
+
+let grantWatchUntil = 0;
+let permissionsBefore: PermissionsState = permissions.get();
+
+/** Called when the user asks for a permission in Yap and is sent to macOS for it. */
+function watchForGrant(): void {
+  grantWatchUntil = Date.now() + GRANT_WATCH_MS;
+}
+
+function newlyGranted(before: PermissionsState, after: PermissionsState): boolean {
+  return (
+    (before.microphone !== 'granted' && after.microphone === 'granted') ||
+    (!before.accessibility && after.accessibility) ||
+    (!before.inputMonitoring && after.inputMonitoring)
+  );
+}
+
+permissions.onChange((state) => {
+  patch({ permissions: state });
+  const before = permissionsBefore;
+  permissionsBefore = state;
+  // The user is in System Settings because Yap sent them there: once the
+  // switch is on, bring them back. The only time Yap brings itself forward.
+  if (Date.now() < grantWatchUntil && newlyGranted(before, state)) {
+    showMainWindow();
+  }
+});
 
 // End-to-end tests drive the hotkey from outside; never present in packaged builds.
 if (!app.isPackaged && process.env.YAP_E2E === '1') {
@@ -441,11 +471,16 @@ async function bootstrap(): Promise<void> {
       return getState();
     },
     requestPermission: async (kind) => {
+      watchForGrant();
       await permissions.request(kind);
       return getState();
     },
-    openPermissionSettings: (kind) => permissions.openSettings(kind),
+    openPermissionSettings: (kind) => {
+      watchForGrant();
+      return permissions.openSettings(kind);
+    },
     repairPermissions: async () => {
+      watchForGrant();
       await permissions.repair();
       return getState();
     },

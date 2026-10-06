@@ -8,6 +8,8 @@ import type { ListenerStatus, NativeBridge, NativePermissions } from './native';
 
 const execFileAsync = promisify(execFile);
 const isMac = process.platform === 'darwin';
+/** How long a system permission dialog gets to appear and take focus from Yap. */
+const DIALOG_GRACE_MS = 800;
 const isWindows = process.platform === 'win32';
 
 const SETTINGS_URLS: Record<PermissionKind, string> = isWindows
@@ -70,6 +72,11 @@ export function toFnKeyAction(value: number | null): FnKeyAction | null {
  * working only when the listener actually runs, not when a preflight call
  * claims it should.
  */
+export interface PermissionsHost {
+  /** A Yap window has keyboard focus. A system dialog that appears takes it away. */
+  appHasFocus(): boolean;
+}
+
 export class PermissionsService {
   private state: PermissionsState;
   private readonly listeners = new Set<(state: PermissionsState) => void>();
@@ -77,7 +84,10 @@ export class PermissionsService {
   private stuckTimer: ReturnType<typeof setTimeout> | null = null;
   private restartedFor: string | null = null;
 
-  constructor(private readonly bridge: NativeBridge) {
+  constructor(
+    private readonly bridge: NativeBridge,
+    private readonly host: PermissionsHost = { appHasFocus: () => false },
+  ) {
     this.state = {
       microphone: readMicrophoneStatus(),
       accessibility: !isMac,
@@ -189,6 +199,15 @@ export class PermissionsService {
     }
   }
 
+  private isGranted(kind: PermissionKind): boolean {
+    if (kind === 'microphone') return this.state.microphone === 'granted';
+    return kind === 'accessibility' ? this.state.accessibility : this.state.inputMonitoring;
+  }
+
+  /**
+   * One piece of system UI per click: the system dialog, or System Settings,
+   * never both. Two windows at once used to bury Yap under System Settings.
+   */
   async request(kind: PermissionKind): Promise<PermissionsState> {
     if (kind === 'microphone') {
       const status = readMicrophoneStatus();
@@ -205,19 +224,30 @@ export class PermissionsService {
       return this.refresh();
     }
 
+    // The dialog registers Yap in the list and has its own button to System
+    // Settings. macOS shows it only once for Input Monitoring though: when no
+    // dialog takes focus from Yap, this click opens the pane instead.
+    const focusedBefore = this.host.appHasFocus();
     try {
-      // Registers Yap in the list (switched off) and shows the system prompt,
-      // so the user only has to flip the switch in the pane opened next.
       if (kind === 'accessibility') {
         await this.bridge.requestAccessibility();
       } else {
         await this.bridge.requestInputMonitoring();
       }
     } catch {
-      // The pane below still gets the user there.
+      await this.openSettings(kind);
+      return this.refresh();
     }
-    await this.openSettings(kind);
-    return this.refresh();
+
+    await this.refresh();
+    if (focusedBefore && !this.isGranted(kind)) {
+      await new Promise((resolve) => setTimeout(resolve, DIALOG_GRACE_MS));
+      await this.refresh();
+      if (!this.isGranted(kind) && this.host.appHasFocus()) {
+        await this.openSettings(kind);
+      }
+    }
+    return this.state;
   }
 
   /**
