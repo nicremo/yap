@@ -37,7 +37,7 @@ import { getGroqApiKey, isGroqKeySet } from './secrets';
 import { applySettingsUpdate, chooseStorageDirectory, loadSettings, saveSettings, withGroqKey } from './settings';
 import { applyCopyLastShortcut, releaseShortcuts } from './shortcuts';
 import { ensureStorage } from './storage';
-import { disposeAutoUpdater, initializeAutoUpdater } from './updater';
+import { checkForUpdatesManually, disposeAutoUpdater, getUpdaterState, initializeAutoUpdater, installDownloadedUpdate } from './updater';
 import { createMainWindow, createOverlayWindow, positionOverlayWindow, windowBackground } from './windows';
 
 const projectRoot = path.resolve(fileURLToPath(new URL('../../', import.meta.url)));
@@ -96,6 +96,7 @@ async function getState(): Promise<AppState> {
     loadHistory(),
   ]);
   return {
+    updater: getUpdaterState(),
     platform: process.platform,
     version: app.getVersion(),
     isPackaged: app.isPackaged,
@@ -624,6 +625,8 @@ async function bootstrap(): Promise<void> {
   registerIpcHandlers({
     engine,
     getState,
+    checkForUpdates: checkForUpdatesManually,
+    installUpdate: () => installDownloadedUpdate(['idle', 'done', 'error'].includes(status.phase)),
     getSettings: () => settings,
     updateSettings,
     saveGroqKey: async (key) => {
@@ -689,6 +692,7 @@ async function bootstrap(): Promise<void> {
       await waitUntilYapIsBehind();
       await engine.pasteAgain(text);
     },
+    isMainWindow: (sender) => liveWindow(mainWindow)?.webContents === sender,
     isRecorder: (sender) => liveWindow(overlayWindow)?.webContents === sender,
     patch,
   });
@@ -733,7 +737,7 @@ async function bootstrap(): Promise<void> {
   setTimeout(() => void checkGroqModels(), 20_000);
   modelCheckTimer = setInterval(() => void checkGroqModels(), MODEL_CHECK_INTERVAL_MS);
 
-  initializeAutoUpdater();
+  initializeAutoUpdater((updater) => patch({ updater }));
 }
 
 async function shutdown(): Promise<void> {

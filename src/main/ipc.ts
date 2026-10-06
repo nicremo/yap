@@ -13,6 +13,7 @@ import type {
   RetranscribeMode,
   StyleMode,
   UpdateSettingsInput,
+  UpdaterState,
 } from '../shared/types';
 import { addAppRule, removeAppRule, updateAppRule } from './app-rules';
 import { addCorrection, addDictionaryEntry, removeCorrection, removeDictionaryEntry } from './dictionary';
@@ -24,6 +25,8 @@ import { deleteAudioRecording, resolveAudioPath } from './audio-store';
 export interface IpcController {
   engine: DictationEngine;
   getState(): Promise<AppState>;
+  checkForUpdates(): Promise<UpdaterState>;
+  installUpdate(): boolean;
   getSettings(): AppSettings;
   updateSettings(updates: UpdateSettingsInput): Promise<AppState>;
   saveGroqKey(key: string): Promise<{ result: KeyValidationResult; state: AppState }>;
@@ -38,6 +41,7 @@ export interface IpcController {
   revealStorage(): Promise<void>;
   showMainWindow(): void;
   pasteHistoryEntry(id: string, version: 'final' | 'raw'): Promise<void>;
+  isMainWindow(sender: Electron.WebContents): boolean;
   isRecorder(sender: Electron.WebContents): boolean;
   patch(state: Partial<AppState>): void;
 }
@@ -68,6 +72,14 @@ function handle<Args extends unknown[], Result>(
 
 export function registerIpcHandlers(controller: IpcController): void {
   handle('app:getState', () => controller.getState());
+  handle('updater:check', (event) => {
+    if (!controller.isMainWindow(event.sender)) throw new Error('Updates can only be controlled from the main window.');
+    return controller.checkForUpdates();
+  });
+  handle('updater:install', (event) => {
+    if (!controller.isMainWindow(event.sender)) throw new Error('Updates can only be controlled from the main window.');
+    return controller.installUpdate();
+  });
 
   handle('settings:update', (_event, updates: unknown) => {
     if (!updates || typeof updates !== 'object') throw new Error('Expected a settings object.');

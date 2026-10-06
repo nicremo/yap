@@ -185,7 +185,13 @@ export interface HistoryEntry {
 /** Whether the copy-last shortcut is registered with the system. */
 export type ShortcutState = 'off' | 'active' | 'taken';
 
+export type UpdaterState =
+  | { kind: 'idle' | 'disabled' | 'checking' | 'current' | 'error' }
+  | { kind: 'available' | 'downloaded'; version: string }
+  | { kind: 'downloading'; version: string; percent: number };
+
 export interface AppState {
+  updater: UpdaterState;
   platform: string;
   version: string;
   isPackaged: boolean;

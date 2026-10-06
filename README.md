@@ -207,3 +207,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development, screenshot capture and p
 Yap builds on [OpenWhisp](https://github.com/giusmarci/openwhisp). The original copyright notice is preserved in [LICENSE](LICENSE).
 
 **MIT licensed. Free to use, study, modify and share.**
+
+### Automatic updates
+
+Installed builds check GitHub for stable releases at launch and every four hours. Updates download automatically and install when Yap quits. Settings also offers a manual check and a restart button once an update is ready. Development builds skip the updater.
+
+See [the release guide](docs/RELEASING.md) for local Apple notarization and the required update assets.

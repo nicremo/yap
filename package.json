@@ -34,6 +34,7 @@
     "build:native": "node scripts/build-helper-platform.js",
     "test:helper": "node scripts/helper-smoke-test.mjs",
     "package": "npm run build && npm run build:native && electron-builder",
+    "release:mac": "node scripts/release-mac.mjs",
     "package:mac": "npm run build && npm run build:native && electron-builder --mac",
     "package:win": "npm run build && npm run build:native && electron-builder --win"
   },
