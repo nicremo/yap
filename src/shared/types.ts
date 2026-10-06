@@ -68,6 +68,8 @@ export interface AppSettings {
   theme: ThemePreference;
   /** The language of Yap itself, not the one dictated in. */
   uiLanguage: UiLanguage;
+  /** Electron accelerator that copies the last dictation from anywhere; empty when off. */
+  copyLastShortcut: string;
   setupComplete: boolean;
   /** Where the setup wizard resumes, e.g. after macOS restarted Yap for a permission. */
   setupStep: SetupStep;
@@ -180,6 +182,9 @@ export interface HistoryEntry {
   rewriteModel?: string;
 }
 
+/** Whether the copy-last shortcut is registered with the system. */
+export type ShortcutState = 'off' | 'active' | 'taken';
+
 export interface AppState {
   platform: string;
   version: string;
@@ -193,6 +198,7 @@ export interface AppState {
   history: HistoryEntry[];
   status: AppStatus;
   fnKeyAction: FnKeyAction | null;
+  copyLastShortcut: ShortcutState;
 }
 
 export type UpdateSettingsInput = Partial<Omit<PublicSettings, 'settingsVersion'>>;

@@ -6,6 +6,7 @@ import type { Page } from '../App';
 import { appliedPolish, formatDate, HistoryList } from '../components/HistoryList';
 import { FnKeyNotice } from '../components/HotkeyRecorder';
 import { HotkeyCap } from '../components/HotkeyCap';
+import { useCopyLastLabel } from '../components/ShortcutRecorder';
 import { Icon } from '../components/Icon';
 import { TryIt } from '../components/TryIt';
 import { Button, Card, Notice, Segmented } from '../components/ui';
@@ -98,8 +99,9 @@ function StatusHead({ state, navigate }: { state: AppState; navigate: (page: Pag
 
 /* ── Last dictation ────────────────────────────────────────────────────── */
 
-function LastDictation({ entry }: { entry: HistoryEntry }) {
+function LastDictation({ state, entry }: { state: AppState; entry: HistoryEntry }) {
   const { locale, t } = useI18n();
+  const copyLast = useCopyLastLabel(state);
   const [version, setVersion] = useState<'final' | 'raw'>('final');
   const [copied, setCopied] = useState(false);
   const { busy, error, run } = useAction();
@@ -150,7 +152,13 @@ function LastDictation({ entry }: { entry: HistoryEntry }) {
         <div className="button-row">
           {entry.status === 'success' ? (
             <>
-              <Button size="sm" icon={copied ? 'check' : 'copy'} variant="secondary" onClick={copy}>
+              <Button
+                size="sm"
+                icon={copied ? 'check' : 'copy'}
+                variant="secondary"
+                title={copyLast ? t.copyLast.fromAnywhere(copyLast) : undefined}
+                onClick={copy}
+              >
                 {copied ? t.common.copied : t.common.copy}
               </Button>
               <Button
@@ -261,7 +269,7 @@ export function HomePage({ state, onState, navigate }: { state: AppState; onStat
         </Card>
       ) : (
         <>
-          <LastDictation key={history[0].id} entry={history[0]} />
+          <LastDictation key={history[0].id} state={state} entry={history[0]} />
           <Stats history={history} />
           <PolishControl state={state} onState={onState} />
 

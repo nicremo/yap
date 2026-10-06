@@ -283,7 +283,7 @@ export const en = {
     language: 'Language',
     languageHint: 'For Yap itself. The language you dictate in is set under Engine.',
     languageSystem: 'System',
-    shortcut: 'Shortcut',
+    shortcut: 'Shortcuts',
     afterDictating: 'After dictating',
     autoPaste: 'Paste automatically',
     autoPasteHint: 'Puts the text where your cursor is, in any app.',
@@ -427,6 +427,26 @@ export const en = {
     delete: 'Delete',
     escape: 'Escape',
     other: (code: number) => `Key ${code}`,
+    /** Modifier names in shortcuts on Windows. */
+    ctrl: 'Ctrl',
+    alt: 'Alt',
+    shift: 'Shift',
+    win: 'Win',
+  },
+
+  copyLast: {
+    title: 'Copy last dictation',
+    hint: 'A shortcut that puts your most recent dictation on the clipboard, from any app.',
+    set: 'Set shortcut',
+    recording: 'Press the keys…',
+    recordingHint: 'Press the whole combination at once. Escape cancels.',
+    needsModifiers: (mac: boolean): string =>
+      mac
+        ? 'Use at least two of ⌃ ⌥ ⇧ ⌘, one of them ⌃ or ⌘, or a function key.'
+        : 'Use at least two of Ctrl, Alt, Shift, Win, one of them Ctrl or Win, or a function key.',
+    taken: 'Another app already uses this shortcut. Pick a different one.',
+    remove: 'Remove the shortcut',
+    fromAnywhere: (shortcut: string) => `${shortcut} copies it from any app`,
   },
 
   dictionary: {
@@ -519,6 +539,9 @@ export const en = {
     pasteFailed: 'Pasting failed, the text is on your clipboard.',
     noTarget: 'No text field was focused, so the text is on your clipboard.',
     pastedAgain: 'Pasted again.',
+    lastCopied: 'Your last dictation is on the clipboard.',
+    nothingToCopy: 'Nothing to copy',
+    nothingToCopyDetail: 'There is no dictation with text yet.',
     retranscribed: 'Retranscribed',
     retranscribedDetail: 'Copy the new text from History.',
     retranscriptionFailed: 'Retranscription failed',

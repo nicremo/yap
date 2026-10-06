@@ -278,6 +278,23 @@ async function run(context) {
   }, 3_000);
   expect(history.every((entry) => entry.status === 'success'), 'every dictation is in the history', history.map((entry) => entry.status));
 
+  console.log('\nA shortcut of your own copies the last dictation from anywhere');
+  await window.getByRole('button', { name: 'Set shortcut' }).click();
+  await window.keyboard.press('Control+Alt+Shift+Digit6');
+  const shortcut = await waitFor('the shortcut to be saved', async () => {
+    const saved = JSON.parse(await readFile(path.join(userData, 'settings.json'), 'utf8'));
+    return saved.copyLastShortcut || false;
+  });
+  expect(shortcut === 'Control+Alt+Shift+6', 'the pressed combination is stored as an accelerator', shortcut);
+  expect((await window.evaluate(() => window.yap.getState())).copyLastShortcut === 'active', 'the system accepted the shortcut');
+  expect(await window.getByRole('button', { name: 'Ctrl+Alt+Shift+6' }).isVisible(), 'Settings shows it as Ctrl+Alt+Shift+6');
+  await app.evaluate(({ clipboard }) => clipboard.writeText('something else'));
+  since = await statusCount();
+  await app.evaluate(() => globalThis.__yapE2E.copyLast());
+  result = await waitForResult(since);
+  expect(result.title === 'Copied' && result.delivery === 'copied', 'the pill says Copied', result);
+  expect((await readClipboard()) === POLISHED, 'the last dictation is on the clipboard');
+
   console.log('\nSwitching the language to German');
   expect((await window.evaluate(() => document.documentElement.lang)) === 'en', 'System on an English system means English');
   await window.getByRole('radio', { name: 'Deutsch' }).click();

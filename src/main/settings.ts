@@ -15,6 +15,7 @@ import type {
 } from '../shared/types';
 import { buildHotkeyLabel } from '../shared/hotkeys';
 import { UI_LANGUAGES } from '../shared/i18n';
+import { isValidAccelerator } from '../shared/shortcuts';
 import { CLOUD_MODELS, LANGUAGES, LOCAL_MODELS, REWRITE_MODELS } from '../shared/models';
 import { SETUP_STEPS } from '../shared/setup';
 import { createDefaultSettings, SETTINGS_VERSION } from './defaults';
@@ -143,6 +144,11 @@ export function migrateSettings(raw: unknown, defaults: AppSettings): AppSetting
     launchAtLogin: bool(source.launchAtLogin, defaults.launchAtLogin),
     theme: pick(source.theme, THEMES, defaults.theme),
     uiLanguage: pick(source.uiLanguage, UI_LANGUAGES, defaults.uiLanguage),
+    // Empty switches the shortcut off.
+    copyLastShortcut:
+      source.copyLastShortcut === '' || isValidAccelerator(source.copyLastShortcut)
+        ? source.copyLastShortcut
+        : defaults.copyLastShortcut,
     setupComplete: bool(source.setupComplete, defaults.setupComplete),
     setupStep: pick(source.setupStep, SETUP_STEPS, defaults.setupStep),
   };

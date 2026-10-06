@@ -413,6 +413,25 @@ export const de: Messages = {
     delete: 'Rückschritttaste',
     escape: 'Esc',
     other: (code) => `Taste ${code}`,
+    ctrl: 'Strg',
+    alt: 'Alt',
+    shift: 'Umschalt',
+    win: 'Win',
+  },
+
+  copyLast: {
+    title: 'Letztes Diktat kopieren',
+    hint: 'Ein Kürzel, das dein letztes Diktat in die Zwischenablage legt, aus jeder App heraus.',
+    set: 'Kürzel festlegen',
+    recording: 'Tasten drücken…',
+    recordingHint: 'Drück die ganze Kombination auf einmal. Escape bricht ab.',
+    needsModifiers: (mac) =>
+      mac
+        ? 'Nimm mindestens zwei von ⌃ ⌥ ⇧ ⌘, darunter ⌃ oder ⌘, oder eine F-Taste.'
+        : 'Nimm mindestens zwei von Strg, Alt, Umschalt, Win, darunter Strg oder Win, oder eine F-Taste.',
+    taken: 'Eine andere App nutzt dieses Kürzel schon. Wähl ein anderes.',
+    remove: 'Kürzel entfernen',
+    fromAnywhere: (shortcut) => `${shortcut} kopiert es aus jeder App`,
   },
 
   dictionary: {
@@ -503,6 +522,9 @@ export const de: Messages = {
     pasteFailed: 'Das Einfügen ist fehlgeschlagen, der Text liegt in der Zwischenablage.',
     noTarget: 'Kein Textfeld hatte den Fokus, deshalb liegt der Text in der Zwischenablage.',
     pastedAgain: 'Erneut eingefügt.',
+    lastCopied: 'Dein letztes Diktat liegt in der Zwischenablage.',
+    nothingToCopy: 'Nichts zum Kopieren',
+    nothingToCopyDetail: 'Es gibt noch kein Diktat mit Text.',
     retranscribed: 'Neu transkribiert',
     retranscribedDetail: 'Kopier den neuen Text aus dem Verlauf.',
     retranscriptionFailed: 'Neue Transkription fehlgeschlagen',

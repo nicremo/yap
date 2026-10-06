@@ -33,6 +33,7 @@ export function createDefaultSettings(): AppSettings {
     launchAtLogin: false,
     theme: 'system',
     uiLanguage: 'system',
+    copyLastShortcut: '',
     setupComplete: false,
     setupStep: 'welcome',
   };

@@ -9,7 +9,9 @@ const pipeline = vi.hoisted(() => ({
 }));
 const keyState = vi.hoisted(() => ({ set: true }));
 const rulesState = vi.hoisted(() => ({ rules: [] as AppRule[] }));
-const historyState = vi.hoisted(() => ({ entries: [] as Array<{ id: string; appName?: string; styleMode?: string; appRule?: string }> }));
+const historyState = vi.hoisted(() => ({
+  entries: [] as Array<{ id: string; appName?: string; styleMode?: string; appRule?: string; status?: string; finalText?: string }>,
+}));
 
 vi.mock('../../src/main/dictation/pipeline', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../src/main/dictation/pipeline')>()),
@@ -407,6 +409,26 @@ describe('DictationEngine', () => {
     bridge.getFocus = () => new Promise(() => undefined);
     await hold(1_200);
     await waitFor(() => pasted.length === 1, 2_000);
+  });
+
+  it('copies the newest dictation with text when the copy-last shortcut is pressed', async () => {
+    historyState.entries = [
+      { id: 'running', status: 'audio-only', finalText: '' },
+      { id: 'failed', status: 'transcription-failed', finalText: '' },
+      { id: 'last', status: 'success', finalText: 'Das letzte Diktat.' },
+      { id: 'older', status: 'success', finalText: 'Ein älteres.' },
+    ];
+
+    await engine.copyLastDictation();
+    expect(clipboard.readText()).toBe('Das letzte Diktat.');
+    expect(statuses.at(-1)).toMatchObject({ phase: 'done', title: 'Copied', delivery: 'copied', preview: 'Das letzte Diktat.' });
+  });
+
+  it('says so when there is nothing to copy yet', async () => {
+    historyState.entries = [];
+    await engine.copyLastDictation();
+    expect(clipboard.readText()).toBe('previous clipboard');
+    expect(statuses.at(-1)).toMatchObject({ phase: 'error', title: 'Nothing to copy' });
   });
 
   it('marks where the text went, so the pill can word it', async () => {

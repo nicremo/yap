@@ -515,6 +515,22 @@ export class DictationEngine {
     });
   }
 
+  /**
+   * The copy-last shortcut: the newest dictation that has text goes on the
+   * clipboard, whatever is running. One still being transcribed has no text
+   * yet, so the one before it is the last.
+   */
+  async copyLastDictation(): Promise<void> {
+    const { status } = t();
+    const entry = (await loadHistory()).find((candidate) => candidate.status === 'success' && candidate.finalText);
+    if (!entry) {
+      this.showResult({ phase: 'error', title: status.nothingToCopy, detail: status.nothingToCopyDetail });
+      return;
+    }
+    clipboard.writeText(entry.finalText);
+    this.showResult({ phase: 'done', title: status.copied, detail: status.lastCopied, preview: entry.finalText, delivery: 'copied' });
+  }
+
   /* ── History ───────────────────────────────────────────────────────── */
 
   private async persistRecording(

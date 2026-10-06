@@ -2331,3 +2331,28 @@ html.overlay-route #root {
     grid-template-columns: minmax(0, 1fr) 120px 104px auto;
   }
 }
+
+/* ── Copy-last shortcut ─────────────────────────────────────────────── */
+
+.hotkey-settings + .shortcut-setting {
+  border-top: 1px solid var(--border);
+}
+
+.shortcut-setting > .row {
+  padding-bottom: 0;
+}
+
+.shortcut-setting > .notice {
+  margin-top: var(--space-3);
+}
+
+.shortcut-control {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.row-text .row-text-problem {
+  color: var(--warning);
+}

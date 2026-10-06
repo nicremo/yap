@@ -35,6 +35,7 @@ import { createNativeBridge } from './native';
 import { KEYBOARD_SETTINGS_URL, PermissionsService, toFnKeyAction } from './permissions';
 import { getGroqApiKey, isGroqKeySet } from './secrets';
 import { applySettingsUpdate, chooseStorageDirectory, loadSettings, saveSettings, withGroqKey } from './settings';
+import { applyCopyLastShortcut, releaseShortcuts } from './shortcuts';
 import { ensureStorage } from './storage';
 import { disposeAutoUpdater, initializeAutoUpdater } from './updater';
 import { createMainWindow, createOverlayWindow, positionOverlayWindow, windowBackground } from './windows';
@@ -57,6 +58,7 @@ let tray: Tray | null = null;
 let isQuitting = false;
 let status: AppStatus = { phase: 'idle', title: 'Ready', detail: '' };
 let fnKeyAction: AppState['fnKeyAction'] = null;
+let copyLastShortcut: AppState['copyLastShortcut'] = 'off';
 let micPollTimer: ReturnType<typeof setInterval> | null = null;
 let audioCleanupTimer: ReturnType<typeof setInterval> | null = null;
 let modelCheckTimer: ReturnType<typeof setInterval> | null = null;
@@ -106,6 +108,7 @@ async function getState(): Promise<AppState> {
     history,
     status,
     fnKeyAction,
+    copyLastShortcut,
   };
 }
 
@@ -497,6 +500,7 @@ if (!app.isPackaged && process.env.YAP_E2E === '1') {
   (globalThis as { __yapE2E?: unknown }).__yapE2E = {
     hotkey: (type: 'down' | 'up') => engine.handleHotkey({ type }),
     ownTextFieldFocused,
+    copyLast: () => engine.copyLastDictation(),
   };
 }
 
@@ -521,6 +525,9 @@ async function updateSettings(updates: UpdateSettingsInput): Promise<AppState> {
   if (previous.uiLanguage !== settings.uiLanguage && applyLocale()) {
     broadcastLocale();
   }
+  if (previous.copyLastShortcut !== settings.copyLastShortcut) {
+    registerCopyLastShortcut();
+  }
   if (previous.storageDirectory !== settings.storageDirectory) {
     await ensureStorage(settings);
   }
@@ -538,6 +545,11 @@ async function updateSettings(updates: UpdateSettingsInput): Promise<AppState> {
   const state = await getState();
   patch({ settings: state.settings, engine: state.engine });
   return state;
+}
+
+function registerCopyLastShortcut(): void {
+  copyLastShortcut = applyCopyLastShortcut(settings.copyLastShortcut, () => void engine.copyLastDictation());
+  patch({ copyLastShortcut });
 }
 
 async function refreshFnKeyAction(): Promise<void> {
@@ -703,6 +715,7 @@ async function bootstrap(): Promise<void> {
   createAppMenu();
   await Promise.all([createMain(!startHidden), ensureOverlayWindow()]);
   createTray();
+  registerCopyLastShortcut();
 
   // Warm everything a first dictation would otherwise wait for: the cached
   // stores, the decrypted key (a keychain prompt belongs here, not mid
@@ -731,6 +744,7 @@ async function shutdown(): Promise<void> {
   audioCleanupTimer = null;
   modelCheckTimer = null;
   disposeAutoUpdater();
+  releaseShortcuts();
   bridge.dispose();
   await flushHistory().catch(() => undefined);
   await flushJsonWrites();

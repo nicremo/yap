@@ -151,6 +151,21 @@ describe('applySettingsUpdate', () => {
   });
 });
 
+describe('copyLastShortcut', () => {
+  it('is off until set, and can be switched off again', () => {
+    expect(migrateSettings({}, defaults).copyLastShortcut).toBe('');
+    const set = applySettingsUpdate(defaults, { copyLastShortcut: 'Control+Alt+Shift+Command+6' });
+    expect(set.copyLastShortcut).toBe('Control+Alt+Shift+Command+6');
+    expect(applySettingsUpdate(set, { copyLastShortcut: '' }).copyLastShortcut).toBe('');
+  });
+
+  it('keeps the old shortcut when an update is not a valid one', () => {
+    const set = applySettingsUpdate(defaults, { copyLastShortcut: 'Control+Alt+6' });
+    expect(applySettingsUpdate(set, { copyLastShortcut: 'Command+Q' }).copyLastShortcut).toBe('Control+Alt+6');
+    expect(migrateSettings({ copyLastShortcut: 'nonsense' }, defaults).copyLastShortcut).toBe('');
+  });
+});
+
 describe('uiLanguage', () => {
   it('follows the system until the user picks a language', () => {
     expect(migrateSettings({}, defaults).uiLanguage).toBe('system');
