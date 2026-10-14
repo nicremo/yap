@@ -6,9 +6,78 @@
     <meta name="color-scheme" content="light dark" />
     <link rel="icon" type="image/png" href="/src/renderer/logo.png" />
     <title>Yap</title>
+    <style>
+      /* Inline so the splash paints in the first frame, before any bundle loads. */
+      .splash {
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        display: grid;
+        place-items: center;
+        background: #faf9f5;
+        color: #17181c;
+        font-family: 'Iowan Old Style', Georgia, serif;
+        -webkit-app-region: drag;
+        transition: opacity 320ms cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .splash-inner {
+        display: grid;
+        justify-items: center;
+        gap: 14px;
+        animation: splash-in 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+      }
+      .splash img {
+        width: 88px;
+        height: 88px;
+      }
+      .splash h1 {
+        margin: 0;
+        font-size: 34px;
+        font-weight: 400;
+        letter-spacing: -0.01em;
+      }
+      .splash-done {
+        opacity: 0;
+        pointer-events: none;
+      }
+      /* The overlay window loads this page too. main.tsx marks it before the
+         window is ever shown, and the CSP allows no inline script to do it sooner. */
+      .overlay-route .splash {
+        display: none;
+      }
+      @keyframes splash-in {
+        from {
+          opacity: 0;
+          transform: translateY(6px) scale(0.96);
+        }
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme='light']) .splash {
+          background: #1a1b20;
+          color: #eceef2;
+        }
+      }
+      :root[data-theme='dark'] .splash {
+        background: #1a1b20;
+        color: #eceef2;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .splash,
+        .splash-inner {
+          animation: none;
+          transition: none;
+        }
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
+    <div class="splash" id="splash" aria-hidden="true">
+      <div class="splash-inner">
+        <img src="/src/renderer/logo.png" alt="" />
+        <h1>Yap</h1>
+      </div>
+    </div>
     <script type="module" src="/src/renderer/main.tsx"></script>
   </body>
 </html>
