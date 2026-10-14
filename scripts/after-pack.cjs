@@ -61,6 +61,21 @@ function findLooseBinaries(directory) {
   return found;
 }
 
+/** Nested .app and .framework bundles, deepest first, so each is sealed after its contents. */
+function findNestedBundles(directory) {
+  const found = [];
+  const walk = (current, depth) => {
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      if (entry.isSymbolicLink() || !entry.isDirectory()) continue;
+      const full = path.join(current, entry.name);
+      walk(full, depth + 1);
+      if (/\.(app|framework)$/.test(entry.name)) found.push({ full, depth });
+    }
+  };
+  walk(directory, 0);
+  return found.sort((a, b) => b.depth - a.depth).map((bundle) => bundle.full);
+}
+
 function codesign(target, identity, entitlements, extra = []) {
   execFileSync(
     'codesign',
@@ -94,8 +109,18 @@ exports.default = async function afterPack(context) {
   console.log(`[afterPack] signing with ${identity.name === '-' ? 'an ad-hoc signature' : `"${identity.name}"`}`);
 
   // Inside out: loose binaries first, then the bundles that contain them.
-  for (const binary of findLooseBinaries(path.join(appPath, 'Contents', 'Resources'))) {
+  // --deep does not reach the Electron Framework libraries (libffmpeg, libEGL, ...)
+  // or Squirrel's ShipIt, and Apple rejects the app when they lack a Developer ID
+  // signature, a secure timestamp or the hardened runtime.
+  const contents = path.join(appPath, 'Contents');
+  const depth = (file) => file.split(path.sep).length;
+  const binaries = [...findLooseBinaries(path.join(contents, 'Frameworks')), ...findLooseBinaries(path.join(contents, 'Resources'))];
+  // Deepest first: a framework's main binary is checked against its Helpers.
+  for (const binary of binaries.sort((a, b) => depth(b) - depth(a))) {
     codesign(binary, identity, entitlements);
+  }
+  for (const bundle of findNestedBundles(path.join(contents, 'Frameworks'))) {
+    codesign(bundle, identity, entitlements);
   }
   codesign(appPath, identity, entitlements, ['--deep']);
   execFileSync('codesign', ['--verify', '--deep', '--strict', '--verbose=2', appPath], { stdio: 'inherit' });
