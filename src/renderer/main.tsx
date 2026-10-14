@@ -30,6 +30,30 @@ async function mount(): Promise<void> {
       </I18nProvider>
     </StrictMode>,
   );
+  dismissSplash();
+}
+
+/** Minimum time the splash stays up, so it reads as a launch screen instead of a flicker. */
+const SPLASH_MIN_MS = 700;
+
+/* The splash in index.html covers the gap between the window appearing and
+   the app's first render. It fades out once React has painted. */
+function dismissSplash(): void {
+  const splash = document.getElementById('splash');
+  if (!splash) return;
+  if (isOverlay) {
+    splash.remove();
+    return;
+  }
+  const wait = Math.max(0, SPLASH_MIN_MS - performance.now());
+  window.setTimeout(() => {
+    requestAnimationFrame(() => {
+      splash.classList.add('splash-done');
+      splash.addEventListener('transitionend', () => splash.remove(), { once: true });
+      // Reduced motion has no transition, so transitionend never fires.
+      window.setTimeout(() => splash.remove(), 400);
+    });
+  }, wait);
 }
 
 void mount();
