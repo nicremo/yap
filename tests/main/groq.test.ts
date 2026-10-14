@@ -218,3 +218,41 @@ describe('validateGroqKey', () => {
     expect(calls).toHaveLength(0);
   });
 });
+
+describe('network fallback', () => {
+  it('retries a network failure on the fallback transport, not the same stack', async () => {
+    const primary: string[] = [];
+    const fallback: string[] = [];
+    setGroqTransport(
+      async (url) => {
+        primary.push(url);
+        throw new Error('net::ERR_ADDRESS_UNREACHABLE');
+      },
+      async (url) => {
+        fallback.push(url);
+        return new Response('hallo welt', { status: 200 });
+      },
+    );
+
+    const text = await transcribeWithGroq({ apiKey: 'k', audio: new Uint8Array([1]), format: 'wav', model: 'whisper-large-v3' });
+
+    expect(text).toBe('hallo welt');
+    expect(primary).toHaveLength(1);
+    expect(fallback).toHaveLength(1);
+  });
+
+  it('reports the failure when the fallback is unreachable too', async () => {
+    setGroqTransport(
+      async () => {
+        throw new Error('net::ERR_ADDRESS_UNREACHABLE');
+      },
+      async () => {
+        throw new Error('fetch failed');
+      },
+    );
+
+    await expect(
+      transcribeWithGroq({ apiKey: 'k', audio: new Uint8Array([1]), format: 'wav', model: 'whisper-large-v3' }),
+    ).rejects.toMatchObject({ kind: 'network' });
+  });
+});

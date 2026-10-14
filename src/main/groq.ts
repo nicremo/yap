@@ -16,9 +16,17 @@ export const GROQ_ORIGIN = new URL(API_BASE).origin;
 type FetchLike = (url: string, init: RequestInit) => Promise<Response>;
 let fetchImpl: FetchLike = (url, init) => net.fetch(url, init);
 
-/** Test seam: swaps the transport. */
-export function setGroqTransport(transport: FetchLike): void {
+/* Node's own stack (undici) for the retry after a network failure. Chromium can
+   keep stale network state after the Mac changes networks, for example an IPv6
+   path that a VPN interface advertises but the current network does not route,
+   and then fails every request with ERR_ADDRESS_UNREACHABLE until Yap restarts.
+   Node resolves fresh through the system and races IPv4 against IPv6. */
+let fallbackFetchImpl: FetchLike = (url, init) => globalThis.fetch(url, init);
+
+/** Test seam: swaps the transport, and the fallback transport unless one is given. */
+export function setGroqTransport(transport: FetchLike, fallback: FetchLike = transport): void {
   fetchImpl = transport;
+  fallbackFetchImpl = fallback;
 }
 
 export type GroqErrorKind = 'auth' | 'rate-limit' | 'network' | 'timeout' | 'server' | 'request';
@@ -137,10 +145,11 @@ interface TimedRequest {
   init: RequestInit;
   timeoutMs: number;
   signal?: AbortSignal;
+  transport?: FetchLike;
 }
 
 /** Performs one request and returns the body, mapping every failure onto a GroqError. */
-async function requestOnce({ path, apiKey, init, timeoutMs, signal }: TimedRequest): Promise<string> {
+async function requestOnce({ path, apiKey, init, timeoutMs, signal, transport }: TimedRequest): Promise<string> {
   const controller = new AbortController();
   let timedOut = false;
   const timer = setTimeout(() => {
@@ -151,7 +160,7 @@ async function requestOnce({ path, apiKey, init, timeoutMs, signal }: TimedReque
   signal?.addEventListener('abort', forwardAbort, { once: true });
 
   try {
-    const response = await fetchImpl(`${API_BASE}${path}`, {
+    const response = await (transport ?? fetchImpl)(`${API_BASE}${path}`, {
       ...init,
       headers: { ...(init.headers as Record<string, string> | undefined), Authorization: `Bearer ${apiKey}` },
       signal: controller.signal,
@@ -178,13 +187,21 @@ async function requestOnce({ path, apiKey, init, timeoutMs, signal }: TimedReque
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-/** One retry for transient failures. A dictation is worth a second attempt, not a third. */
-async function requestWithRetry(request: () => Promise<string>): Promise<string> {
+/**
+ * One retry for transient failures. A dictation is worth a second attempt, not a third.
+ * After a network failure the retry uses the fallback transport, because the
+ * same stack would fail the same way.
+ */
+async function requestWithRetry(request: (transport?: FetchLike) => Promise<string>): Promise<string> {
   try {
     return await request();
   } catch (error) {
     if (!(error instanceof GroqError)) throw error;
 
+    if (error.kind === 'network') {
+      console.warn('[yap] Groq network error, retrying on the fallback transport:', error.message);
+      return request(fallbackFetchImpl);
+    }
     if (error.retryable) {
       await sleep(200);
       return request();
@@ -223,13 +240,14 @@ export async function transcribeWithGroq(request: TranscriptionRequest): Promise
   // Base allowance plus time for slow uplinks on long recordings.
   const timeoutMs = 15_000 + Math.ceil(request.audio.byteLength / 100_000) * 1_000;
 
-  const body = await requestWithRetry(() =>
+  const body = await requestWithRetry((transport) =>
     requestOnce({
       path: '/audio/transcriptions',
       apiKey: request.apiKey,
       init: { method: 'POST', body: buildTranscriptionForm(request) },
       timeoutMs,
       signal: request.signal,
+      transport,
     }),
   );
 
@@ -266,7 +284,7 @@ export function buildChatBody(request: Omit<ChatRequest, 'apiKey' | 'signal' | '
 }
 
 export async function chatWithGroq(request: ChatRequest): Promise<ChatResult> {
-  const body = await requestWithRetry(() =>
+  const body = await requestWithRetry((transport) =>
     requestOnce({
       path: '/chat/completions',
       apiKey: request.apiKey,
@@ -277,6 +295,7 @@ export async function chatWithGroq(request: ChatRequest): Promise<ChatResult> {
       },
       timeoutMs: request.timeoutMs ?? 10_000,
       signal: request.signal,
+      transport,
     }),
   );
 
