@@ -42,6 +42,13 @@ function bool(value: unknown, fallback: boolean): boolean {
   return typeof value === 'boolean' ? value : fallback;
 }
 
+/** Device ids and names are short; anything longer did not come from the system. */
+const MAX_DEVICE_TEXT = 512;
+
+function text(value: unknown, maxLength: number): string {
+  return typeof value === 'string' && value.length <= maxLength ? value : '';
+}
+
 function isHotkey(value: unknown): value is HotkeyConfig {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as Record<string, unknown>;
@@ -149,6 +156,8 @@ export function migrateSettings(raw: unknown, defaults: AppSettings): AppSetting
       source.copyLastShortcut === '' || isValidAccelerator(source.copyLastShortcut)
         ? source.copyLastShortcut
         : defaults.copyLastShortcut,
+    microphoneId: text(source.microphoneId, MAX_DEVICE_TEXT),
+    microphoneLabel: text(source.microphoneLabel, MAX_DEVICE_TEXT),
     setupComplete: bool(source.setupComplete, defaults.setupComplete),
     setupStep: pick(source.setupStep, SETUP_STEPS, defaults.setupStep),
   };

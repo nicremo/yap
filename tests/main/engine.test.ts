@@ -181,7 +181,7 @@ describe('DictationEngine', () => {
   it('opens the microphone on the first press and asks for Opus in cloud mode', async () => {
     engine.handleHotkey({ type: 'down' });
     await flush();
-    expect(commands).toEqual([{ type: 'start', sessionId: 1, encodeOpus: true }]);
+    expect(commands).toEqual([{ type: 'start', sessionId: 1, encodeOpus: true, microphone: null }]);
     expect(statuses.at(-1)?.phase).toBe('listening');
   });
 

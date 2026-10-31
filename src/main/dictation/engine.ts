@@ -231,7 +231,12 @@ export class DictationEngine {
       this.handleRecorderEvent({ type: 'failed', sessionId: id, message: t().status.recorderUnavailable });
       return;
     }
-    recorder.send('recorder:command', { type: 'start', sessionId: id, encodeOpus: settings.transcriptionMode === 'cloud' });
+    recorder.send('recorder:command', {
+      type: 'start',
+      sessionId: id,
+      encodeOpus: settings.transcriptionMode === 'cloud',
+      microphone: settings.microphoneId ? { deviceId: settings.microphoneId, label: settings.microphoneLabel } : null,
+    });
   }
 
   private async cancelSession(): Promise<void> {

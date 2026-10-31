@@ -1,4 +1,6 @@
 import { en, type Messages } from '../../shared/i18n/en';
+import type { MicrophonePreference } from '../../shared/types';
+import { chooseMicrophone, IS_MAC, listMicrophones, onDevicesChanged, type MicrophoneChoice, type MicrophoneDevice } from './devices';
 import { encodeWav, mergeChunks, peakWindowRms, resample, TARGET_SAMPLE_RATE } from './wav';
 
 /* Runs on the audio thread. Collects samples into small blocks and hands
@@ -60,37 +62,35 @@ function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T
   return Promise.race([promise, sleep(ms).then(() => fallback)]);
 }
 
-let builtInMicrophoneId: string | null | undefined;
+let cachedMicrophones: MicrophoneDevice[] | undefined;
 
-/* MacBooks get their built-in microphone even when headphones are connected:
-   recording through AirPods switches them to the low-quality headset profile
-   for everything else that is playing. */
-async function findBuiltInMicrophone(): Promise<string | null> {
-  if (builtInMicrophoneId !== undefined) return builtInMicrophoneId;
-  try {
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    const builtIn = devices.find(
-      (device) =>
-        device.kind === 'audioinput' &&
-        /macbook|built-in|integriert/i.test(device.label),
-    );
-    // Labels are empty before the first permission grant; do not cache that.
-    if (devices.some((device) => device.label)) {
-      builtInMicrophoneId = builtIn?.deviceId ?? null;
-    }
-    return builtIn?.deviceId ?? null;
-  } catch {
-    return null;
-  }
+async function knownMicrophones(): Promise<MicrophoneDevice[]> {
+  if (cachedMicrophones) return cachedMicrophones;
+  const microphones = await listMicrophones();
+  // Labels are empty before the first permission grant; do not cache that.
+  if (microphones.some((device) => device.label)) cachedMicrophones = microphones;
+  return microphones;
 }
 
 if (typeof navigator !== 'undefined' && navigator.mediaDevices) {
-  navigator.mediaDevices.addEventListener?.('devicechange', () => {
-    builtInMicrophoneId = undefined;
+  onDevicesChanged(() => {
+    cachedMicrophones = undefined;
   });
 }
 
-async function openMicrophone(deviceId: string | null): Promise<MediaStream> {
+/** The device id to open, or null for the system default. */
+export async function resolveMicrophone(preference: MicrophonePreference | null): Promise<string | null> {
+  let choice: MicrophoneChoice;
+  try {
+    choice = chooseMicrophone(await knownMicrophones(), preference, IS_MAC);
+  } catch {
+    return null;
+  }
+  if (choice.kind === 'none') throw new DOMException(en.microphone.notFound, 'NotFoundError');
+  return choice.kind === 'device' ? choice.device.deviceId : null;
+}
+
+export async function openMicrophone(deviceId: string | null): Promise<MediaStream> {
   const constraints = (id: string | null): MediaStreamConstraints => ({
     audio: {
       channelCount: 1,
@@ -107,7 +107,7 @@ async function openMicrophone(deviceId: string | null): Promise<MediaStream> {
     const name = error instanceof DOMException ? error.name : '';
     // The preferred device went away (unplugged, renamed): use the default one.
     if (deviceId && (name === 'OverconstrainedError' || name === 'NotFoundError' || name === 'NotReadableError')) {
-      builtInMicrophoneId = undefined;
+      cachedMicrophones = undefined;
       return navigator.mediaDevices.getUserMedia(constraints(null));
     }
     throw error;
@@ -166,11 +166,11 @@ export class AudioRecorder {
   private lastLevelAt = 0;
 
   /** A recorder records once; every dictation gets a new instance. */
-  start(encodeOpus: boolean): Promise<void> {
+  start(encodeOpus: boolean, microphone: MicrophonePreference | null = null): Promise<void> {
     if (this.released) {
       return Promise.reject(new Error('This recorder has already been used.'));
     }
-    this.starting ??= this.open(encodeOpus);
+    this.starting ??= this.open(encodeOpus, microphone);
     return this.starting;
   }
 
@@ -183,7 +183,7 @@ export class AudioRecorder {
     }
   }
 
-  private async open(encodeOpus: boolean): Promise<void> {
+  private async open(encodeOpus: boolean, microphone: MicrophonePreference | null): Promise<void> {
     const openedAt = performance.now();
     const context = this.createContext();
     this.context = context;
@@ -192,7 +192,7 @@ export class AudioRecorder {
     try {
       // Device lookup, module load and the microphone open all overlap.
       const moduleLoaded = context.audioWorklet.addModule(getWorkletUrl());
-      const stream = await openMicrophone(await findBuiltInMicrophone());
+      const stream = await openMicrophone(await resolveMicrophone(microphone));
       this.stream = stream;
       await moduleLoaded;
 

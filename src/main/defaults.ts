@@ -34,6 +34,8 @@ export function createDefaultSettings(): AppSettings {
     theme: 'system',
     uiLanguage: 'system',
     copyLastShortcut: '',
+    microphoneId: '',
+    microphoneLabel: '',
     setupComplete: false,
     setupStep: 'welcome',
   };

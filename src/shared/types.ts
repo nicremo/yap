@@ -70,6 +70,10 @@ export interface AppSettings {
   uiLanguage: UiLanguage;
   /** Electron accelerator that copies the last dictation from anywhere; empty when off. */
   copyLastShortcut: string;
+  /** The chosen input device; empty picks one automatically. */
+  microphoneId: string;
+  /** Its name when chosen, so it is found again after a replug gave it a new id. */
+  microphoneLabel: string;
   setupComplete: boolean;
   /** Where the setup wizard resumes, e.g. after macOS restarted Yap for a permission. */
   setupStep: SetupStep;
@@ -216,8 +220,14 @@ export interface KeyValidationResult {
 
 /* ── Recorder protocol between main and the overlay window ──────────────── */
 
+/** The microphone the user picked; null records from the automatic choice. */
+export interface MicrophonePreference {
+  deviceId: string;
+  label: string;
+}
+
 export type RecorderCommand =
-  | { type: 'start'; sessionId: number; encodeOpus: boolean }
+  | { type: 'start'; sessionId: number; encodeOpus: boolean; microphone: MicrophonePreference | null }
   | { type: 'stop'; sessionId: number }
   | { type: 'cancel'; sessionId: number };
 
