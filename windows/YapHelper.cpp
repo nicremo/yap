@@ -187,12 +187,168 @@ static void cmdPaste(const char* bundleId, const char* pidStr) {
 
 static WORD targetVk = 0;
 
+// A typing key (Space, a letter, F5) must still type when it is only tapped,
+// so the helper decides what a press is before anything reaches the app:
+//
+//   hold             longer than HOLD_MS: dictation until the release
+//   double tap       hands-free dictation; the next press stops it
+//   single tap       replayed as the keystroke it was, once the double-tap
+//                    window has passed or the next key goes down
+//
+// Modifier keys type nothing, so they start dictation at once and the app
+// tells taps from holds (gesture.ts).
+static const UINT HOLD_MS = 250;
+// Matches DOUBLE_TAP_WINDOW_MS in gesture.ts.
+static const UINT DOUBLE_TAP_MS = 350;
+// The recording limit in engine.ts. A hands-free session the app ended on its
+// own is forgotten after it, so the key types again.
+static const ULONGLONG HANDSFREE_MAX_MS = 10ULL * 60 * 1000;
+// Marks the keystrokes the helper replays, so the hook lets them through.
+static const ULONG_PTR YAP_INJECTED = 0x59415021;
+
+enum TypingState {
+    TS_IDLE,
+    TS_PRESSED,         // down, hold or tap not decided yet
+    TS_HOLDING,         // held: dictating until the release
+    TS_TAPPED,          // tapped once, waiting for a second tap
+    TS_LATCHING,        // second tap still down: hands-free has started
+    TS_HANDSFREE,       // dictating hands-free, key up
+    TS_STOPPING,        // the press that stops hands-free, still down
+};
+
+static bool typingKey = false;
+static TypingState typingState = TS_IDLE;
+// The real release of a press already replayed as a tap.
+static bool swallowUp = false;
+static ULONGLONG handsfreeSince = 0;
+static UINT_PTR typingTimer = 0;
+
+static void stopTypingTimer() {
+    if (typingTimer) KillTimer(NULL, typingTimer);
+    typingTimer = 0;
+}
+
+static void fillKey(INPUT* input, WORD vk, WORD scan, DWORD flags) {
+    input->type = INPUT_KEYBOARD;
+    input->ki.wVk = vk;
+    input->ki.wScan = scan;
+    input->ki.dwFlags = flags;
+    input->ki.dwExtraInfo = YAP_INJECTED;
+}
+
+/* The held-back press was a tap: type it now. A key that arrived while it was
+   held back comes after it, so fast typing keeps its order ("a b", not "ab "). */
+static void replayTap(const KBDLLHOOKSTRUCT* next) {
+    stopTypingTimer();
+    typingState = TS_IDLE;
+    INPUT inputs[3] = {};
+    UINT count = 0;
+    fillKey(&inputs[count++], targetVk, 0, 0);
+    fillKey(&inputs[count++], targetVk, 0, KEYEVENTF_KEYUP);
+    if (next) {
+        DWORD flags = (next->flags & LLKHF_EXTENDED) ? KEYEVENTF_EXTENDEDKEY : 0;
+        fillKey(&inputs[count++], (WORD)next->vkCode, (WORD)next->scanCode, flags);
+    }
+    SendInput(count, inputs, sizeof(INPUT));
+}
+
+static void CALLBACK typingTimerElapsed(HWND, UINT, UINT_PTR, DWORD) {
+    stopTypingTimer();
+    if (typingState == TS_PRESSED) {
+        typingState = TS_HOLDING;
+        emitEvent("fnDown");
+    } else if (typingState == TS_TAPPED) {
+        replayTap(NULL);
+    }
+}
+
+/* Returns true when the event is swallowed. */
+static bool handleTypingKey(const KBDLLHOOKSTRUCT* kb, bool isKeyDown, bool isKeyUp) {
+    if (kb->vkCode != targetVk) {
+        if (!isKeyDown) return false;
+        // Another key while a press is held back: that press was a tap.
+        if (typingState == TS_PRESSED) {
+            replayTap(kb);
+            swallowUp = true;
+            return true;
+        }
+        if (typingState == TS_TAPPED) {
+            replayTap(kb);
+            return true;
+        }
+        return false;
+    }
+
+    if (typingState == TS_HANDSFREE && GetTickCount64() - handsfreeSince > HANDSFREE_MAX_MS)
+        typingState = TS_IDLE;
+
+    if (isKeyDown) {
+        switch (typingState) {
+        case TS_IDLE:
+            if (targetModifiers != 0 && !abstractModifiersHeld(targetModifiers)) return false;
+            typingState = TS_PRESSED;
+            swallowUp = false;
+            typingTimer = SetTimer(NULL, 0, HOLD_MS, typingTimerElapsed);
+            return true;
+        case TS_TAPPED:
+            // Replayed for the app as the double tap it understands.
+            stopTypingTimer();
+            typingState = TS_LATCHING;
+            emitEvent("fnDown");
+            emitEvent("fnUp");
+            emitEvent("fnDown");
+            return true;
+        case TS_HANDSFREE:
+            typingState = TS_STOPPING;
+            emitEvent("fnDown");
+            return true;
+        default:
+            // Auto-repeat while a press is held back or dictating types nothing.
+            return true;
+        }
+    }
+
+    if (isKeyUp) {
+        switch (typingState) {
+        case TS_PRESSED:
+            stopTypingTimer();
+            typingState = TS_TAPPED;
+            typingTimer = SetTimer(NULL, 0, DOUBLE_TAP_MS, typingTimerElapsed);
+            return true;
+        case TS_HOLDING:
+        case TS_STOPPING:
+            typingState = TS_IDLE;
+            emitEvent("fnUp");
+            return true;
+        case TS_LATCHING:
+            typingState = TS_HANDSFREE;
+            handsfreeSince = GetTickCount64();
+            emitEvent("fnUp");
+            return true;
+        default:
+            if (swallowUp) {
+                swallowUp = false;
+                return true;
+            }
+            return false;
+        }
+    }
+    return false;
+}
+
 static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
     if (nCode != HC_ACTION) return CallNextHookEx(NULL, nCode, wParam, lParam);
 
     KBDLLHOOKSTRUCT* kb = (KBDLLHOOKSTRUCT*)lParam;
     bool isKeyDown = (wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN);
     bool isKeyUp   = (wParam == WM_KEYUP   || wParam == WM_SYSKEYUP);
+
+    if (kb->dwExtraInfo == YAP_INJECTED) return CallNextHookEx(NULL, nCode, wParam, lParam);
+
+    if (typingKey) {
+        if (handleTypingKey(kb, isKeyDown, isKeyUp)) return 1;
+        return CallNextHookEx(NULL, nCode, wParam, lParam);
+    }
 
     if (kb->vkCode != targetVk) return CallNextHookEx(NULL, nCode, wParam, lParam);
 
@@ -223,6 +379,7 @@ static int cmdListen(int keyCode, int modifiers) {
         emitError("Unsupported key code for Windows.");
         return 1;
     }
+    typingKey = !isModifierKey(keyCode);
 
     HHOOK hook = SetWindowsHookExW(WH_KEYBOARD_LL, LowLevelKeyboardProc, NULL, 0);
     if (!hook) {
