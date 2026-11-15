@@ -42,7 +42,7 @@ function useRecorderHost(onLevel: (level: number) => void, t: Messages): void {
         recorder.onLevel = (level) => {
           if (latestSession === sessionId) levelRef.current(level);
         };
-        recorder.start(command.encodeOpus).then(
+        recorder.start(command.encodeOpus, command.microphoneDeviceId).then(
           () => window.yap.sendRecorderEvent({ type: 'started', sessionId }),
           (error: unknown) => {
             recorders.delete(sessionId);

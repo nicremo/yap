@@ -29,6 +29,7 @@ export function createDefaultSettings(): AppSettings {
     hotkey: process.platform === 'win32' ? DEFAULT_HOTKEY_WINDOWS : DEFAULT_HOTKEY,
     autoPaste: true,
     copyToClipboard: false,
+    microphoneDeviceId: null,
     showOverlay: true,
     launchAtLogin: false,
     theme: 'system',

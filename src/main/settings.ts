@@ -140,6 +140,9 @@ export function migrateSettings(raw: unknown, defaults: AppSettings): AppSetting
       : defaults.hotkey,
     autoPaste: bool(source.autoPaste, defaults.autoPaste),
     copyToClipboard: bool(source.copyToClipboard, defaults.copyToClipboard),
+    microphoneDeviceId: typeof source.microphoneDeviceId === 'string' && source.microphoneDeviceId.trim()
+      ? source.microphoneDeviceId
+      : null,
     showOverlay: bool(source.showOverlay, defaults.showOverlay),
     launchAtLogin: bool(source.launchAtLogin, defaults.launchAtLogin),
     theme: pick(source.theme, THEMES, defaults.theme),

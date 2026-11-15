@@ -153,11 +153,11 @@ describe('wav helpers', () => {
 describe('AudioRecorder', () => {
   it('records 16 kHz audio, encodes WAV and Opus and releases the microphone', async () => {
     const recorder = new AudioRecorder();
-    await recorder.start(true);
+    await recorder.start(true, 'usb-mic');
 
     expect(FakeAudioContext.instances[0].sampleRate).toBe(16_000);
     expect(getUserMedia).toHaveBeenCalledWith({
-      audio: expect.objectContaining({ deviceId: { exact: 'built-in' }, echoCancellation: true }),
+      audio: expect.objectContaining({ deviceId: { exact: 'usb-mic' }, echoCancellation: true }),
     });
 
     feed(0.25);
@@ -171,9 +171,11 @@ describe('AudioRecorder', () => {
     expect(FakeAudioContext.instances[0].closeCalls).toBe(1);
   });
 
-  it('skips the Opus encoder when it was not asked for', async () => {
+  it('uses the system microphone and skips Opus when disabled', async () => {
     const recorder = new AudioRecorder();
     await recorder.start(false);
+    expect(getUserMedia.mock.calls[0][0].audio).not.toHaveProperty('deviceId');
+    expect(navigator.mediaDevices.enumerateDevices).not.toHaveBeenCalled();
     feed(0.1);
     expect((await recorder.stop()).opus).toBeNull();
   });
@@ -230,12 +232,12 @@ describe('AudioRecorder', () => {
     expect(getUserMedia).toHaveBeenCalledTimes(1);
   });
 
-  it('falls back to the default microphone when the built-in one is gone', async () => {
+  it('falls back to the default microphone when the selected one is gone', async () => {
     getUserMedia.mockImplementationOnce(async () => {
       throw new DOMException('gone', 'OverconstrainedError');
     });
     const recorder = new AudioRecorder();
-    await recorder.start(false);
+    await recorder.start(false, 'usb-mic');
 
     expect(getUserMedia).toHaveBeenCalledTimes(2);
     expect(getUserMedia.mock.calls[1][0]).toEqual({ audio: expect.not.objectContaining({ deviceId: expect.anything() }) });
