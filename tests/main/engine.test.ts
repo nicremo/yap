@@ -181,8 +181,17 @@ describe('DictationEngine', () => {
   it('opens the microphone on the first press and asks for Opus in cloud mode', async () => {
     engine.handleHotkey({ type: 'down' });
     await flush();
-    expect(commands).toEqual([{ type: 'start', sessionId: 1, encodeOpus: true }]);
+    expect(commands).toEqual([{ type: 'start', sessionId: 1, encodeOpus: true, microphoneDeviceId: null }]);
     expect(statuses.at(-1)?.phase).toBe('listening');
+  });
+
+  it('passes the selected microphone to the recorder', async () => {
+    settings.microphoneDeviceId = 'usb-microphone';
+    engine.handleHotkey({ type: 'down' });
+    await flush();
+    expect(commands).toEqual([
+      { type: 'start', sessionId: 1, encodeOpus: true, microphoneDeviceId: 'usb-microphone' },
+    ]);
   });
 
   it('pastes the polished text and restores the clipboard when copying is off', async () => {

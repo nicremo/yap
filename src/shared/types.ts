@@ -63,6 +63,7 @@ export interface AppSettings {
   hotkey: HotkeyConfig;
   autoPaste: boolean;
   copyToClipboard: boolean;
+  microphoneDeviceId: string | null;
   showOverlay: boolean;
   launchAtLogin: boolean;
   theme: ThemePreference;
@@ -217,7 +218,7 @@ export interface KeyValidationResult {
 /* ── Recorder protocol between main and the overlay window ──────────────── */
 
 export type RecorderCommand =
-  | { type: 'start'; sessionId: number; encodeOpus: boolean }
+  | { type: 'start'; sessionId: number; encodeOpus: boolean; microphoneDeviceId: string | null }
   | { type: 'stop'; sessionId: number }
   | { type: 'cancel'; sessionId: number };
 

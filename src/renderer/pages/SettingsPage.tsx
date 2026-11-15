@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { LOCALE_NAMES, LOCALES, type UiLanguage } from '../../shared/i18n';
 import type { AppState, ThemePreference, UpdateSettingsInput } from '../../shared/types';
 import { HotkeySettings } from '../components/HotkeyRecorder';
+import { MicrophoneSettings } from '../components/MicrophoneSettings';
 import { PermissionList } from '../components/PermissionList';
 import { CopyLastShortcut } from '../components/ShortcutRecorder';
 import { themeOptions } from '../components/ThemeToggle';
@@ -58,6 +59,12 @@ export function SettingsPage({ state, onState }: { state: AppState; onState: (ne
           />
         </div>
       </Card>
+
+      <MicrophoneSettings
+        deviceId={settings.microphoneDeviceId}
+        saving={busy === 'settings'}
+        onChange={(microphoneDeviceId) => void update({ microphoneDeviceId })}
+      />
 
       <Card title={t.settings.shortcut}>
         <HotkeySettings state={state} onSave={(hotkey) => void update({ hotkey })} />
